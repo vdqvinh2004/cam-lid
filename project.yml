@@ -1,0 +1,55 @@
+name: CamLid
+options:
+  bundleIdPrefix: com.camlid
+  deploymentTarget:
+    macOS: "14.0"
+packages:
+  CamLidCore:
+    path: Packages/CamLidCore
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
+targets:
+  CamLid:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - CamLidApp/AppMain.swift
+    dependencies:
+      - package: CamLidCore
+        product: CamLidApp
+      - package: Sparkle
+        product: Sparkle
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.camlid.CamLid
+      INFOPLIST_FILE: CamLidApp/Info.plist
+      CODE_SIGNING_ALLOWED: NO
+      SWIFT_VERSION: 6.0
+      SWIFT_ENABLE_EXPLICIT_MODULES: NO
+      MARKETING_VERSION: 0.1.0
+      CURRENT_PROJECT_VERSION: 1
+  camlid-tool:
+    type: tool
+    platform: macOS
+    deploymentTarget: "14.0"
+    productName: camlid
+    sources:
+      - Packages/CamLidCore/Sources/camlid/main.swift
+    dependencies:
+      - package: CamLidCore
+        product: CamLidCLI
+    settings:
+      PRODUCT_NAME: camlid
+      CODE_SIGNING_ALLOWED: NO
+      SWIFT_VERSION: 6.0
+schemes:
+  CamLid:
+    build:
+      targets:
+        CamLid: all
+        camlid-tool: all
+    run:
+      config: Debug
+    test:
+      config: Debug

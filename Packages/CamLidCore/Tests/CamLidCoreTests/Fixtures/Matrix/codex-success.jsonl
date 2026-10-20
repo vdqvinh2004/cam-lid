@@ -1,0 +1,6 @@
+{"type":"thread.started","thread_id":"01a10873-0746-7011-acf9-ad852b5204d8"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc 'echo MATRIX-OK-1'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc 'echo MATRIX-OK-1'","aggregated_output":"MATRIX-OK-1\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"MATRIX-OK-1"}}
+{"type":"turn.completed","usage":{"input_tokens":38017,"cached_input_tokens":29184,"cache_write_input_tokens":0,"output_tokens":47,"reasoning_output_tokens":0}}

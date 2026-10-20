@@ -1,0 +1,115 @@
+import Testing
+import AppKit
+import CamLidCore
+@testable import CamLidApp
+struct AgentBadgeTests {
+    @Test func orcaExplanationSeparatesReceiptAgeFromStateFreshness() throws {
+        let task = try AgentTask(id: "orca/pane", sessionID: "outside", runID: "pane",
+            state: .working, evidenceKind: .lifecycle, confidence: .inferred)
+        let active = AgentBadgeState(provider: "orca", enabled: true, tasks: [task], evidenceAgeSeconds: 3)
+        #expect(active.workingCount == 1 && active.observedState == "Active")
+        #expect(active.observationExplanation.contains("Reported confidence: inferred"))
+        #expect(active.observationExplanation.contains("source receipt") && active.observationExplanation.contains("not task-state age"))
+        #expect(active.observationExplanation.contains("freshness is unverified") && active.observationExplanation.contains("does not prove all jobs"))
+        for rows in [[], [try row("idle", .idle)]] {
+            let inactive = AgentBadgeState(provider: "orca", enabled: true, tasks: rows, evidenceAgeSeconds: 0, cliDetected: true)
+            #expect(inactive.installationText == "CLI detected" && inactive.workingCount == 0)
+            #expect(inactive.observationExplanation.contains("freshness is unverified") && inactive.observationExplanation.contains("does not prove all jobs"))
+        }
+    }
+    @Test func receiptExplanationRejectsInvalidAgesAndBoundsOldAgeText() {
+        for age in [Double.nan, .infinity, -.infinity, -1] {
+            let state = AgentBadgeState(provider: "orca", enabled: true, tasks: [], evidenceAgeSeconds: age)
+            #expect(state.observationExplanation.contains("receipt age unavailable"))
+        }
+        let old = AgentBadgeState(provider: "orca", enabled: true, tasks: [], evidenceAgeSeconds: .greatestFiniteMagnitude)
+        #expect(old.observationExplanation.contains("at least 1 hr ago"))
+    }
+    @Test func processExplanationNeverPromotesInstallationOrPresenceToWork() {
+        let state = AgentBadgeState(provider: "codex", enabled: true, tasks: [], processCount: 1, cliDetected: true)
+        #expect(state.observedState == "Unknown" && state.workingCount == 0 && state.waitingCount == 0)
+        #expect(state.observationExplanation.contains("confidence: unknown") && state.observationExplanation.contains("Process presence alone does not prove activity or completion"))
+        #expect(AgentBadgeState.workingSummary([state]).contains("No selected agents reporting work"))
+    }
+    func row(_ id: String, _ state: TaskState) throws -> AgentTask {
+        try AgentTask(id: "orca/" + id, sessionID: id, runID: id, state: state, evidenceKind: .lifecycle, confidence: .exact)
+    }
+    @Test func unknownCoverageIsNotPresentedAsAbsenceInCompactBadge() {
+        let badge = AgentBadgeState(provider: "orca", enabled: true, tasks: [], observationKnown: false)
+        #expect(badge.observedState == "Unknown" && badge.compactDetail == "Task unknown")
+    }
+    @Test func enrollmentDoesNotInventActivity() {
+        #expect(AgentBadgeState(provider: "codex", enabled: true, tasks: []).observedState == "Not detected")
+    }
+    @Test func parallelAndUnknownAggregation() throws {
+        let rows = try [row("a", .idle), row("b", .working), row("c", .unknown)]
+        let active = AgentBadgeState(provider: "orca", enabled: true, tasks: rows)
+        #expect(active.observedState == "Active" && active.workingCount == 1 && active.unknownCount == 1)
+        #expect(AgentBadgeState(provider: "orca", enabled: true, tasks: try [row("a", .idle), row("b", .unknown)]).observedState == "Unknown")
+        #expect(AgentBadgeState(provider: "orca", enabled: false, tasks: rows).observedState == "Active")
+    }
+    @Test func staleIdleAndWaitingRemainDistinct() throws {
+        #expect(AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("a", .idle)], evidenceAgeSeconds: 16).observedState == "Unknown")
+        #expect(AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("a", .waiting)], evidenceAgeSeconds: 16).observedState == "Waiting")
+        let hashed = try AgentTask(id: "evt-123", sessionID: "s", runID: "r", state: .working, evidenceKind: .lifecycle, confidence: .exact)
+        #expect(AgentBadgeState(provider: "codex", enabled: true, tasks: [hashed]).observedState == "Active")
+    }
+    @Test func dashboardShowsOnlyWorkingEnabledAgents() throws {        let working = AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("a", .working)])
+        let idle = AgentBadgeState(provider: "codex", enabled: true, tasks: [try row("b", .idle)])
+        let disabled = AgentBadgeState(provider: "claude", enabled: false, tasks: [try row("c", .working)])
+        let unknown = AgentBadgeState(provider: "opencode", enabled: true, tasks: [try row("d", .unknown)])
+        let data = DashboardData(mode: .auto, state: .ready, reasonText: "",
+            agents: [working, idle, disabled, unknown])
+        #expect(data.workingAgents.map(\.provider) == ["orca"])
+        #expect(DashboardData(mode: .off, state: .off, reasonText: "").workingAgents.isEmpty)
+    }
+    @Test func providerMarksMapToBundledAssets() {
+        #expect(AgentBadgeState(provider: "orca", enabled: true, tasks: []).markAssetName == "agent-orca")
+        #expect(AgentBadgeState(provider: "codex", enabled: true, tasks: []).markAssetName == "agent-codex")
+        #expect(AgentBadgeState(provider: "claude", enabled: true, tasks: []).markAssetName == "agent-claude")
+        #expect(AgentBadgeState(provider: "opencode", enabled: true, tasks: []).markAssetName == nil)
+        #expect(AgentBadgeState(provider: "opencode", enabled: true, tasks: []).usesVectorMark)
+        #expect(AgentBadgeState(provider: "mystery", enabled: true, tasks: []).markAssetName == nil)
+    }
+    @Test @MainActor func bundledMarksLoadAtRuntime() {
+        // Exercises the real production path (Bundle.module inside CamLidApp).
+        for provider in ["orca", "codex", "claude"] {
+            guard let image = AgentMarkView.image(for: provider) else {
+                Issue.record("missing bundled mark: \(provider)")
+                continue
+            }
+            #expect(image.size.width > 0 && image.size.height > 0)
+        }
+        #expect(AgentMarkView.image(for: "opencode") == nil)
+        #expect(AgentMarkView.image(for: "mystery") == nil)
+    }
+    @Test func waitingSummaryAndDetailStayDistinctFromWork() throws {
+        let waiting = AgentBadgeState(provider: "opencode", enabled: true, tasks: [try row("a", .waiting)])
+        #expect(waiting.waitingCount == 1 && waiting.observedState == "Waiting")
+        #expect(waiting.compactDetail == "Waiting for user · 1 task")
+        #expect(waiting.detail.contains("Waiting for user"))
+        #expect(waiting.observationExplanation.contains("never keep the machine awake"))
+        #expect(AgentBadgeState.waitingSummary([waiting]) == "1 selected agent waiting for user")
+        #expect(AgentBadgeState.waitingSummary([]) == "No selected agents waiting for user")
+        let mixed = AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("w", .working), try row("q", .waiting)])
+        #expect(AgentBadgeState.waitingSummary([waiting, mixed]) == "1 selected agent waiting for user")
+        #expect(AgentBadgeState.workingSummary([waiting, mixed]) == "1 selected agent reporting work")
+    }
+    @Test func dashboardListsWaitingSeparatelyFromWorking() throws {
+        let working = AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("a", .working)])
+        let waiting = AgentBadgeState(provider: "opencode", enabled: true, tasks: [try row("b", .waiting)])
+        let both = AgentBadgeState(provider: "codex", enabled: true, tasks: [try row("c", .working), try row("d", .waiting)])
+        let data = DashboardData(mode: .auto, state: .ready, reasonText: "",
+            agents: [working, waiting, both])
+        #expect(data.workingAgents.map(\.provider) == ["orca", "codex"])
+        #expect(data.waitingAgents.map(\.provider) == ["opencode"])
+    }
+    @Test func mixedWorkingAndWaitingShowsBothCountsWaitingFirst() throws {
+        let mixed = AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("w", .working), try row("q", .waiting)])
+        #expect(mixed.workingCount == 1 && mixed.waitingCount == 1)
+        #expect(mixed.compactDetail.contains("Active") && mixed.compactDetail.contains("1 waiting"))
+        #expect(mixed.detail.contains("1 waiting"))
+        #expect(AgentBadgeState.workingSummary([mixed]) == "1 selected agent reporting work")
+        #expect(AgentBadgeState.waitingSummary([mixed]) == "No selected agents waiting for user")
+    }
+}

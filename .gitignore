@@ -1,0 +1,59 @@
+# Local macOS artifacts
+.DS_Store
+.AppleDouble
+._*
+.Spotlight-V100
+.Trashes
+
+# Swift / Swift Package Manager build outputs
+.build/
+build/
+DerivedData/
+.swiftpm/
+*.o
+*.d
+*.dSYM/
+
+# Temporary QA scratch: regenerable per-run build caches and episode roots.
+# Safe to delete anytime; next build refetches packages over network.
+.pi/qa-builds/
+
+# Xcode user state and per-machine project data
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcbkptlist
+# Compiler index cache generated inside the Xcode project
+/CamLid.xcodeproj/-Xcc/
+
+# Private diagnostics, exports and local agent state
+.local/
+.pi/
+.env
+.env.*
+!.env.example
+.agents/*
+!.agents/skills/
+!.agents/skills/**
+# Serena tool state: default project config plus local cache/memories.
+.serena/
+# Keep reusable Spec Kit skills versionable; no personal auth/cache files.
+
+# QA, planning and research material is kept local only.
+docs/qa/
+docs/planning/
+docs/research/
+/Tests/
+
+# Python packaging QA
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/

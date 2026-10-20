@@ -1,0 +1,1386 @@
+import AppKit
+import CamLidCore
+import CamLidCLI
+import Darwin
+
+/// Live application coordinator (F01 remediation). Hosts the implemented views
+/// with real local state: atomic validated file preferences,
+/// a real ActivityStore recording genuine local transitions, and live
+/// PolicyEngine/SafetyPolicy evaluation on a 1s tick.
+///
+/// HONESTY BOUNDARY: nothing here actuates host power. There is no backend
+/// (M1 pending), read-only telemetry, and every
+/// surface carries the preview banner. Closed-lid arming is refused outright.
+/// Start creates a *preview* session so grace/safety/cap transitions are
+/// observable and recorded — safety immediately latches on unknown sensors,
+/// which is the correct unknown-is-not-healthy behavior, not a bug.
+enum TerminationDrainDecision {
+    enum Choice: Equatable {
+        case keepOpen
+        case quitWithoutPendingHistory
+    }
+
+    static func shouldTerminate(
+        editorSettled: Bool,
+        settingsInstallSettled: Bool,
+        historyDrained: Bool,
+        choice: Choice? = nil
+    ) -> Bool {
+        if choice == .keepOpen { return false }
+        let fullyDrained = editorSettled && settingsInstallSettled && historyDrained
+        return fullyDrained || choice == .quitWithoutPendingHistory
+    }
+}
+
+@MainActor
+public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActions {
+    private let menuBar = MenuBarController()
+    private var config: Configuration = (try? Configuration()) ?? uncheckedDefaultConfig()
+    private let history: AsyncHistoryRecorder
+    private let sensors = LiveSensorProvider()
+    private let healthReader: (() -> HealthSnapshot)?
+    private let loginItem = LoginItemController()
+    private let outcomeNotifications: OutcomeNotifications
+    private let permissions: AppPermissions
+    private var latestHealth: HealthSnapshot?
+    private var latestReason: String?
+    private var sensorAvailability: [String: String] = [:]
+    private var omittedHistoryRecords = 0
+    private var lastReportedEvidenceRejection: String?
+    private var terminationHistorySealed = false
+    private var terminationConfirmed = false
+    private var terminationDeferredHistory: [StoredTransition] = []
+
+    private var session: ProtectionSession?
+    private var sessionBatteryDeadline: Double?
+    private var sessionTimerMinutes: Int?
+    private var sessionSleepDelayMinutes: Int?
+    private var agents = RuntimeAgentStore()
+    private let controlServer: LocalControlServer
+    private let preferences: UserDefaults
+    private let configURL: URL
+    private let settingsWriter: @Sendable (Data, URL) throws -> Void
+    private let settingsInstaller: @Sendable (URL, URL) throws -> Void
+    private lazy var settingsPreparer = PreferenceWritePreparer(writer: settingsWriter, installer: settingsInstaller)
+    private var settingsInstallToken: UUID?
+    private var settingsPreparationCount = 0
+    var hasPendingSettingsInstallation: Bool { settingsInstallToken != nil }
+    var hasPendingSettingsWork: Bool { settingsPreparationCount > 0 || hasPendingSettingsInstallation }
+    private var revision = 1
+    private var safety = SafetyPolicy()
+    private var cpu = CPUObserver()
+    private var lastReportedState: EffectiveState = .off
+    private var timer: Timer?
+    private var thermalObserver: NSObjectProtocol?
+    private var orcaUITracker = OrcaUITracker()
+    private var orcaUIIssue: String? = "accessibilityObservationRemoved"
+    private var orcaUIReadDiagnostics = OrcaUIReadDiagnostics()
+    private var orcaUISurvey: OrcaUIStructureSurveyResult?
+    private var orcaMetadataTracker = OrcaUITracker()
+    private var orcaMetadataPolling = false
+    private var lastOrcaMetadataPoll = -Double.infinity
+    private var lastOrcaMetadataSuccess = -Double.infinity
+    private var orcaMetadataIssue = "orcaMetadataNotObserved"
+    private var orcaMetadataEpoch = UUID()
+    private var processPolling = false
+    private var lastProcessPoll = -Double.infinity
+    private var lastProcessSuccess = -Double.infinity
+    private var lastProcessObservation = -Double.infinity
+    private var processCandidates: [ProcessCandidate] = []
+    private var installedCLIs: Set<String>?
+    private var lifetimeTracker = LifetimeRuleTracker()
+    private var lifetimeProcessSnapshot: LifetimeProcessSnapshot?
+    private var exactTaskEpoch: String?
+    private var latestLifetimeState: LifetimePolicyState?
+
+    private var utilityUI: UtilityUIProcess?
+    private var activityOutcome: String?
+    private lazy var updates = UpdateController(safety: { [weak self] in
+        guard let self else { var state = UpdateSafetyContext(); state.recoveryRequired = true; return state }
+        return self.updateSafetyContext()
+    })
+    private var refusalNotice: String?
+    private var authorityUnavailable = false
+    private var terminationFlowActive = false
+
+    private static let onboardedKey = "CamLidOnboarded"
+    private static let configKey = "CamLidConfigurationV1"
+
+    public override convenience init() {
+        let arguments = ProcessInfo.processInfo.arguments
+        let qaPath: String? = {
+            if let index = arguments.firstIndex(of: "--qa-state-directory"), arguments.count > index + 1 { return arguments[index + 1] }
+            return Bundle.main.object(forInfoDictionaryKey: "CamLidQAStateDirectory") as? String
+        }()
+        if let qaPath {
+            let root = URL(fileURLWithPath: qaPath, isDirectory: true)
+            let preferences = UserDefaults(suiteName: "CamLidQA." + root.lastPathComponent) ?? .standard
+            self.init(historyDirectory: root.appendingPathComponent("history"),
+                controlDirectory: root.appendingPathComponent("control"), preferences: preferences)
+            return
+        }
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+        self.init(historyDirectory: support.appendingPathComponent("CamLid/History", isDirectory: true))
+    }
+
+    init(historyDirectory: URL, controlDirectory: URL = LocalControlChannel.defaultDirectory,
+         preferences: UserDefaults = .standard, settingsWriter: (@Sendable (Data, URL) throws -> Void)? = nil,
+         settingsInstaller: (@Sendable (URL, URL) throws -> Void)? = nil,
+         outcomeNotifications: OutcomeNotifications? = nil, permissions: AppPermissions? = nil,
+         healthReader: (() -> HealthSnapshot)? = nil) {
+        self.healthReader = healthReader
+        self.preferences = preferences
+        self.outcomeNotifications = outcomeNotifications ?? OutcomeNotifications()
+        self.permissions = permissions ?? AppPermissions()
+        self.configURL = historyDirectory.appendingPathComponent("preferences.json")
+        self.settingsInstaller = settingsInstaller ?? { source, destination in
+            guard Darwin.rename(source.path, destination.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        }
+        self.settingsWriter = settingsWriter ?? { data, url in
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            let temporary = url.deletingLastPathComponent().appendingPathComponent(".preferences-" + UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: temporary) }
+            try data.write(to: temporary, options: .withoutOverwriting)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
+            guard rename(temporary.path, url.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        }
+        controlServer = LocalControlServer(directory: controlDirectory)
+        let storage = FileHistoryStorage(directory: historyDirectory)
+        history = AsyncHistoryRecorder(store: ActivityStore(storage: storage), diagnostic: { storage.lastOperationError() })
+        super.init()
+        loadPersistedConfig()
+    }
+
+    // MARK: - Lifecycle
+
+    public func applicationDidFinishLaunching(_ notification: Notification) {
+        start()
+    }
+
+    public func applicationWillTerminate(_ notification: Notification) {
+        timer?.invalidate()
+        controlServer.stop()
+        if let thermalObserver { NotificationCenter.default.removeObserver(thermalObserver) }
+        utilityUI?.close(); utilityUI = nil
+        menuBar.remove()
+    }
+
+    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if let helper = utilityUI, helper.isRunning {
+            Task { @MainActor in
+                guard await helper.prepareToQuit() else { sender.reply(toApplicationShouldTerminate: false); return }
+                self.utilityUI = nil
+                let reply = self.applicationShouldTerminate(sender)
+                if reply != .terminateLater { sender.reply(toApplicationShouldTerminate: reply == .terminateNow) }
+            }
+            return .terminateLater
+        }
+
+        guard beginTerminationFlow() else { return .terminateCancel }
+
+        func reply(_ shouldTerminate: Bool) {
+            if !shouldTerminate { cancelTerminationFlow() }
+            else { terminationConfirmed = true }
+            sender.reply(toApplicationShouldTerminate: shouldTerminate)
+        }
+
+        func present(_ alert: NSAlert) async -> NSApplication.ModalResponse { alert.runModal() }
+
+        func finishAfterDraining(editorSettled: Bool) async {
+            let settingsInstallSettled = await settleSettingsInstallation(timeout: 2)
+            // Admission is closed before the ordered barrier. Timer/sensor
+            // callbacks cannot append a transition after a successful drain.
+            sealTerminationHistory()
+            let historyBarrierPassed = await history.flush(timeout: 2)
+            let historyDrained = historyBarrierPassed && history.lastError == nil && omittedHistoryRecords == 0 && terminationDeferredHistory.isEmpty
+            guard !TerminationDrainDecision.shouldTerminate(
+                editorSettled: editorSettled,
+                settingsInstallSettled: settingsInstallSettled,
+                historyDrained: historyDrained
+            ) else {
+                reply(true)
+                return
+            }
+
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Pending changes could not be confirmed"
+            alert.informativeText = "CamLid could not confirm every settings and activity-history write before the quit deadline. An in-flight settings install may still apply after CamLid quits, and pending history may be lost. Keep CamLid open to let pending work finish, or quit with those changes unconfirmed."
+            alert.addButton(withTitle: "Keep Open")
+            alert.addButton(withTitle: "Quit Without Pending History")
+            let response = await present(alert)
+            let choice: TerminationDrainDecision.Choice = response == .alertSecondButtonReturn
+                ? .quitWithoutPendingHistory : .keepOpen
+            reply(TerminationDrainDecision.shouldTerminate(
+                editorSettled: editorSettled,
+                settingsInstallSettled: settingsInstallSettled,
+                historyDrained: historyDrained,
+                choice: choice
+            ))
+        }
+
+        Task { @MainActor in await finishAfterDraining(editorSettled: true) }
+        return .terminateLater
+    }
+
+    /// Admission closes before awaiting any quit work; cancelling quit restores
+    /// it. These state changes perform no UI, storage, process or power action.
+    @discardableResult func beginTerminationFlow() -> Bool {
+        guard !terminationFlowActive else { return false }
+        terminationFlowActive = true; return true
+    }
+    func sealTerminationHistory() { terminationHistorySealed = true; history.sealMutations() }
+    func cancelTerminationFlow() {
+        terminationHistorySealed = false; terminationFlowActive = false; terminationConfirmed = false; history.resumeMutations()
+        let deferred = terminationDeferredHistory; terminationDeferredHistory.removeAll(keepingCapacity: true)
+        for transition in deferred {
+            if !history.record(transition), omittedHistoryRecords < Int.max { omittedHistoryRecords += 1 }
+        }
+    }
+
+    func start() {
+        startControlService()
+        loginItem.refresh()
+        outcomeNotifications.configure(categories: config.notificationCategories ?? [])
+        outcomeNotifications.onPermissionChanged = { [weak self] in
+            guard let self, self.utilityUI?.isRunning == true else { return }
+            self.utilityUI?.send(.update(self.utilityUIState()))
+        }
+        Task { await outcomeNotifications.refresh() }
+        menuBar.actions = self
+        menuBar.onToggleDashboard = { [weak self] in self?.toggleDashboard() }
+        menuBar.onOpenOptions = { [weak self] in self?.utilityUI?.send(.closeDashboard) }
+        menuBar.install()
+        record(category: .configuration, newState: .ready, reasons: ["appLaunched"])
+        refresh()
+        thermalObserver = NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in Task { @MainActor in self?.refresh() } }
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+        if !preferences.bool(forKey: Self.onboardedKey) {
+            showOnboarding()
+        }
+    }
+
+    // MARK: - MenuBarActions (preview sessions; never power actuation)
+
+    public func menuBarStartProtection() { Task { await activateDashboardMode(.auto, expectedRevision: revision) } }
+
+    func activateDashboardMode(_ mode: RequestedMode, expectedRevision: Int) async {
+        guard !authorityUnavailable, !terminationFlowActive, !hasPendingSettingsWork else { return }
+        guard revision == expectedRevision else {
+            refusalNotice = "Settings changed. Retry the mode selection."; refresh(); return
+        }
+        if mode == .off || session?.requestedMode == mode {
+            menuBarStopProtection()
+            return
+        }
+        var patch = ConfigPatch(); patch.mode = mode
+        if config.mode == .manual, config.timerMinutes == nil { patch.timerMinutes = 0 }
+        guard case .saved = await applySettingsPatchAsync(patch, expectedRevision: expectedRevision) else {
+            refusalNotice = "Mode not started. Settings could not be confirmed; retry."; refresh(); return
+        }
+        await startPreviewSession()
+    }
+
+    func startPreviewSession() async {
+        guard !authorityUnavailable, !terminationFlowActive else { return }
+        refusalNotice = nil
+        guard config.mode != .off else {
+            refusalNotice = "Choose a mode before starting."
+            refresh(); toggleDashboard(show: true); return
+        }
+        if config.closedLidOptIn {
+            refusalNotice = "Closed-lid preview refused: power control is unavailable."
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["backendUnverified"])
+            refresh()
+            toggleDashboard(show: true)
+            return
+        }
+        guard session == nil else { return }
+        let health = currentHealth()
+        if let reason = config.batteryEntryRefusal(health: health) {
+            refusalNotice = switch reason {
+            case "batteryEntryLow": "Battery is below the start level. Connect the charger or check the entry level in Safety settings."
+            case "batteryUnknown": "Battery reading is unavailable. Connect the charger or retry after readings recover."
+            case "notCharging": "Connect the charger, or turn off Require charger and enable Allow battery sessions in Safety settings."
+            default: "Power source is unavailable. Retry after readings recover."
+            }
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: [reason])
+            refresh(); toggleDashboard(show: true); return
+        }
+        let mode = config.mode
+        let now = uptime()
+        sessionBatteryDeadline = health.powerSource == .battery
+            ? now + Double(min(config.runCapMinutes, config.batteryCapMinutes)) * 60 : nil
+        guard let created = try? ProtectionSession(
+            id: UUID().uuidString, requestedMode: mode, armedClosedLid: false,
+            startedAtMonotonic: now,
+            capDeadlineMonotonic: config.sessionDurationMinutes(for: mode, powerSource: health.powerSource).map { now + Double($0) * 60 }
+        ) else { return }
+        session = created
+        sessionTimerMinutes = config.timedDurationMinutes == 0 ? 0 : min(config.timedDurationMinutes, config.runCapMinutes)
+        sessionSleepDelayMinutes = config.completionDelayMinutes
+        record(category: .enrollment, newState: created.effectiveState, reasons: ["previewSessionStarted"])
+        refresh()
+    }
+
+    public func menuBarStopProtection() {
+        guard session != nil, !terminationFlowActive else { return }
+        record(category: .stateTransition, newState: .ready, reasons: ["previewSessionStopped"])
+        session = nil
+        refresh()
+    }
+
+    public func menuBarShowWelcome() { showOnboarding() }
+    public func menuBarOpenSettings() { showSettings() }
+    public func menuBarOpenSleepDiagnostics() { showUtility(.sleepDiagnostics) }
+    public func menuBarOpenActivityLog() { showActivityLog() }
+    public func menuBarQuit() {
+        // No owned power state exists (preview never actuates), so immediate
+        // terminate is safe. Cleanup confirmation activates with actuation.
+        record(category: .configuration, newState: .off, reasons: ["appQuitNoOwnedPower"])
+        NSApp.terminate(nil)
+    }
+
+    public var menuBarCanStart: Bool { !authorityUnavailable && !terminationFlowActive && !hasPendingSettingsWork }
+    /// Auto specifically needs at least one detection-enabled agent.
+    public var menuBarAutoAvailable: Bool { !config.adapterEnrollment.isEmpty }
+    public var menuBarCanStop: Bool { session != nil }
+    public var menuBarActiveMode: RequestedMode? { session?.requestedMode }
+
+    @discardableResult
+    func changeTimerDuration(_ minutes: Int, expectedRevision: Int) -> Bool {
+        guard !authorityUnavailable, !terminationFlowActive, !hasPendingSettingsWork,
+              revision == expectedRevision, var active = session,
+              let duration = active.restartTimer(minutes: minutes, maximumMinutes: config.runCapMinutes, now: uptime()) else {
+            refusalNotice = "Timer not changed. Retry in a running Timed session."; refresh(); return false
+        }
+        sessionTimerMinutes = duration
+        session = active
+        refusalNotice = nil
+        record(category: .configuration, newState: active.effectiveState, reasons: ["sessionTimerChanged"])
+        refresh()
+        return true
+    }
+
+    @discardableResult
+    func changeSleepDelay(_ minutes: Int, expectedRevision: Int) -> Bool {
+        guard !authorityUnavailable, !terminationFlowActive, !hasPendingSettingsWork,
+              revision == expectedRevision, var active = session,
+              active.changeSleepDelay(minutes: minutes, previousMinutes: sessionSleepDelayMinutes ?? config.completionDelayMinutes) else {
+            refusalNotice = "Sleep delay not changed. Retry in a running Auto session."; refresh(); return false
+        }
+        sessionSleepDelayMinutes = minutes
+        session = active
+        refusalNotice = nil
+        record(category: .configuration, newState: active.effectiveState, reasons: ["sessionSleepDelayChanged"])
+        refresh()
+        return true
+    }
+
+    // MARK: - Live evaluation
+
+    private func uptime() -> Double { ContinuousTime.now }
+
+    private func currentHealth() -> HealthSnapshot {
+        if let healthReader { return healthReader() }
+        // Live read-only sensors where they exist (battery/thermal/display);
+        // lid has a separate timestamp and CPU a separate interval sampler.
+        let readings = sensors.read()
+        return HealthMonitor().snapshot(from: readings, now: uptime()).snapshot
+    }
+
+    private func sessionStateForRecord() -> EffectiveState {
+        session?.effectiveState ?? (config.mode == .off ? .off : .ready)
+    }
+
+    private func refresh() {
+        guard !terminationConfirmed else { return }
+        permissions.refresh()
+        agents.configure(waitRetentionSeconds: Double(config.waitRetentionMinutes) * 60)
+        pollProcesses()
+        pollOrcaMetadata()
+        let now = uptime()
+        if config.orcaMetadataAllowed, lastOrcaMetadataSuccess.isFinite, now - lastOrcaMetadataSuccess > 15 {
+            invalidateOrcaMetadata(issue: "orcaMetadataStale")
+        }
+        let health = currentHealth()
+        latestHealth = health
+        recordSensorAvailability(health)
+        if agents.lastRejection != lastReportedEvidenceRejection {
+            lastReportedEvidenceRejection = agents.lastRejection
+            record(category: .configuration, newState: sessionStateForRecord(),
+                reasons: agents.lastRejection.map { ["agentEvidenceRejected", $0] } ?? ["agentEvidenceRecovered"])
+        }
+        let cpuEvaluation = cpu.evaluate(cpuPercent: health.cpuPercent, cpuStopEnabled: config.cpuStopEnabled, now: now)
+        let signal = safety.evaluate(
+            health: health, config: config, cpuStop: cpuEvaluation.stop, now: now)
+        let lifetime = updateLifetimePolicy(now: now)
+        if var active = session {
+            // Battery exposure latches a cap from session start; AC return and timer edits cannot extend it.
+            if health.powerSource != .ac || sessionBatteryDeadline != nil {
+                let deadline = active.startedAtMonotonic + Double(min(config.runCapMinutes, config.batteryCapMinutes)) * 60
+                sessionBatteryDeadline = min(sessionBatteryDeadline ?? deadline, deadline)
+                if let batteryDeadline = sessionBatteryDeadline {
+                    active.capDeadlineMonotonic = min(active.capDeadlineMonotonic ?? batteryDeadline, batteryDeadline)
+                }
+            }
+            var policyConfig = config
+            policyConfig.completionDelayMinutes = sessionSleepDelayMinutes ?? config.completionDelayMinutes
+            let decision = PolicyEngine.evaluate(
+                session: active, tasks: sleepRelevantTasks(now: now), health: health, config: policyConfig,
+                armed: true, safety: signal, recoveryConflict: false,
+                completionUncertain: agentCompletionUncertain()
+                    || (!config.adapterEnrollment.isEmpty && now - lastProcessSuccess > 15),
+                lifetimeHoldReason: lifetime?.holdReason ?? (hasLifetimeRules ? "lifetimeRuleUnknown" : nil),
+                lifetimeCompletionSuppressed: lifetime?.suppressesAutoCompletion ?? hasLifetimeRules,
+                nowMonotonic: now)
+            let changed = decision.state != active.effectiveState
+            active = decision.session
+            session = active
+            if changed {
+                record(
+                    category: decision.state == .safetyStopped ? .safetyStop
+                        : decision.state == .completionGrace ? .grace
+                        : decision.state == .expired ? .capExpiry : .stateTransition,
+                    newState: decision.state, reasons: decision.reasons)
+            }
+        }
+        let shown = session?.effectiveState ?? (config.mode == .off ? .off : .ready)
+        if shown != lastReportedState {
+            lastReportedState = shown
+        }
+        latestReason = statusReason(signal: signal)
+        menuBar.update(status: MenuBarStatus(
+            state: shown, reasonText: latestReason, leaseVerified: false))
+        updates.refreshSafety()
+        if utilityUI?.isRunning == true { utilityUI?.send(.update(utilityUIState())) }
+    }
+
+    private func sensorDetails(_ health: HealthSnapshot, now: Double) -> String {
+        let lidAge = health.lid?.sampledAtMonotonic.map { String(format: "%.1f s old", max(0, now - $0)) } ?? "no fresh sample"
+        let lidSource = health.lid?.source ?? "IOPMrootDomain.AppleClamshellState"
+        return "Lid source: \(lidSource) · \(lidAge).\nTemperature: \(health.temperature.displayText).\nPressure is a macOS thermal state, not degrees.\nThis preview owns no power lease."
+    }
+
+    private func recordSensorAvailability(_ health: HealthSnapshot) {
+        let current = ["lid": health.lid?.availability ?? "error", "temperature": health.temperature.availability]
+        for key in ["lid", "temperature"] {
+            guard let availability = current[key], sensorAvailability[key] != availability else { continue }
+            sensorAvailability[key] = availability
+            // Only bounded machine codes, never raw system/provider errors.
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: [key + "AvailabilityChanged", key + availability.capitalized])
+        }
+    }
+
+    private func protectionReadiness() -> ProtectionReadiness {
+        ProtectionReadiness(facts: ProtectionReadinessFacts(buildKind: .preview,
+            supportRowID: nil, supportRowQualified: false, helperTrusted: false,
+            helperAvailable: false, recoveryRequired: false, recoveryJournalReady: false,
+            ownershipEvidence: .unknown, matchingGlobalOverrideObserved: false,
+            backendVerified: false, leaseVerified: false, safetyQualifying: false,
+            requestedClosedLidIntent: config.closedLidOptIn))
+    }
+
+    private func badgeStates() -> [AgentBadgeState] {
+        AgentBadgeState.providers.map { provider in
+            AgentBadgeState(provider: provider, enabled: config.adapterEnrollment.contains(provider), tasks: agents.tasks(provider: provider, now: uptime()), evidenceAgeSeconds: agents.lastReceipt(provider: provider).map { max(0, uptime() - $0) },
+                processCount: uptime() - lastProcessObservation <= 15 ? processCandidates.filter { $0.provider == provider }.count : 0,
+                cliDetected: installedCLIs?.contains(provider),
+                observationKnown: uptime() - lastProcessSuccess <= 15
+                    || (provider == "orca" && config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= 15))
+        }
+    }
+
+    private func agentCompletionUncertain() -> Bool {
+        // Orca receipt freshness does not qualify underlying state freshness or completion coverage.
+        config.adapterEnrollment.contains("orca") || badgeStates().contains {
+            $0.detectionEnabled && ($0.observedState == "Unknown" || ($0.processCount ?? 0) > 0)
+        }
+    }
+
+    /// External observations stay visible independently of sleep selection.
+    func sleepRelevantTasks(now: Double) -> [AgentTask] {
+        agents.tasks(now: now).filter { task in
+            guard let provider = agents.provider(for: task.id) else { return false }
+            return config.adapterEnrollment.contains(provider)
+        }
+    }
+
+    private var hasLifetimeRules: Bool {
+        (config.lifetimeRules ?? []).contains(where: \.enabled)
+    }
+
+    private func updateLifetimePolicy(now: Double) -> LifetimePolicyState? {
+        let state = try? lifetimeTracker.update(
+            rules: config.lifetimeRules ?? [], snapshot: lifetimeProcessSnapshot, now: now,
+            sessionID: session?.id, exactTaskEpoch: exactTaskEpoch,
+            waitRetentionSeconds: Double(config.waitRetentionMinutes) * 60)
+        latestLifetimeState = state
+        return state
+    }
+
+    private func statusReason(signal: SafetySignal) -> String? {
+        if session == nil && config.mode == .off { return nil }
+        if agents.lastRejection == "enrollmentFull" { return "Agent capacity reached: 20 holding tasks are already tracked." }
+        if agents.lastRejection == "retirementHistoryFull" { return "Detection history full; new agent evidence is unavailable." }
+        if session == nil { return "Ready to start a preview" }
+        if !signal.reasons.isEmpty {
+            let labels = ["thermalCritical": "Critical thermal pressure", "thermalSerious": "Sustained serious thermal pressure",
+                "thermalUnknown": "Thermal reading unavailable", "lidUnknown": "Lid reading unavailable",
+                "powerUnknown": "Power source unavailable", "notCharging": "AC power required",
+                "batteryFloor": "Battery below safety floor", "batteryUnknown": "Battery reading unavailable", "cpuStop": "Sustained CPU load exceeded limit"]
+            return signal.reasons.map { labels[$0] ?? "Safety condition requires attention" }.joined(separator: ", ")
+        }
+        if session?.requestedMode == .auto {
+            guard let lifetime = latestLifetimeState else {
+                if hasLifetimeRules { return "Watched program status is unavailable." }
+                return "preview — no power actuation"
+            }
+            if lifetime.hasActiveRule, let label = lifetime.statuses.first(where: { $0.presence == .present })?.label {
+                return "Watched program is running: \(label)."
+            }
+            if lifetime.hasUnknownHold, let label = lifetime.statuses.first(where: { $0.presence == .unknown })?.label {
+                return "Watched program status is uncertain: \(label)."
+            }
+            if lifetime.suppressesAutoCompletion {
+                return "Watched program lifetime does not confirm AI task completion."
+            }
+        }
+        return "preview — no power actuation"
+    }
+
+    func changeMode(_ mode: RequestedMode) {
+        var patch = ConfigPatch(); patch.mode = mode
+        guard let next = try? config.applying(patch) else { return }
+        guard persistConfig(next) else { return }
+        record(category: .configuration, newState: sessionStateForRecord(), reasons: ["modeChanged"])
+        refresh()
+    }
+
+    // MARK: - Dashboard panel
+
+    private func toggleDashboard(show: Bool? = nil) {
+        let shouldShow = show ?? !(utilityUI?.dashboardVisible ?? false)
+        if shouldShow { showUtility(.dashboard) } else { utilityUI?.send(.closeDashboard); menuBar.restoreFocusToStatusItem() }
+    }
+
+    private func utilityUIState() -> UtilityUIState {
+        permissions.refresh()
+        let anchor = menuBar.anchorButton
+        let frame = anchor.flatMap { button in button.window?.convertToScreen(button.convert(button.bounds, to: nil)) } ?? .zero
+        return UtilityUIState(dashboard: dashboardData(), configuration: config, revision: revision,
+            protection: protectionReadiness(), settingsSection: SettingsSection(rawValue: preferences.string(forKey: "CamLidSettingsSection") ?? "") ?? .agents,
+            anchorFrame: frame, installationPending: hasPendingSettingsWork,
+            observationReady: uptime() - lastProcessSuccess <= 15,
+            updates: updates.snapshot, canCheckUpdates: updates.canCheck,
+            loginState: loginItem.state, loginMessage: loginItem.message,
+            notificationPermission: outcomeNotifications.permissionState,
+            accessibilityPermission: permissions.accessibility, permissionSettingsError: permissions.settingsError)
+    }
+    private func showUtility(_ surface: UtilitySurface) {
+        if surface == .settings { loginItem.refresh(); Task { await outcomeNotifications.refresh() } }
+        guard !terminationFlowActive else { return }
+        if utilityUI?.isRunning != true {
+            do {
+                utilityUI = try UtilityUIProcess(event: { [weak self] in self?.receiveUtilityEvent($0) }, exited: { [weak self] pid in
+                    if self?.utilityUI?.pid == pid { self?.utilityUI = nil }
+                })
+            } catch { refusalNotice = "Couldn’t open CamLid UI. Retry from the menu."; refresh(); return }
+        }
+        utilityUI?.send(.show(surface, utilityUIState()))
+    }
+    func diagnosticSnapshot() async -> DiagnosticSnapshot {
+        var snapshot = await SleepDiagnosticReader.shared.snapshot()
+        snapshot.configuredMode = config.mode; snapshot.activeSessionMode = session?.requestedMode
+        snapshot.protection = .preview; snapshot.restoration = "noPowerResourcesOwned"
+        return snapshot
+    }
+    func receiveUtilityEvent(_ event: UtilityUIEvent) {
+        switch event {
+        case .commit(let id, let patch, let revision):
+            let recipient = utilityUI
+            Task { @MainActor in
+                let result = await self.applySettingsPatchAsync(patch, expectedRevision: revision)
+                recipient?.send(.commitResult(id, result))
+                if case .saved = result, !(patch.notificationCategories ?? []).isEmpty {
+                    await self.outcomeNotifications.authorizeFromUserAction()
+                }
+            }
+        case .authorizeAccessibility:
+            permissions.requestAccessibility(); refresh()
+        case .openPermissionSettings(let permission):
+            permissions.open(permission); refresh()
+        case .refreshPermissions:
+            permissions.refresh(); refresh()
+            Task { await outcomeNotifications.refresh() }
+        case .authorizeNotifications:
+            Task { await outcomeNotifications.authorizeFromUserAction() }
+        case .visibility(_, let settings):
+            if settings {
+                permissions.refresh()
+                loginItem.refresh()
+                utilityUI?.send(.update(utilityUIState()))
+                Task { await outcomeNotifications.refresh() }
+            }
+        case .applyLoginPreference: loginItem.apply(config.launchAtLogin); refresh()
+        case .readDiagnostics(let id):
+            let recipient = utilityUI
+            Task { @MainActor in recipient?.send(.diagnostics(id, await self.diagnosticSnapshot())) }
+        case .start: menuBarStartProtection()
+        case .activateMode(let mode, let revision):
+            Task { await activateDashboardMode(mode, expectedRevision: revision) }
+        case .timerDuration(let minutes, let revision): changeTimerDuration(minutes, expectedRevision: revision)
+        case .sleepDelay(let minutes, let revision): changeSleepDelay(minutes, expectedRevision: revision)
+        case .stop: menuBarStopProtection()
+        case .sleepDiagnostics: menuBarOpenSleepDiagnostics()
+        case .activity: showActivityLog()
+        case .reloadHistory: showActivityLog(show: false)
+        case .onboarding: showOnboarding()
+        case .updates: menuBarOpenUpdates()
+        case .checkUpdates: updates.check(); refresh()
+        case .notice(let message): refusalNotice = message; refresh()
+        case .restoreStatusFocus: menuBar.restoreFocusToStatusItem()
+        case .quit:
+            // Leave the pipe's main-queue callback before AppKit's terminateLater loop.
+            NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0.2)
+        case .section(let section): preferences.set(section.rawValue, forKey: "CamLidSettingsSection")
+        case .settings(let section):
+            preferences.set(section.rawValue, forKey: "CamLidSettingsSection"); showSettings()
+        case .activityOutcome(let outcome): activityOutcome = outcome; showActivityLog(show: false)
+        case .exportHistory: exportLog()
+        case .deleteHistory(let id): deleteHistory(sessionID: id)
+        case .finishOnboarding(let id):
+            let recipient = utilityUI
+            recipient?.send(.onboardingResult(id, finishOnboarding()))
+        case .cancelOnboarding: preferences.set(true, forKey: Self.onboardedKey)
+        case .quitDecision, .editorState: break
+        }
+    }
+
+    func dashboardData() -> DashboardData {
+        let now = uptime()
+        let active = session
+        let state = active?.effectiveState ?? (config.mode == .off ? .off : .ready)
+        let graceRemaining = active?.graceDeadlineMonotonic.map { max(0, $0 - now) }
+        let capRemaining = active?.capDeadlineMonotonic.map { max(0, $0 - now) }
+        var notices: [String] = []
+        if let notice = refusalNotice { notices.append(notice) }
+        let health = latestHealth
+        let summary = health.map(HealthSummary.from) ?? .unknown
+        if let failure = history.lastError { notices.append("History unavailable: " + failure + ".") }
+        if omittedHistoryRecords > 0 { notices.append("History omitted \(omittedHistoryRecords) transitions while storage was busy.") }
+        let badges = badgeStates()
+        let working = AgentBadgeState.workingSummary(badges)
+        let waiting = AgentBadgeState.waitingSummary(badges)
+        let summaryParts = [working, waiting].filter { !$0.hasPrefix("No ") }
+        let taskSummary = summaryParts.isEmpty ? "No selected agents reporting work" : summaryParts.joined(separator: " · ")
+        let data = DashboardData(
+            mode: active?.requestedMode ?? config.mode, state: state,
+            reasonText: latestReason ?? "",
+            leaseVerified: false,
+            lidDisplayText: summary.lidDisplay,
+            tasks: agents.tasks(now: now).map {
+                DashboardTaskRow(id: $0.id, provider: agents.provider(for: $0.id) ?? "agent",
+                    stateText: $0.state.rawValue, confidenceText: $0.confidence.rawValue)
+            },
+            taskSummaryText: taskSummary,
+            batteryText: summary.battery, thermalText: summary.thermal,
+            temperatureText: health?.temperature.displayText,
+            sensorDetailsText: health.map { sensorDetails($0, now: now) },
+            cpuText: health?.cpuPercent.map { String(format: "%.1f%%", $0) },
+            freshnessText: "Read-only telemetry · backend unverified",
+            isStale: health == nil,
+            graceRemainingSeconds: graceRemaining,
+            capRemainingSeconds: capRemaining,
+            completionDelayText: "Sleep when done: \(sessionSleepDelayMinutes ?? config.completionDelayMinutes) min",
+            banner: .unsupported, bannerMessage: notices.isEmpty ? nil : notices.joined(separator: " "),
+            lastSessionText: active.map { "Session \($0.id.prefix(8)) rev \($0.stateRevision)" },
+            stopEnabled: active != nil, startEnabled: menuBarCanStart && menuBarAutoAvailable, metrics: DashboardMetric.from(health), agents: badges,
+            timerMinutes: active == nil ? nil : sessionTimerMinutes, sleepDelayMinutes: active == nil ? nil : sessionSleepDelayMinutes)
+        return data
+    }
+
+    // MARK: - Settings / log / onboarding windows
+
+    func applySettings(_ candidate: Configuration, expectedRevision: Int) -> SettingsCommitResult {
+        guard revision == expectedRevision else {
+            return .conflict(configuration: config, revision: revision)
+        }
+        do { try candidate.validate() } catch { return .failed("Settings failed validation. Nothing was saved.") }
+        guard persistConfig(candidate) else { return .failed("Couldn’t save settings. Check storage and retry.") }
+        record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configApplied"])
+        refresh()
+        return .saved(revision: revision)
+    }
+
+    func applySettingsPatch(_ patch: ConfigPatch, expectedRevision: Int) -> SettingsCommitResult {
+        guard revision == expectedRevision else {
+            return .conflict(configuration: config, revision: revision)
+        }
+        guard let candidate = try? config.applying(patch) else { return .failed("Invalid setting. Last applied value retained.") }
+        return applySettings(candidate, expectedRevision: expectedRevision)
+    }
+
+    /// Runtime UI/RPC writes prepare away from the main thread. Revision and
+    /// cancellation are checked again before installing the prepared inode.
+    func applySettingsPatchAsync(_ patch: ConfigPatch, expectedRevision: Int,
+                                 deadline: Double? = nil) async -> SettingsCommitResult {
+        guard !authorityUnavailable, !terminationFlowActive else { return .failed("Not applied — the local authority is unavailable, quitting, or another CamLid instance owns it.") }
+        guard !hasPendingSettingsInstallation else { return .unconfirmed("Outcome unconfirmed — a previous settings write is still finishing. Wait for confirmation before retrying.") }
+        guard revision == expectedRevision else {
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configConflict"])
+            return .conflict(configuration: config, revision: revision)
+        }
+        guard revision < Int.max, let candidate = try? config.applying(patch),
+              let data = try? JSONEncoder().encode(PersistedSettings(schemaVersion: 1, revision: revision + 1, configuration: candidate)) else {
+            return .failed("Invalid setting. Last applied value retained.")
+        }
+        let expires = min(deadline ?? (uptime() + 0.7), uptime() + 0.7)
+        settingsPreparationCount += 1
+        defer { settingsPreparationCount -= 1 }
+        guard let prepared = await settingsPreparer.prepare(data, beside: configURL, deadline: expires) else {
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configWriteFailed"])
+            return .failed("Not applied — storage is busy or unavailable. Retry the edit.")
+        }
+        defer { settingsPreparer.discard(prepared) }
+        guard !Task.isCancelled, uptime() < expires, !terminationFlowActive, !authorityUnavailable else {
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configWriteFailed"])
+            return .failed("Not applied — the write expired, was cancelled, or the authority is quitting. Retry when available.")
+        }
+        guard revision == expectedRevision, !hasPendingSettingsInstallation else {
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configConflict"])
+            return .conflict(configuration: config, revision: revision)
+        }
+        let token = UUID()
+        settingsInstallToken = token
+        let outcome = await settingsPreparer.install(prepared, at: configURL, deadline: expires) { [weak self] success in
+            Task { @MainActor in self?.finishSettingsInstallation(token: token, candidate: candidate, nextRevision: expectedRevision + 1, success: success) }
+        }
+        switch outcome {
+        case .installed:
+            finishSettingsInstallation(token: token, candidate: candidate, nextRevision: expectedRevision + 1, success: true)
+            return .saved(revision: expectedRevision + 1)
+        case .failed:
+            finishSettingsInstallation(token: token, candidate: candidate, nextRevision: expectedRevision + 1, success: false)
+            return .failed("Not applied — storage is unavailable. Retry the edit.")
+        case .unconfirmed:
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configCommitUnconfirmed"])
+            return .unconfirmed("Outcome unconfirmed — storage is still finishing the write. It may apply later; wait for confirmation before retrying.")
+        }
+    }
+
+    private func finishSettingsInstallation(token: UUID, candidate: Configuration, nextRevision: Int, success: Bool) {
+        guard settingsInstallToken == token else { return }
+        settingsInstallToken = nil
+        if success {
+            acceptPersistedConfig(candidate, nextRevision: nextRevision)
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configApplied"])
+        } else {
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configWriteFailed"])
+        }
+        refresh()
+    }
+
+    func settleSettingsInstallation(timeout: Double = 2) async -> Bool {
+        let end = uptime() + max(0, min(timeout, 2))
+        while hasPendingSettingsWork, uptime() < end {
+            do { try await Task.sleep(for: .milliseconds(10)) } catch { return false }
+        }
+        return !hasPendingSettingsWork
+    }
+
+    public func menuBarOpenUpdates() {
+        showUtility(.updates)
+    }
+
+    private func updateSafetyContext() -> UpdateSafetyContext {
+        var context = UpdateSafetyContext()
+        context.sessionActive = session != nil
+        context.recoveryRequired = session?.effectiveState == .recoveryRequired
+        context.unsavedSettings = hasPendingSettingsWork || utilityUI?.settingsDirty == true
+        context.agentWorkActive = agents.tasks(now: uptime()).contains { [.working, .waiting, .unknown].contains($0.state) }
+        return context
+    }
+
+    private func showSettings() { showUtility(.settings) }
+
+    private func showActivityLog(show: Bool = true) {
+        if show { showUtility(.activity) }
+        let recipient = utilityUI
+        let requestID = UUID()
+        recipient?.send(.historyLoading(requestID))
+        Task { [weak self] in
+            guard let self else { return }
+            let records = await self.history.transitions()
+            guard recipient === self.utilityUI else { return }
+            recipient?.send(.history(requestID, records ?? [],
+                error: records == nil ? (self.history.lastError ?? "History read timed out. Retry to confirm current records.") : self.history.lastError,
+                outcome: self.activityOutcome))
+        }
+    }
+
+    private func deleteHistory(sessionID: String?) {
+        guard !authorityUnavailable, !terminationFlowActive else {
+            activityOutcome = "History changes unavailable: CamLid is quitting or another instance owns the authority."; showActivityLog(show: false); return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            guard !self.terminationFlowActive else { return }
+            let receipt = await self.history.delete(sessionID: sessionID)
+            if let receipt, self.history.lastError == nil {
+                self.activityOutcome = "Deleted \(receipt.removedCount) records."
+            } else {
+                self.activityOutcome = "Deletion unconfirmed. Refresh history before retrying; a started operation may finish after its deadline."
+            }
+            self.showActivityLog(show: false)
+        }
+    }
+
+    private func exportLog() {
+        Task { [weak self] in
+            guard let self, !self.terminationFlowActive else { return }
+            guard let data = await self.history.exportRedactedJSON(salt: UUID().uuidString), self.history.lastError == nil else {
+                self.activityOutcome = "Export unavailable: history could not be read."; self.showActivityLog(show: false); return
+            }
+            guard !self.terminationFlowActive else { return }
+            self.utilityUI?.send(.exportData(data))
+        }
+    }
+
+    func flushHistory(timeout: Double = 0.7) async -> Bool { await history.flush(timeout: timeout) }
+
+    private func showOnboarding() { showUtility(.onboarding) }
+
+    @discardableResult func finishOnboarding() -> Bool {
+        guard !authorityUnavailable, !terminationFlowActive else { return false }
+        guard !preferences.bool(forKey: Self.onboardedKey) else { return true }
+        preferences.set(true, forKey: Self.onboardedKey)
+        record(category: .configuration, newState: sessionStateForRecord(), reasons: ["onboardingComplete"])
+        refresh(); return true
+    }
+
+    private func pollProcesses() {
+        guard !processPolling, uptime() - lastProcessPoll >= 5 else { return }
+        processPolling = true
+        let started = uptime()
+        lastProcessPoll = started
+        let scanLifetimeRules = hasLifetimeRules && session?.requestedMode == .auto
+        Task { [weak self] in
+            let (candidates, complete, installed, lifetime) = await Task.detached(priority: .utility) {
+                let installed = AgentCLIInstallation.detected()
+                let processList = NativeProcessList()
+                let snapshot = processList.agentSnapshot()
+                let candidates = ProcessDiscovery(provider: InMemoryProcessList(records: snapshot.records),
+                    patterns: AgentBadgeState.providers.map { CandidatePattern(executableContains: $0, provider: $0) }, maxFallbackEntries: 20).discover()
+                let lifetime = scanLifetimeRules ? processList.lifetimeSnapshot() : nil
+                return (candidates, snapshot.complete, installed, lifetime)
+            }.value
+            guard let self else { return }
+            self.processPolling = false
+            self.installedCLIs = installed
+            self.lifetimeProcessSnapshot = lifetime
+            self.receiveProcessSnapshot(candidates, complete: complete, observedAt: started)
+            // Presence never fabricates working/idle/completion or an Auto hold.
+        }
+    }
+
+    private func pollOrcaMetadata() {
+        guard config.orcaMetadataAllowed, Bundle.main.bundleURL.pathExtension == "app",
+              !orcaMetadataPolling, uptime() - lastOrcaMetadataPoll >= 5 else { return }
+        lastOrcaMetadataPoll = uptime(); orcaMetadataPolling = true
+        let epoch = orcaMetadataEpoch
+        Task { [weak self] in
+            let result = await Task.detached(priority: .utility) {
+                Result { try OrcaPoller().snapshot(consent: true) }
+            }.value
+            guard let self else { return }
+            self.orcaMetadataPolling = false
+            guard !self.terminationFlowActive, self.config.orcaMetadataAllowed, self.orcaMetadataEpoch == epoch else { return }
+            switch result {
+            case .success(let snapshot): self.receiveOrcaMetadataSnapshot(snapshot)
+            case .failure(let error):
+                let issue = error as? OrcaPollError
+                self.invalidateOrcaMetadata(issue: issue == nil ? "orcaMetadataInvalid" : "orcaMetadataUnavailable")
+            }
+        }
+    }
+
+    func receiveOrcaMetadataSnapshot(_ snapshot: OrcaMetadataSnapshot) {
+        guard config.orcaMetadataAllowed else { return }
+        let now = uptime(), duration = snapshot.receivedAt - snapshot.queryStartedAt
+        let age = now - snapshot.receivedAt
+        guard duration.isFinite, duration >= 0, duration <= 4.5, age.isFinite, age >= 0, age <= 1 else {
+            invalidateOrcaMetadata(issue: "orcaMetadataStale"); return
+        }
+        do {
+            let events = try orcaMetadataTracker.consume(OrcaUISnapshot(statuses: snapshot.statuses,
+                complete: true, observedAt: snapshot.receivedAt), now: now)
+            for event in events { try receiveObservation(event) }
+            lastOrcaMetadataSuccess = snapshot.receivedAt
+            orcaMetadataIssue = "none"
+        } catch { invalidateOrcaMetadata(issue: "orcaMetadataRejected") }
+    }
+
+    private func invalidateOrcaMetadata(issue: String) {
+        orcaMetadataIssue = issue
+        lastOrcaMetadataSuccess = -Double.infinity
+        let now = uptime()
+        if let events = try? orcaMetadataTracker.consume(OrcaUISnapshot(statuses: [], complete: false, observedAt: now), now: now) {
+            for event in events { _ = try? receiveObservation(event) }
+        }
+    }
+
+    func receiveOrcaUISnapshot(_ snapshot: OrcaUISnapshot) {
+        do {
+            let events = try orcaUITracker.consume(snapshot, now: uptime())
+            orcaUIIssue = snapshot.complete ? nil : "orcaUIIncomplete"
+            for event in events {
+                do { try receiveObservation(event) }
+                catch { orcaUIIssue = "orcaUIObservationRejected" }
+            }
+        } catch {
+            orcaUIIssue = (error as? OrcaUIReadError)?.code ?? "orcaUIObservationRejected"
+        }
+    }
+
+    func receiveProcessSnapshot(_ candidates: [ProcessCandidate], complete: Bool, observedAt: Double) {
+        let age = uptime() - observedAt
+        guard age.isFinite, age >= 0, age <= 0.2 else {
+            processCandidates = []; lastProcessSuccess = -Double.infinity; lastProcessObservation = -Double.infinity; return
+        }
+        processCandidates = Array(candidates.prefix(20))
+        lastProcessObservation = observedAt
+        lastProcessSuccess = complete && candidates.count <= 20 ? observedAt : -Double.infinity
+    }
+
+    // MARK: - Same-user preview control
+
+    func startControlService() {
+        do {
+            try controlServer.start { [weak self] command, payload in
+                let allowance = command == .diagnose ? 5.5 : 0.8
+                let box = ControlReplyBox(timeout: allowance + 0.1)
+                let deadline = ContinuousTime.now + allowance
+                Task { @MainActor in
+                    guard let self, ContinuousTime.now < deadline else {
+                        box.finish(.failure(IPCError.unavailable)); return
+                    }
+                    do { box.finish(.success(try await self.handleControlAsync(command, payload: payload, deadline: deadline))) }
+                    catch { box.finish(.failure(error)) }
+                }
+                return try box.wait()
+            }
+        } catch {
+            authorityUnavailable = true
+            if case IPCError.policyDenied(let reason) = error {
+                refusalNotice = "Preview control unavailable: " + reason
+            } else { refusalNotice = "Preview control unavailable; local service could not start." }
+        }
+    }
+
+    func handleControlAsync(_ command: AllowlistedCommand, payload: Data, deadline: Double) async throws -> Data {
+        try requireControlAdmission(command)
+        if command == .diagnose {
+            _ = try BoundedPayload(payload)
+            guard payload.isEmpty else { throw IPCError.invalidInput("diagnoseTakesNoPayload") }
+            let snapshot = await diagnosticSnapshot()
+            let bytes = try snapshot.boundedJSON()
+            return try JSONEncoder().encode(CLIResult(json: String(decoding: bytes, as: UTF8.self), exitCode: snapshot.hasCoverage ? 0 : 4))
+        }
+        if command == .logsExport {
+            _ = try BoundedPayload(payload)
+            guard let data = await history.exportRedactedJSON(salt: UUID().uuidString,
+                timeout: max(0, min(0.7, deadline - uptime()))) else { throw IPCError.unavailable }
+            return data
+        }
+        guard command == .configSet else { return try handleControl(command, payload: payload) }
+        _ = try BoundedPayload(payload)
+        let options = try JSONDecoder().decode(CLIOptions.self, from: payload)
+        guard let raw = options.flags["patchJSON"] else { throw IPCError.invalidInput("missingPatch") }
+        var context = CommandContext(historyStore: nil)
+        context.config = config; context.revision = revision; context.session = session
+        context.files["remote-patch"] = raw
+        var sanitized = options; sanitized.flags["file"] = "remote-patch"
+        let result = Commands.dispatch("config set", options: sanitized, context: &context)
+        guard result.exitCode == 0, options.flags["dry-run"] == nil else { return try JSONEncoder().encode(result) }
+        guard let dictionary = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any] else { throw IPCError.invalidInput("invalidPatch") }
+        let patch = try ConfigPatch(jsonDictionary: dictionary)
+        switch await applySettingsPatchAsync(patch, expectedRevision: revision, deadline: deadline) {
+        case .saved: return try JSONEncoder().encode(result)
+        case .conflict:
+            return try JSONEncoder().encode(CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"revisionConflict\"}", exitCode: 3))
+        case .failed: throw IPCError.unavailable
+        case .unconfirmed:
+            return try JSONEncoder().encode(CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"commitUnconfirmed\",\"mayApplyLater\":true,\"readBackRequired\":true}", exitCode: 5))
+        }
+    }
+
+    /// In-process observer metadata only; no provider/IPC producer can call this path.
+    @discardableResult
+    func receiveObservation(_ event: NormalizedEvent) throws -> String {
+        guard AgentBadgeState.providers.contains(event.provider) else {
+            throw IPCError.policyDenied("unsupportedObservedProvider")
+        }
+        let now = uptime()
+        let result = try agents.ingest(JSONEncoder().encode(event), now: now)
+        if result == "applied", let task = agents.tasks(now: now).first(where: {
+            $0.sessionID == event.sessionID && $0.runID == event.runID && agents.provider(for: $0.id) == event.provider
+        }) {
+            // A gap fill may apply a buffered terminal observation.
+            let identity = EvidenceNormalizer.runKey(provider: event.provider,
+                sessionID: event.sessionID, runID: event.runID) + "\0" + String(event.epoch)
+            if task.evidenceKind != .process && (task.state == .working || task.state == .waiting) {
+                exactTaskEpoch = identity
+            }
+            if task.evidenceKind != .process,
+               task.state == .failed || (task.state == .completed && session?.requestedMode != .auto) {
+                outcomeNotifications.emit(category: task.state == .failed ? .failure : .completion,
+                    session: session?.id ?? "app", event: identity,
+                    reason: "terminalEvidence", preview: true, now: now)
+            }
+        }
+        refresh()
+        record(category: .stateTransition, newState: sessionStateForRecord(), reasons: ["agentObservation"])
+        return result
+    }
+
+    func handleControl(_ command: AllowlistedCommand, payload: Data) throws -> Data {
+        try requireControlAdmission(command)
+        _ = try BoundedPayload(payload)
+        if command == .logsExport {
+            // Real transport uses the ordered off-main read path above.
+            throw IPCError.unavailable
+        }
+        let options = payload.isEmpty ? CLIOptions() : try JSONDecoder().decode(CLIOptions.self, from: payload)
+        var context = CommandContext(historyStore: nil)
+        context.config = config; context.revision = revision; context.session = session
+        context.health = latestHealth; context.nowMonotonic = uptime()
+        var result: CLIResult
+        switch command {
+        case .status, .doctor, .agentsList:
+            latestHealth = currentHealth()
+            var object: [String: Any] = ["schemaVersion": 1, "available": true, "preview": true,
+                "powerActuation": false, "leaseVerified": false, "backendVerified": false,
+                "configuredMode": config.mode.rawValue, "activeSessionMode": session?.requestedMode.rawValue as Any? ?? NSNull(),
+                "restoration": "noPowerResourcesOwned",
+                "mode": config.mode.rawValue, "effectiveState": "unavailable", "policyState": sessionStateForRecord().rawValue,
+                "revision": revision, "reasonCodes": ["backendPendingM1"],
+                "settingsCommitPending": hasPendingSettingsWork,
+                "historyError": history.lastError as Any? ?? NSNull(),
+                "omittedHistoryRecords": omittedHistoryRecords,
+                "deferredHistoryRecords": terminationDeferredHistory.count,
+                "toolDiagnostic": NSNull()]
+            updates.refreshSafety()
+            object["batteryModeActive"] = session != nil && config.batteryModeAllowed && !config.chargingOnly && latestHealth?.powerSource == .battery
+            object["agentSourceLimitations"] = ["observation": "externalOSMetadataAndReadOnlyOrcaMetadata", "setupRequired": false,
+                "providerConnections": config.orcaMetadataAllowed, "providerEventsAccepted": false,
+                "processScanCompleteAndFresh": uptime() - lastProcessSuccess <= 15,
+                "standaloneTurnLifecycle": "unknown", "remoteWork": "unverified", "processPresenceProvesWork": false] as [String: Any]
+            object["orcaUIObservation"] = ["source": "removedAccessibilitySource",
+                "lastIssue": orcaUIIssue as Any? ?? NSNull(), "qualification": "removed",
+                "completionCoverageQualified": false, "providerConnection": false,
+                "permissionPrompted": permissions.promptRequested ? NSNull() as Any : false,
+                "permissionPromptRequested": permissions.promptRequested,
+                "permissionState": permissions.accessibility,
+                "readDiagnostics": ["stage": orcaUIReadDiagnostics.stage,
+                    "nodesVisited": orcaUIReadDiagnostics.nodesVisited,
+                    "axError": orcaUIReadDiagnostics.axError as Any? ?? NSNull(),
+                    "arrayCount": orcaUIReadDiagnostics.arrayCount as Any? ?? NSNull(),
+                    "ancestorPath": orcaUIReadDiagnostics.ancestorPath.map {
+                        ["depth": $0.depth, "role": $0.role, "frame": $0.frame as Any? ?? NSNull()] as [String: Any]
+                    }]] as [String: Any]
+            object["orcaMetadataObservation"] = ["source": "readOnlyOrcaCLI", "enabled": config.orcaMetadataAllowed,
+                "lastIssue": orcaMetadataIssue, "queryReceiptAgeSeconds": lastOrcaMetadataSuccess.isFinite ? max(0, uptime() - lastOrcaMetadataSuccess) as Any : NSNull(),
+                "sourceStateFreshness": "unverified", "completionCoverageQualified": false,
+                "mixedJSONTransientMemory": true, "contentSavedOrSentToAI": false] as [String: Any]
+            object["orcaUIStructureSurvey"] = try orcaUISurvey.map {
+                try JSONSerialization.jsonObject(with: JSONEncoder().encode($0))
+            } ?? NSNull()
+            object["permissions"] = ["accessibility": permissions.accessibility,
+                "notifications": outcomeNotifications.permissionState,
+                "settingsError": permissions.settingsError as Any? ?? NSNull()] as [String: Any]
+            object["evidenceCapacity"] = ["holdingTasks": agents.tasks(now: uptime()).filter { PolicyEngine.holdsSession($0, now: uptime()) }.count,
+                "maxHoldingTasks": PolicyLimits.maxEnrolledTasks, "trackedRuns": agents.trackedRunCount,
+                "retiredRuns": agents.retiredRunCount, "lastRejection": agents.lastRejection as Any? ?? NSNull()] as [String: Any]
+            object["agentDetection"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(badgeStates()))
+            var protection = try JSONSerialization.jsonObject(with: JSONEncoder().encode(protectionReadiness())) as! [String: Any]
+            protection["readinessState"] = protection.removeValue(forKey: "state")
+            protection["effectiveState"] = "Preview"
+            protection["state"] = "preview"
+            object["protection"] = protection
+            object["updates"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(updates.snapshot))
+            if let latestHealth {
+                var health = try JSONSerialization.jsonObject(with: JSONEncoder().encode(latestHealth)) as! [String: Any]
+                var temperature = try JSONSerialization.jsonObject(with: JSONEncoder().encode(latestHealth.temperature)) as! [String: Any]
+                temperature["ageSeconds"] = latestHealth.temperature.sampledAtMonotonic.map { max(0, uptime() - $0) } as Any? ?? NSNull()
+                health["temperature"] = temperature
+                if var lid = health["lid"] as? [String: Any] {
+                    lid["ageSeconds"] = latestHealth.lid?.sampledAtMonotonic.map { max(0, uptime() - $0) } as Any? ?? NSNull()
+                    health["lid"] = lid
+                }
+                object["health"] = health
+            }
+            if let session { object["session"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(session)) }
+            object["tasks"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(agents.tasks(now: uptime())))
+            result = CLIResult(json: String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self), exitCode: 0)
+        case .admitCommand, .renewCommand, .finishCommand:
+            result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"backendPendingM1\",\"preview\":true,\"powerActuation\":false}", exitCode: 3)
+        case .sleep:
+            guard options.positionals.isEmpty, Set(options.flags.keys).isSubset(of: ["json", "dry-run"]),
+                  options.flags.values.allSatisfy({ $0 == "true" }) else { throw IPCError.invalidInput("invalidSleepOptions") }
+            let display = LiveSensorProvider.displayObservation()
+            let input = LiveSensorProvider.recentInputObservation()
+            let health = currentHealth()
+            let now = uptime()
+            let tasks = sleepRelevantTasks(now: now)
+            let lifetime = updateLifetimePolicy(now: now)
+            let lifetimeContributes = session.map {
+                $0.requestedMode == .auto && !$0.latchedSafetyStop
+                    && [.ready, .protected, .completionGrace].contains($0.effectiveState)
+            } ?? false
+            let decision = GuardedSleepDecision.evaluate(now: now,
+                observedAt: health.lid?.sampledAtMonotonic ?? .nan, lid: health.lidState,
+                displaysObservedAt: display.sampledAtMonotonic, displays: display.state,
+                inputObservedAt: input.sampledAtMonotonic, idleSeconds: input.idleSeconds,
+                workActive: tasks.contains { [.working, .waiting].contains($0.state) }
+                    || (lifetimeContributes && lifetime?.hasActiveRule == true),
+                workUnknown: tasks.contains { $0.state == .unknown } || (lifetimeContributes
+                    && (lifetime?.hasUnknownHold == true || lifetime?.suppressesAutoCompletion == true || lifetime == nil))
+                    || now - lastProcessSuccess > 5 || agentCompletionUncertain(),
+                restore: .verified, backendVerified: false)
+            if options.flags["dry-run"] == nil, !decision.eligible {
+                record(category: .stateTransition, newState: sessionStateForRecord(),
+                    reasons: ["sleepBlocked"] + decision.blockers)
+            }
+            let data = try JSONEncoder().encode(decision)
+            result = CLIResult(json: String(decoding: data, as: UTF8.self), exitCode: decision.eligible ? 0 : 3)
+        case .configGet:
+            result = Commands.dispatch("config get", options: options, context: &context)
+        case .configSet:
+            guard let patch = options.flags["patchJSON"] else { throw IPCError.invalidInput("missingPatch") }
+            context.files["remote-patch"] = patch
+            var sanitized = options; sanitized.flags["file"] = "remote-patch"
+            result = Commands.dispatch("config set", options: sanitized, context: &context)
+            if result.exitCode == 0, options.flags["dry-run"] == nil {
+                guard persistConfig(context.config) else { throw IPCError.unavailable }
+                record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configApplied"])
+                refresh()
+            }
+        case .start:
+            result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"backendPendingM1\",\"preview\":true,\"powerActuation\":false}", exitCode: 3)
+        case .quit:
+            // Preview owns no power resources. A future actuating backend must
+            // replace this with restoration-confirmed shutdown before shipping.
+            record(category: .configuration, newState: .off, reasons: ["cliQuitNoOwnedPower"])
+            // AppKit's terminateLater loop must not nest inside a main-dispatch
+            // callback: that blocks the main-actor cleanup task from replying.
+            NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0.2)
+            result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":true,\"powerActuation\":false,\"cleanupOutcome\":\"noPowerResourcesOwned\"}", exitCode: 0)
+        case .stop:
+            let hadSession = session != nil
+            menuBarStopProtection()
+            result = CLIResult(json: "{\"schemaVersion\":1,\"released\":\(hadSession),\"cleanupOutcome\":\"noPowerResourcesOwned\",\"preview\":true}", exitCode: 0)
+        default: throw IPCError.policyDenied("commandNotAvailableInPreview")
+        }
+        return try JSONEncoder().encode(result)
+    }
+
+    // MARK: - Config persistence (validated; never silently arms)
+
+    private func requireControlAdmission(_ command: AllowlistedCommand) throws {
+        if terminationFlowActive && ![.status, .doctor, .agentsList, .configGet, .logsExport].contains(command) {
+            throw IPCError.policyDenied("applicationTerminating")
+        }
+        guard ![.event, .agentDiagnostic, .run, .admitCommand, .renewCommand, .finishCommand].contains(command) else {
+            throw IPCError.policyDenied("externalObservationOnly")
+        }
+    }
+
+    @discardableResult
+    private func persistConfig(_ candidate: Configuration) -> Bool {
+        guard !authorityUnavailable, !terminationFlowActive, !hasPendingSettingsInstallation, revision < Int.max else { return false }
+        let nextRevision = revision + 1
+        let snapshot = PersistedSettings(schemaVersion: 1, revision: nextRevision, configuration: candidate)
+        do {
+            try candidate.validate()
+            try settingsWriter(JSONEncoder().encode(snapshot), configURL)
+        } catch {
+            refusalNotice = "Settings could not be saved. Last applied values retained."
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configWriteFailed"])
+            return false
+        }
+        acceptPersistedConfig(candidate, nextRevision: nextRevision)
+        return true
+    }
+
+    private func acceptPersistedConfig(_ candidate: Configuration, nextRevision: Int) {
+        let changedLogin = config.launchAtLogin != candidate.launchAtLogin
+        let sourceChanged = config.orcaMetadataAllowed != candidate.orcaMetadataAllowed
+        config = candidate; revision = nextRevision
+        if sourceChanged {
+            orcaMetadataEpoch = UUID()
+            invalidateOrcaMetadata(issue: candidate.orcaMetadataAllowed ? "orcaMetadataNotObserved" : "orcaObservationDisabled")
+            lastOrcaMetadataPoll = -Double.infinity
+        }
+        outcomeNotifications.configure(categories: candidate.notificationCategories ?? [])
+        if changedLogin { loginItem.apply(candidate.launchAtLogin) }
+        if config.mode == .off, session != nil {
+            record(category: .stateTransition, newState: .off, reasons: ["modeOffPreview"]); session = nil
+        } else if var active = session, active.requestedMode != config.mode {
+            sessionTimerMinutes = config.timedDurationMinutes == 0 ? 0 : min(config.timedDurationMinutes, config.runCapMinutes)
+            sessionSleepDelayMinutes = config.completionDelayMinutes
+            if config.sessionDurationMinutes(for: config.mode) == nil {
+                active.capDeadlineMonotonic = nil
+            } else if active.capDeadlineMonotonic == nil {
+                active.capDeadlineMonotonic = config.sessionDurationMinutes(for: config.mode)
+                    .map { active.startedAtMonotonic + Double($0) * 60 }
+            } else if config.mode == .timed, active.requestedMode != .timed,
+                      let minutes = config.sessionDurationMinutes(for: .timed),
+                      let deadline = active.capDeadlineMonotonic {
+                active.capDeadlineMonotonic = min(deadline, active.startedAtMonotonic + Double(minutes) * 60)
+            }
+            active.requestedMode = config.mode; session = active
+        }
+        // Selection affects sleep policy only; passive observations stay visible.
+    }
+
+    private static func readPrivatePreferences(_ url: URL) -> Data? {
+        let descriptor = Darwin.open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
+        guard descriptor >= 0 else { return nil }
+        defer { Darwin.close(descriptor) }
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, info.st_uid == getuid(),
+              (info.st_mode & S_IFMT) == S_IFREG, (info.st_mode & 0o077) == 0,
+              info.st_size > 0, info.st_size <= 65_536 else { return nil }
+        var data = Data(count: Int(info.st_size))
+        let count = data.withUnsafeMutableBytes { buffer in
+            Darwin.read(descriptor, buffer.baseAddress, buffer.count)
+        }
+        guard count == data.count else { return nil }
+        return data
+    }
+
+    private func loadPersistedConfig() {
+        var metadata = stat()
+        let hasEntry = lstat(configURL.path, &metadata) == 0
+        let missingEntry = !hasEntry && errno == ENOENT
+        if !hasEntry && !missingEntry {
+            refusalNotice = "Saved settings could not be inspected. Using safe defaults."; return
+        }
+        // lstat sees dangling symlinks too: an unreadable authoritative entry
+        // must never silently resurrect an older UserDefaults configuration.
+        if hasEntry || preferences.data(forKey: "CamLidConfigurationV2") != nil {
+            let data = hasEntry ? Self.readPrivatePreferences(configURL) : preferences.data(forKey: "CamLidConfigurationV2")
+            guard let data else {
+                refusalNotice = "Saved settings could not be read. Using safe defaults."; return
+            }
+            guard let saved = try? JSONDecoder().decode(PersistedSettings.self, from: data),
+                saved.schemaVersion == 1, saved.revision >= 1,
+                (try? saved.configuration.validate()) != nil else {
+                refusalNotice = "Saved settings are invalid. Preview uses safe defaults."
+                return
+            }
+            config = saved.configuration; revision = saved.revision
+            return
+        }
+        guard let data = preferences.data(forKey: Self.configKey) else { return }
+        guard let decoded = try? JSONDecoder().decode(Configuration.self, from: data),
+            (try? decoded.validate()) != nil else {
+            refusalNotice = "Saved settings are invalid. Preview uses safe defaults."
+            return
+        }
+        config = decoded
+        revision = max(1, preferences.integer(forKey: "CamLidConfigRevision"))
+    }
+
+    // MARK: - History
+
+    private func record(category: ActivityCategory, newState: EffectiveState, reasons: [String]) {
+        // A duplicate UI owns neither the control authority nor shared history.
+        guard !authorityUnavailable, !terminationConfirmed else { return }
+        guard let transition = try? StoredTransition(
+            sessionID: session?.id,
+            stateRevision: (session?.stateRevision ?? 0),
+            category: category, previousState: lastReportedState, newState: newState,
+            reasonCodes: reasons,
+            healthSummary: latestHealth.map(HealthSummary.from) ?? .unknown)
+        else { return }
+        if terminationHistorySealed {
+            // Preserve transitions on Keep Open. Normal quit never claims a
+            // complete drain while any deferred transition remains.
+            if terminationDeferredHistory.count < AsyncHistoryRecorder.maximumOutstandingOperations {
+                terminationDeferredHistory.append(transition)
+            } else if omittedHistoryRecords < Int.max { omittedHistoryRecords += 1 }
+            return
+        }
+        if !history.record(transition), omittedHistoryRecords < Int.max { omittedHistoryRecords += 1 }
+        let alertCategory: NotificationCategory? = category == .safetyStop ? .safety
+            : newState == .recoveryRequired ? .restoration
+            : newState == .ready && reasons.contains("graceExpired") ? .completion : nil
+        if let alertCategory {
+            outcomeNotifications.emit(category: alertCategory, session: session?.id ?? "app", event: transition.id.uuidString,
+                reason: reasons.first ?? "stateChanged", preview: true, now: uptime())
+        }
+    }
+}
+
+private func uncheckedDefaultConfig() -> Configuration {
+    // try? Configuration() cannot fail (defaults are valid); this is unreachable.
+    // swiftlint:disable:next force_try
+    try! Configuration()
+}
+
+private final class ControlReplyBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private let ready = DispatchSemaphore(value: 0)
+    private let timeout: Double
+    init(timeout: Double = 0.9) { self.timeout = timeout }
+    private var result: Result<Data, any Error>?
+    func finish(_ result: Result<Data, any Error>) {
+        lock.lock(); self.result = result; lock.unlock(); ready.signal()
+    }
+    func wait() throws -> Data {
+        guard ready.wait(timeout: .now() + timeout) == .success else { throw IPCError.unavailable }
+        lock.lock(); defer { lock.unlock() }
+        guard let result else { throw IPCError.unavailable }
+        return try result.get()
+    }
+}
+
+private struct PersistedSettings: Codable {
+    let schemaVersion: Int
+    let revision: Int
+    let configuration: Configuration
+}
+
+// Explicit session edits; routine policy evaluation never renews a deadline.
+extension ProtectionSession {
+    mutating func restartTimer(minutes: Int, maximumMinutes: Int, now: Double) -> Int? {
+        guard requestedMode == .timed || requestedMode == .manual,
+              !latchedSafetyStop, effectiveState != .expired,
+              capDeadlineMonotonic.map({ now < $0 }) ?? true,
+              minutes == 0 || (5...480).contains(minutes) else { return nil }
+        let duration = minutes == 0 ? 0 : min(minutes, maximumMinutes)
+        capDeadlineMonotonic = duration == 0 ? nil : now + Double(duration) * 60
+        return duration
+    }
+
+    mutating func changeSleepDelay(minutes: Int, previousMinutes: Int) -> Bool {
+        guard requestedMode == .auto, !latchedSafetyStop, effectiveState != .expired,
+              (0...30).contains(minutes) else { return false }
+        if let deadline = graceDeadlineMonotonic {
+            // Keep measuring from completion when editing during grace.
+            graceDeadlineMonotonic = deadline - Double(previousMinutes) * 60 + Double(minutes) * 60
+        }
+        return true
+    }
+}

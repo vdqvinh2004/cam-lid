@@ -1,0 +1,7 @@
+// Local signed-candidate configuration. Use only with real certificate and release metadata.
+// Feed/key/team must be supplied explicitly; empty values keep checks unavailable.
+CODE_SIGNING_ALLOWED = YES
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = Developer ID Application
+ENABLE_HARDENED_RUNTIME = YES
+// No new entitlements, privileged helper, automatic update or profile collection.
