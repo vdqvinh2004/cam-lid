@@ -10,8 +10,8 @@ let package = Package(
         .executable(name: "camlid-power-qa", targets: ["camlid-power-qa"]),
     ],
     dependencies: [
-        .package(path: "../../Tests/Experiments/LidRecoveryJournal"),
-        .package(path: "../../Tests/Experiments/LidNativeAdapter"),
+        .package(path: "../LidRecoveryJournal"),
+        .package(path: "../LidNativeAdapter"),
     ],
     targets: [
         .target(name: "CamLidPowerService", dependencies: [
