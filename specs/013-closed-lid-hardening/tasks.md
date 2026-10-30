@@ -156,7 +156,7 @@ clean-checkout/handoff gaps without authorizing T501/T502.
   Driver disarmed; latch preserved, no further retry authority.
   Earlier preflight rejection remains recorded, not overwritten. Not overall G2 qualification.
 
-- [ ] **T502 — G3 app/CLI integration.**
+- [x] **T502 — G3 app/CLI integration.** — **Review 2026-10-31:** closed as superseded by spec 014: app/CLI wiring done in Phase 7; final sign-off is 014 T601.
   Wire the M9 contract into the app behind the experimental flag, with consent/banner/recovery
   copy and CLI parity. *Blocked:* separate app-integration approval; no shipping-gate change.
 

@@ -5,8 +5,8 @@ feature folders and one selected feature context; it does not itself require mil
 [Shared roadmap](../docs/planning/roadmap.md) defines cross-feature gates and detailed procedures.
 
 - [M0: Project Planning](001-project-planning/spec.md) — Complete: documentation only.
-- [M1: Power and Detection Feasibility](002-power-feasibility/spec.md) — Blocked; historical R0 accepted, but G2 qualification and support rows remain unpassed.
-- [M2: Native Foundation and Safety](003-native-foundation/spec.md) — Preview components implemented; live backend gate awaits M1.
+- [M1: Power and Detection Feasibility](002-power-feasibility/spec.md) — Blocked; historical R0 accepted, but G2 qualification and support rows remain unpassed. **Review 2026-10-31:** Standard backend qualified on one Mac by the 014 G2 trial; only T002 (agent lifecycle, now an M3 concern) remains.
+- [M2: Native Foundation and Safety](003-native-foundation/spec.md) — Preview components implemented; live backend gate awaits M1. **Review 2026-10-31:** helper backend, lease, journal and recovery done through spec 014; open: T009 qualification, T014, T019 storage faults, T022 (Quit, manual Sleep, external assertions), T023 `camlid start`, T024 recovery CLI.
 - [M3: Agents and Orca Integration](004-agent-integration/spec.md) — Third-person external observation; source accuracy/freshness/coverage qualification open. Legacy hook/bridge/wrapper ingress is disabled, not a product prerequisite.
 - [M4: Native UX and Activity History](005-native-ux/spec.md) — Hosted preview/history implemented; native walkthrough/integration workflow pending.
 - [M4a: Apple HIG UI/UX Refinement](009-apple-hig-ux/spec.md) — Preview refinement implemented; complete native acceptance remains open before M5/M6 approval.
@@ -18,9 +18,9 @@ feature folders and one selected feature context; it does not itself require mil
 
 Experimental feature spec (not a milestone; no gate change):
 
-- [Closed-lid best-effort mode (012)](012-closed-lid-best-effort/spec.md) — Offline model implemented; R0 accepted historically. Full-Sleep/continuity/failure-class G2 qualification and separately approved G3 integration remain open. Manual, finite, attended, AC-only scope; no verified-restoration claim.
+- [Closed-lid best-effort mode (012)](012-closed-lid-best-effort/spec.md) — Offline model implemented; R0 accepted historically. Full-Sleep/continuity/failure-class G2 qualification and separately approved G3 integration remain open. Manual, finite, attended, AC-only scope; no verified-restoration claim. **Review 2026-10-31:** all remaining tasks closed as superseded by spec 014 or moved to M5/M6/M7.
 
-- [M9: Closed-Lid Best-Effort Hardening (013)](013-closed-lid-hardening/spec.md) — Original offline scope plus reproducibility follow-up complete (22/23 current tasks checked, including auth-only install-packet preparation and T501 foreign-policy row PASS with operator attestation); overall G2 and G3 T502 remain blocked. [Current reproducibility/handoff work](../docs/qa/reproducible-m9-handoff-2026-10-21.md) preserves those gates.
+- [M9: Closed-Lid Best-Effort Hardening (013)](013-closed-lid-hardening/spec.md) — Original offline scope plus reproducibility follow-up complete (22/23 current tasks checked, including auth-only install-packet preparation and T501 foreign-policy row PASS with operator attestation); overall G2 and G3 T502 remain blocked. [Current reproducibility/handoff work](../docs/qa/reproducible-m9-handoff-2026-10-21.md) preserves those gates. **Review 2026-10-31:** T502 closed as superseded by spec 014 (sign-off is 014 T601).
 
 - [Persistent Helper, Standard mode (014)](014-persistent-helper/spec.md) — Draft, 0/20 tasks. Replaces the blocked exclusive-create/one-use admission with a root LaunchDaemon installed once through administrator authentication ([ADR 0001](../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md)). The 012/013 mechanism stays as the experimental, frozen **Strict** mode. No gate passed; native actions still need explicit owner approval.
 

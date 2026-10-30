@@ -477,7 +477,7 @@ pass). Native tasks below still require their own one-use approvals.
 
 ## Phase 2 — G2 native qualification (separate approvals per episode/boot)
 
-- [ ] **T201 — Full system Sleep repeats** (owner-frozen 2026-10-21: ≥3 across ≥2 boots):
+- [x] **T201 — Full system Sleep repeats** (owner-frozen 2026-10-21: ≥3 across ≥2 boots): — **Review 2026-10-31:** closed as superseded: Strict is frozen (ADR 0001). The general need for a manual Sleep check moves to 014 T706.
   clean termination, zero unexplained darkwakes, operator attestation. Genuine backend
   failure under a valid procedure rejects the backend; invalid/incomplete attempts do not
   count as PASS or permit automatic retry. No native episode is approved by policy freeze.
@@ -625,26 +625,26 @@ pass). Native tasks below still require their own one-use approvals.
   cooling/readiness then fresh safety scope required. No actual lease/manual Sleep/lid
   trial/physical credit yet. No native recorder, guardian/ownership proof,
   installed trust/binary change or new acquisition/IPC/Sleep authority.
-- [ ] **T202 — Sustained closed-lid sessions** with independent progress and honest display
+- [x] **T202 — Sustained closed-lid sessions** with independent progress and honest display — **Review 2026-10-31:** closed as superseded by 014 G2 trial 1 (Standard backend, 5 min with the lid closed, no progress gap).
   scope.
-- [ ] **T203 — Failure classes:** app crash, helper crash/hang, journal corruption/permission,
+- [x] **T203 — Failure classes:** app crash, helper crash/hang, journal corruption/permission, — **Review 2026-10-31:** closed as superseded by 014 G2 trials 3–7 and the 014 journal tests.
   AC loss, thermal, foreign override, manual Sleep, reboot with pending journal.
-- [ ] **T204 — Hardware rows:** target MacBook Air first; additional rows only if shipping
+- [x] **T204 — Hardware rows:** target MacBook Air first; additional rows only if shipping — **Review 2026-10-31:** closed as superseded: one hardware row (Mac17,3 / 26A434) in `QualifiedSupportRows`; other Macs use the untested-configuration acceptance (014 Phase 8).
   scope expands.
 
 ## Phase 3 — G3 app integration (separate approval)
 
-- [ ] **T301 — Wire the best-effort projection behind the experimental flag** without changing
+- [x] **T301 — Wire the best-effort projection behind the experimental flag** without changing — **Review 2026-10-31:** closed as superseded by 014 Phases 7–8 (Standard backend wired behind opt-in and the permit).
   the shipping backend or the `protected` state.
-- [ ] **T302 — Consent, banner and recovery UX** in the app.
-- [ ] **T303 — CLI parity** and refusal reason codes.
-- [ ] **T304 — Regression + M6:** existing suites, Debug/Release builds, UI/accessibility,
+- [x] **T302 — Consent, banner and recovery UX** in the app. — **Review 2026-10-31:** closed as superseded by 014 T203, T302, T705, T804, T805 (install, consent, banners, conflicts).
+- [x] **T303 — CLI parity** and refusal reason codes. — **Review 2026-10-31:** closed here, moved to 003 T023 (`camlid start` still refuses).
+- [x] **T304 — Regression + M6:** existing suites, Debug/Release builds, UI/accessibility, — **Review 2026-10-31:** closed here, moved to M6 (007).
   CLI integration, M6 evidence pack.
 
 ## Phase 4 — G4 release gates (separate)
 
-- [ ] **T401 — M5** signing/notarisation/SMAppService install/remove/update.
-- [ ] **T402 — M7** supervised real users after M6 PASS.
+- [x] **T401 — M5** signing/notarisation/SMAppService install/remove/update. — **Review 2026-10-31:** closed here, moved to M5 (006); ADR 0001 excludes notarisation and `SMAppService`.
+- [x] **T402 — M7** supervised real users after M6 PASS. — **Review 2026-10-31:** closed here, moved to M7 (008).
 
 ## Blocked / explicitly out of scope
 
