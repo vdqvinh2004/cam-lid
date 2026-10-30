@@ -49,9 +49,12 @@ sudo cat "/Library/Application Support/CamLidPowerHelper/identity.json"
 "$APP/Contents/MacOS/CamLid" --helper-inspect; echo "exit=$?"
 pmset -g | grep -i SleepDisabled          # must be unchanged from step 1
 
-# 5. Identity check. Run from a copy (different CDHash is not possible by copying; re-sign it):
-cp -R "$APP" /tmp/CamLid-other.app && codesign --force --sign - --options runtime /tmp/CamLid-other.app
-/tmp/CamLid-other.app/Contents/MacOS/CamLid --helper-inspect; echo "exit=$?"   # expect unreachable / exit 1
+# 5. Identity check. A copy re-signed ad hoc with the same identifier and entitlements has the SAME CDHash, so
+#    it is the same pinned identity and is accepted: the pin follows the code, not the path. To see the helper
+#    refuse a different peer, run the probe (an unpinned client) right after a positive control:
+swiftc scripts/helper-peer-probe.swift -o /tmp/helper-peer-probe
+"$APP/Contents/MacOS/CamLid" --helper-inspect; echo "control exit=$?"      # expect accepted=true, exit 0
+/tmp/helper-peer-probe; echo "probe exit=$?"                               # expect "refused", exit 0; "ANSWERED" (exit 1) is a failure
 
 # 6. Recovery job (no password). The journal is empty, so it must do nothing.
 sudo /Library/PrivilegedHelperTools/com.camlid.power-helper --recover-v1   # expect "recovery: nothingToRecover"
@@ -74,8 +77,13 @@ If step 4 prints `unreachable` while the helper is installed, check `launchctl p
 (is it running?) and the app's signature flags (`codesign -dvvv "$APP"` must show `runtime`).
 
 ## Result of the first run (2026-10-31)
-Steps 2b, 3, 4 and 7 were run by the owner; steps 5 and 6 were not. Install returned `installed`, status `installed` with
+Steps 2b, 3, 4, 6 and 7 were run by the owner; step 5 ran with the first, flawed design. Install returned `installed`, status `installed` with
 `serviceLoaded:true`, `--helper-inspect` returned `accepted=true state=ready reason=noPendingIntent` (exit 0),
 `SleepDisabled` stayed 0, uninstall returned `uninstalled`, the earlier `identity.json` and the scope directories were
 intact and no `identity.json.previous` remained. Paste commands without trailing `#` comments: interactive zsh passes
 them as arguments.
+
+Second run (2026-10-31): both daemons loaded (`com.camlid.power-helper` running, `com.camlid.power-recovery` with `runs = 2`,
+`last exit code = 0`); `--recover-v1` as root returned `recovery: nothingToRecover` (exit 0) with `SleepDisabled` 0; uninstall
+again restored the earlier files. The re-signed copy was **accepted** (same CDHash, same identity), which corrected the
+step 5 design above; the helper-side refusal of a different peer is checked with `scripts/helper-peer-probe.swift`.
