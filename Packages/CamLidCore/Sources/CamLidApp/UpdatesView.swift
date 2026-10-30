@@ -1,7 +1,9 @@
 import SwiftUI
 
 public struct UpdatesView: View {
-    var preferredHeight: CGFloat { 175 }
+    var preferredHeight: CGFloat {
+        snapshot.phase == .unavailable ? 120 : 185
+    }
     public let snapshot: UpdateSnapshot
     public let canCheck: Bool
     public let onCheck: () -> Void
@@ -15,23 +17,47 @@ public struct UpdatesView: View {
             .accessibilityIdentifier("camlid.updates.window")
     }
     private var content: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(title, systemImage: "arrow.down.circle").font(.headline).help(title)
+        VStack(alignment: .leading, spacing: 10) {
+            CamLidStatusLabel(title, systemImage: symbol, tone: updateTone,
+                              font: .headline, help: title)
             Text(detail).fixedSize(horizontal: false, vertical: true)
-            if snapshot.phase == .available, let version = snapshot.version { Text("Available version: \(version)") }
+            if snapshot.phase == .available, let version = snapshot.version {
+                Text("Available version: \(version)")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             if snapshot.phase == .checking {
                 ProgressView("Checking update information…").controlSize(.small)
                     .accessibilityLabel("Checking for updates")
             } else if snapshot.phase != .unavailable {
                 HStack {
-                    Text("Checks only; no installation.").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Button("Check for Updates", action: onCheck)
                         .disabled(!canCheck).help(canCheck ? "Check the signed update feed" : detail)
                         .accessibilityIdentifier("camlid.updates.check")
                 }
+                Text("CamLid only checks; it won’t download or install updates.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }.padding(20).frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+    private var symbol: String {
+        switch snapshot.phase {
+        case .unavailable, .ready: "arrow.down.circle"
+        case .checking: "arrow.triangle.2.circlepath"
+        case .current: "checkmark.circle.fill"
+        case .available: "arrow.down.circle.fill"
+        case .offline: "wifi.slash"
+        case .error: "exclamationmark.triangle.fill"
+        case .deferred: "clock.fill"
+        }
+    }
+    private var updateTone: CamLidTone {
+        switch snapshot.phase {
+        case .current: .success
+        case .available: .accent
+        case .offline, .error, .deferred: .warning
+        default: .neutral
+        }
     }
     var title: String {
         switch snapshot.phase {
@@ -47,20 +73,20 @@ public struct UpdatesView: View {
     }
     var detail: String {
         switch snapshot.reason {
-        case "developerIDRequired": "Update checks are available in the signed release."
-        case "trustedFeedRequired": "No trusted update feed is configured for this release."
-        case "updateSigningKeyRequired": "The update verification key is unavailable. Try a signed release."
-        case "noCompatibleUpdate": "The feed did not provide a compatible update. This does not confirm the latest version."
-        case "sessionActive": "The check will resume after the current session ends."
-        case "agentWorkActive": "The check will resume when agent work is no longer active or uncertain."
-        case "recoveryRequired": "Resolve power recovery before checking for updates."
-        case "unsavedSettings": "Resolve or discard pending edits in Settings before checking for updates."
-        case "networkUnavailable": "Reconnect and try again. Your installed version is unchanged."
-        case "updateCheckFailed": "The check failed. Your installed version is unchanged. Try again later."
-        case "latestCompatibleVersion": "The feed confirms the latest compatible version is installed."
-        case "updateAvailable": "A newer compatible version is available. Installation is unavailable in this preview."
-        case "checkingSignedFeed": "Reading the signed feed; no download or installation."
-        default: "Checks run only when you request them. No system profile is sent."
+        case "developerIDRequired": "This preview build can’t check for updates. The release version of CamLid can."
+        case "trustedFeedRequired": "This build has no update feed. Update checks work in the release app."
+        case "updateSigningKeyRequired": "This build can’t verify updates. Use the release version of CamLid."
+        case "noCompatibleUpdate": "No compatible update was found. This doesn’t confirm the latest version."
+        case "sessionActive": "CamLid will check after the current session ends."
+        case "agentWorkActive": "CamLid will check when agents are no longer active."
+        case "recoveryRequired": "Finish recovery first, then check for updates."
+        case "unsavedSettings": "Finish the pending Settings change, then check for updates."
+        case "networkUnavailable": "Reconnect to the internet, then try again. Your installed version hasn’t changed."
+        case "updateCheckFailed": "The check didn’t complete. Your installed version hasn’t changed. Try again later."
+        case "latestCompatibleVersion": "The latest compatible version is installed."
+        case "updateAvailable": "A newer compatible version is available. This preview can check but not install updates."
+        case "checkingSignedFeed": "Checking for a compatible update. No download or installation."
+        default: "CamLid checks only when you ask, and sends no system profile."
         }
     }
 }

@@ -40,6 +40,6 @@ struct ProtectionReadinessTests {
         #expect(temperature["availability"] as? String == "unsupported")
         #expect(health["thermalPressure"] is String)
         #expect((health["lid"] as? [String: Any])?["source"] as? String == "IOPMrootDomain.AppleClamshellState")
-        #expect((status["agentDetection"] as? [[String: Any]])?.count == 4)
+        #expect((status["agentDetection"] as? [[String: Any]])?.count == AgentBadgeState.providers.count)
     }
 }

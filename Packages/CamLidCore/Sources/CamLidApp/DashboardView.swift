@@ -97,6 +97,10 @@ public struct DashboardData: Codable, Sendable, Equatable {
     public let metrics: [DashboardMetric]
     public let agents: [AgentBadgeState]
     public let timerMinutes: Int?
+    /// Largest finite duration the active session can accept. On battery this
+    /// is the stable safety cap, not the shrinking remaining time.
+    public let timerMaximumMinutes: Int?
+    public let timerLimitText: String?
     public let sleepDelayMinutes: Int?
 
     public init(
@@ -121,7 +125,8 @@ public struct DashboardData: Codable, Sendable, Equatable {
         bannerMessage: String? = nil,
         lastSessionText: String? = nil,
         stopEnabled: Bool = false, startEnabled: Bool = false, metrics: [DashboardMetric] = DashboardMetric.from(nil), agents: [AgentBadgeState] = [],
-        timerMinutes: Int? = nil, sleepDelayMinutes: Int? = nil
+        timerMinutes: Int? = nil, timerMaximumMinutes: Int? = nil, timerLimitText: String? = nil,
+        sleepDelayMinutes: Int? = nil
     ) {
         self.mode = mode
         self.state = state
@@ -146,7 +151,8 @@ public struct DashboardData: Codable, Sendable, Equatable {
         self.stopEnabled = stopEnabled
         self.startEnabled = startEnabled; self.metrics = isStale ? DashboardMetric.from(nil) : metrics
         self.agents = agents
-        self.timerMinutes = timerMinutes; self.sleepDelayMinutes = sleepDelayMinutes
+        self.timerMinutes = timerMinutes; self.timerMaximumMinutes = timerMaximumMinutes
+        self.timerLimitText = timerLimitText; self.sleepDelayMinutes = sleepDelayMinutes
     }
 
     /// Honest empty state: unknown telemetry, no fabricated values.
@@ -204,8 +210,11 @@ public struct DashboardView: View {
             ScrollView { content }
         }.onExitCommand(perform: onClose)
     }
+    private var timerSelection: Int {
+        durationMinutes == 0 ? 0 : max(0, min(durationMinutes, maximumDurationMinutes))
+    }
     private var content: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: data.statusSymbol).font(.title3).foregroundStyle(.secondary)
@@ -226,9 +235,7 @@ public struct DashboardView: View {
                     .accessibilityIdentifier(CamLidAccessibility.IDs.reasonText)
             }
             if !data.powerActuationAvailable {
-                Label("Preview · power control unavailable", systemImage: "shield.slash")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .help("Sessions preview CamLid behavior. This build does not keep the Mac awake or change lid-close sleep.")
+                PreviewBuildNotice(font: .caption)
             }
             HStack {
                 if let onModeChange {
@@ -237,23 +244,42 @@ public struct DashboardView: View {
                         .accessibilityIdentifier(CamLidAccessibility.IDs.dashboardMode)
                 } else { Text("Mode: \(data.mode == .manual ? "Timed" : data.mode.rawValue.capitalized)") }
             }
+            if !data.hasEnabledAgents {
+                HStack(spacing: 4) {
+                    Text("Auto needs an agent.").foregroundStyle(.secondary)
+                    if let onOpenAgents {
+                        Button("Choose Agents…", action: onOpenAgents)
+                            .buttonStyle(.link)
+                            .help("Open Settings → Agents to choose which agents may delay sleep")
+                            .accessibilityIdentifier("camlid.dashboard.chooseAgents")
+                    }
+                }
+                .font(.caption)
+            }
             if let onDurationChange, data.stopEnabled, data.mode == .timed || data.mode == .manual {
-                HStack(spacing: 8) {
-                    Label("Timer", systemImage: "timer").foregroundStyle(.secondary)
-                        .help("Timed duration; Infinite runs until stopped or a safety limit, including the battery time limit")
-                    Picker("Duration", selection: Binding(get: { durationMinutes }, set: onDurationChange)) {
-                        Text("∞ Infinite").tag(0)
-                        ForEach(NumericChoice.presets(.timer).filter { $0 > 0 && $0 <= maximumDurationMinutes }, id: \.self) { value in
-                            Text(NumericChoice.label(value, field: .runCap)).tag(value)
-                        }
-                        if durationMinutes != 0, !NumericChoice.presets(.timer).filter({ $0 <= maximumDurationMinutes }).contains(durationMinutes) {
-                            Text(NumericChoice.label(durationMinutes, field: .runCap)).tag(durationMinutes)
-                        }
-                    }.labelsHidden().accessibilityLabel("Session duration")
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .help("Changing the duration restarts the timer now; battery exposure keeps its original deadline")
-                        .disabled(data.state == .safetyStopped || data.state == .expired)
-                        .accessibilityIdentifier("camlid.dashboard.timer")
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Label("Timer", systemImage: "timer").foregroundStyle(.secondary)
+                            .help("Timed duration; Infinite runs until stopped or a safety limit, including the battery time limit")
+                        Picker("Duration", selection: Binding(get: { timerSelection }, set: onDurationChange)) {
+                            Text("∞ Infinite").tag(0)
+                            ForEach(NumericChoice.presets(.timer).filter { $0 > 0 && $0 <= maximumDurationMinutes }, id: \.self) { value in
+                                Text(NumericChoice.label(value, field: .runCap)).tag(value)
+                            }
+                            if timerSelection != 0, !NumericChoice.presets(.timer).contains(timerSelection) {
+                                Text(NumericChoice.label(timerSelection, field: .runCap)).tag(timerSelection)
+                            }
+                        }.labelsHidden().accessibilityLabel("Session duration")
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .help("Changing the duration restarts the timer now; battery exposure keeps its original deadline")
+                            .disabled(data.state == .safetyStopped || data.state == .expired)
+                            .accessibilityIdentifier("camlid.dashboard.timer")
+                    }
+                    if let limit = data.timerLimitText {
+                        Text(limit).font(.caption2).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("camlid.dashboard.timerLimit")
+                    }
                 }
             }
             if let onSleepDelayChange, data.stopEnabled, data.mode == .auto {
@@ -274,55 +300,26 @@ public struct DashboardView: View {
                         .accessibilityIdentifier("camlid.dashboard.sleepDelay")
                 }
             }
-            if data.graceRemainingSeconds != nil || data.timerRemainingSeconds != nil {
+            if let grace = data.graceRemainingSeconds {
                 VStack(spacing: 2) {
-                    if let grace = data.graceRemainingSeconds { healthRow(data.graceLabel, formatCountdown(grace)) }
-                    if let cap = data.timerRemainingSeconds { healthRow("Timer remaining", formatCountdown(cap)) }
+                    healthRow(data.graceLabel, formatCountdown(grace))
                 }.accessibilityIdentifier("camlid.dashboard.next")
             }
             DashboardMetrics(metrics: data.metrics)
-            if data.bannerMessage != nil || !data.hasEnabledAgents || !data.workingAgents.isEmpty || !data.waitingAgents.isEmpty {
+            if data.bannerMessage != nil || !data.listedAgents.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     if let message = data.bannerMessage {
-                        Label(message, systemImage: "exclamationmark.triangle")
-                            .font(.callout).fixedSize(horizontal: false, vertical: true).help(message)
+                        CamLidStatusLabel(message, systemImage: "exclamationmark.triangle",
+                                          tone: .warning, help: message)
                     }
-                    if !data.hasEnabledAgents {
-                        Text(data.taskSummaryText).font(.callout).foregroundStyle(.secondary)
-                        if let onOpenAgents {
-                            Button("Choose agents…", action: onOpenAgents)
-                                .buttonStyle(.link).font(.callout)
-                                .help("Open Settings → Agents to choose which agents may delay sleep")
-                                .accessibilityIdentifier("camlid.dashboard.chooseAgents")
+                    if !data.listedAgents.isEmpty {
+                        BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
+                            ForEach(data.listedAgents) { agent in
+                                DashboardAgentBadge(agent: agent)
+                            }
                         }
-                    }
-                    if !data.workingAgents.isEmpty || !data.waitingAgents.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                        ForEach(data.workingAgents + data.waitingAgents) { agent in
-                            HStack(alignment: .center, spacing: 6) {
-                                AgentMarkView(provider: agent.provider).help(agent.title)
-                                Text(agent.title).font(.callout).bold().lineLimit(1)
-                                Spacer(minLength: 4)
-                                if agent.waitingCount > 0 {
-                                    Label("\(agent.waitingCount)", systemImage: "hourglass")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                        .accessibilityLabel(agent.waitingCount == 1 ? "1 task waiting for user" : "\(agent.waitingCount) tasks waiting for user")
-                                        .help("Tasks waiting for user input in " + agent.title + ". Waiting never holds power.")
-                                }
-                                if agent.workingCount > 0 {
-                                    Label("\(agent.workingCount)", systemImage: "terminal")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                        .accessibilityLabel(agent.workingCount == 1 ? "1 reported working task" : "\(agent.workingCount) reported working tasks")
-                                        .help("Working tasks reported by " + agent.title)
-                                }
-                            }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8).padding(.vertical, 6)
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                                .help(agent.detail + (agent.workingCount > 0 ? " · May delay sleep. " : " · Waiting never holds power. ") + agent.observationExplanation)
-                                .accessibilityElement(children: .combine)
-                                .accessibilityValue(agent.observationExplanation)
-                                .accessibilityIdentifier("camlid.observed." + agent.provider)
-                        }
-                        }.accessibilityIdentifier(CamLidAccessibility.IDs.taskList)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier(CamLidAccessibility.IDs.taskList)
                     }
                 }.padding(.top, 4)
             }
@@ -338,25 +335,16 @@ private struct DashboardMetrics: View {
     let metrics: [DashboardMetric]
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 6) { ForEach(metrics) { DashboardMetricBadge(metric: $0) } }
+            HStack(spacing: 6) { ForEach(metrics) { metric in metricChip(metric) } }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 6)], alignment: .leading, spacing: 6) {
-                ForEach(metrics) { DashboardMetricBadge(metric: $0) }
+                ForEach(metrics) { metric in metricChip(metric) }
             }
         }.accessibilityIdentifier(CamLidAccessibility.IDs.healthRows)
     }
-}
 
-private struct DashboardMetricBadge: View {
-    let metric: DashboardMetric
-    var body: some View {
-        Label(metric.value, systemImage: metric.symbol)
-            .font(.caption).monospacedDigit()
-            .foregroundStyle(metric.attention && metric.value != "Unknown" ? Color.orange : Color.primary)
-            .fixedSize(horizontal: true, vertical: true)
-            .padding(.horizontal, 6).padding(.vertical, 4)
-            .frame(maxWidth: .infinity)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-            .help(metric.detail).accessibilityLabel(metric.detail)
+    private func metricChip(_ metric: DashboardMetric) -> some View {
+        CamLidMetricChip(value: metric.value, systemImage: metric.symbol, detail: metric.detail,
+                         attention: metric.attention && metric.value != "Unknown")
     }
 }
 
@@ -367,12 +355,16 @@ public extension DashboardData {
     }
     /// Running rows: currently working AND enabled in Settings.
     var workingAgents: [AgentBadgeState] {
-        agents.filter { $0.detectionEnabled && $0.workingCount > 0 }
+        agents.filter { $0.detectionEnabled && $0.workingCount > 0 }.sortedForAgentDisplay()
     }
     /// Waiting rows: enabled, waiting for the user, and not also working.
     /// Shown distinctly; waiting never holds power.
     var waitingAgents: [AgentBadgeState] {
-        agents.filter { $0.detectionEnabled && $0.workingCount == 0 && $0.waitingCount > 0 }
+        agents.filter { $0.detectionEnabled && $0.workingCount == 0 && $0.waitingCount > 0 }.sortedForAgentDisplay()
+    }
+    /// The dashboard shows one scan-friendly A–Z list across both states.
+    var listedAgents: [AgentBadgeState] {
+        (workingAgents + waitingAgents).sortedForAgentDisplay()
     }
     /// Whether the user selected any agent for detection. The empty-state hint shows
     /// only in this case; enabled-but-idle shows no agent section at all.

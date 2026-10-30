@@ -108,6 +108,47 @@ struct BatterySessionTests {
         #expect(await app.flushHistory())
     }
 
+    @Test func batteryTimerUsesEffectiveCapInsteadOfClaimingTwoHours() async throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let reading = try health(.battery, battery: 80)
+        let app = fixture.makeCoordinator(healthReader: { reading })
+        try await apply(["mode": "timed", "timerMinutes": 120, "chargingOnly": false, "batteryModeAllowed": true], to: app)
+        await app.startPreviewSession()
+        let active = try session(app)
+        let start = try #require(active["startedAtMonotonic"] as? Double)
+        let initial = try #require(app.dashboardData().timerMaximumMinutes)
+        #expect(initial == 60)
+        #expect(app.dashboardData().timerLimitText?.contains("60 min") == true)
+        let revision = try #require(status(app)["revision"] as? Int)
+        #expect(app.changeTimerDuration(120, expectedRevision: revision))
+        let changed = try #require(app.dashboardData().timerMaximumMinutes)
+        #expect(changed == 60)
+        #expect(try #require(app.dashboardData().timerMinutes) == 60)
+        let changedSession = try session(app)
+        #expect((changedSession["capDeadlineMonotonic"] as? Double ?? .infinity) <= start + 3_600)
+        #expect(await app.flushHistory())
+    }
+
+    @Test func acTimerEditActuallyExtendsToTheSelectedDuration() async throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let app = fixture.makeCoordinator()
+        try await apply(["mode": "timed", "timerMinutes": 60], to: app)
+        await app.startPreviewSession()
+        let active = try session(app)
+        let start = try #require(active["startedAtMonotonic"] as? Double)
+        #expect(try #require(app.dashboardData().timerMinutes) == 60)
+        let revision = try #require(status(app)["revision"] as? Int)
+        #expect(app.changeTimerDuration(120, expectedRevision: revision))
+        #expect(try #require(app.dashboardData().timerMinutes) == 120)
+        #expect(app.dashboardData().timerMaximumMinutes == 120)
+        #expect(app.dashboardData().timerLimitText == nil)
+        let changed = try session(app)
+        let deadline = try #require(changed["capDeadlineMonotonic"] as? Double)
+        #expect(deadline > start + 3_600)
+        #expect(deadline <= start + 7_300)
+        #expect(await app.flushHistory())
+    }
+
     @Test func settingsAutosaveValidatesNewFieldsAndRetainsFailedIntent() throws {
         var current = try Configuration()
         let editor = SettingsEditor(configuration: current, revision: 1, section: .safety)

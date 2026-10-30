@@ -10,7 +10,7 @@ public enum OnboardingPage: Int, Sendable, CaseIterable {
         }
     }
     var preferredHeight: CGFloat {
-        400 // Keep navigation buttons stationary while page content scrolls.
+        424 // Keep the agent list and its note visible above the pinned footer.
     }
 }
 
@@ -36,26 +36,41 @@ public struct OnboardingView: View {
     }
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Step \(page.rawValue + 1) of \(OnboardingPage.allCases.count)")
-                .font(.caption).foregroundStyle(.secondary)
+            HStack(alignment: .center) {
+                Text("Step \(page.rawValue + 1) of \(OnboardingPage.allCases.count)")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                HStack(spacing: 5) {
+                    ForEach(OnboardingPage.allCases, id: \.self) { item in
+                        Capsule()
+                            .fill(item.rawValue <= page.rawValue ? Color.accentColor : Color.secondary.opacity(0.25))
+                            .frame(width: item == page ? 18 : 6, height: 6)
+                    }
+                }
+                .accessibilityHidden(true)
+            }
             Text(page.title).font(.title2).bold()
             ScrollView {
                 OnboardingContent(page: page, agents: agents, isObserving: isObserving)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 4)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             if finishFailed {
-                Label("Couldn’t complete Welcome. Keep CamLid open and try again. Your settings are unchanged.",
-                      systemImage: "exclamationmark.circle")
-                    .font(.callout).foregroundStyle(.secondary)
-                    .help("Welcome could not finish; retry without changing settings")
-                    .accessibilityIdentifier("camlid.onboarding.error")
+                CamLidStatusLabel(
+                    "Couldn’t complete Welcome. Keep CamLid open and try again. Your settings are unchanged.",
+                    systemImage: "exclamationmark.circle", tone: .danger,
+                    help: "Welcome could not finish; retry without changing settings"
+                )
+                .accessibilityIdentifier("camlid.onboarding.error")
             }
+            Divider()
             HStack {
                 Button("Back") { page = OnboardingPage(rawValue: page.rawValue - 1)! }
                     .disabled(page == .welcome || finishing)
                     .accessibilityIdentifier(CamLidAccessibility.IDs.onboardingBack)
                 Spacer()
-                Button("Skip", action: onCancel)
+                Button(page == .rollback ? "Close" : "Skip", action: onCancel)
                     .disabled(finishing).keyboardShortcut(.cancelAction)
                 if page == .rollback {
                     if finishing { ProgressView().controlSize(.small).accessibilityLabel("Completing Welcome") }
@@ -84,53 +99,51 @@ private struct OnboardingContent: View {
     let page: OnboardingPage
     let agents: [AgentBadgeState]
     let isObserving: Bool
+    private var detectedAgents: [AgentBadgeState] {
+        agents.filter { $0.isDetected || $0.cliDetected == true }.sortedForAgentDisplay()
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch page {
             case .welcome:
                 Text("Follow your local coding agents from the menu bar.")
-                Label("Power control unavailable", systemImage: "shield.slash").font(.headline)
-                    .help("Preview only; Mac sleep behavior is unchanged")
-                Text("This build observes activity and previews session behavior. It does not keep the Mac awake or change lid-close sleep.")
-                    .foregroundStyle(.secondary)
+                CamLidNoticeCard(
+                    tone: .info, systemImage: "info.circle", title: "Preview build",
+                    message: "This build can’t keep your Mac awake or change lid-close sleep. You can still explore sessions, agents and safety limits."
+                )
                 Text("Click the menu-bar icon for the dashboard. Right-click or Control-click for options.")
+                    .font(.callout)
             case .detection:
-                Text("Dashboard shows selected agents reporting work. Choose agents in Settings → Agents.")
-                if isObserving {
-                    ProgressView("Looking for local agents…").controlSize(.small)
-                }
-                ForEach(agents) { agent in
-                    HStack {
-                        AgentMarkView(provider: agent.provider).help(agent.title)
-                        Text(agent.title)
-                        Spacer()
-                        if agent.waitingCount > 0 {
-                            Label("\(agent.waitingCount)", systemImage: "hourglass")
-                                .monospacedDigit().foregroundStyle(.secondary)
-                                .help("\(agent.waitingCount) tasks waiting for user. Waiting never holds power.")
-                                .accessibilityLabel("\(agent.waitingCount) tasks waiting for user")
+                Text("CamLid can keep your agents working while you step away.")
+                if detectedAgents.isEmpty {
+                    if isObserving {
+                        ProgressView("Looking for local agents…").controlSize(.small)
+                    } else {
+                        Text("No supported agents detected on this Mac.")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                } else {
+                    BadgeFlowLayout(spacing: 8, lineSpacing: 8) {
+                        ForEach(detectedAgents) { agent in
+                            AgentBadge(provider: agent.provider, title: agent.title)
+                                .accessibilityIdentifier("camlid.onboarding.agent." + agent.provider)
                         }
-                        if agent.workingCount > 0 {
-                            Label("\(agent.workingCount)", systemImage: "terminal")
-                                .monospacedDigit().foregroundStyle(.secondary)
-                                .help("\(agent.workingCount) working tasks reported by \(agent.title)")
-                                .accessibilityLabel("\(agent.workingCount) reported working tasks")
-                        } else if agent.waitingCount == 0 { Text(agent.compactDetail).foregroundStyle(.secondary) }
-                    }.accessibilityElement(children: .combine)
-                        .padding(.vertical, 4).help(agent.detail + ". " + agent.observationExplanation)
-                        .accessibilityValue(agent.observationExplanation)
-                        .accessibilityIdentifier("camlid.onboarding.agent." + agent.provider)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Text("Detection needs no setup. A running app alone doesn’t prove work or completion.")
+                Text("CamLid finds these agents automatically on this Mac.")
                     .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             case .rollback:
-                Label("Use a ventilated desk, never a closed bag.", systemImage: "exclamationmark.triangle")
-                    .font(.headline)
-                    .help("Ventilation is required; keep the Mac out of closed bags")
-                Text("Click Auto or Timed to start. Click the active mode again to stop. Auto’s Sleep when done sets the delay after selected work ends.")
-                Text("Infinite has no time limit. Battery and thermal safety stops still apply. Activity shows what happened and why.")
+                CamLidNoticeCard(
+                    tone: .warning, systemImage: "exclamationmark.triangle.fill",
+                    title: "Use a ventilated desk, never a closed bag.",
+                    help: "Ventilation is required; keep the Mac out of closed bags"
+                )
+                Text("Choose Auto or Timed in the dashboard. Click the active mode again to stop. Auto’s Sleep when done sets the delay after selected work ends.")
+                Text("Infinite has no time limit. Battery and thermal safety stops still apply. Activity records what happened and why.")
                     .foregroundStyle(.secondary)
-                Text("Readings can be delayed or unavailable. This preview cannot keep the Mac awake or change lid-close sleep.")
+                Text("Readings can be delayed or unavailable. This preview can’t keep the Mac awake or change lid-close sleep.")
                     .font(.callout).foregroundStyle(.secondary)
             }
         }

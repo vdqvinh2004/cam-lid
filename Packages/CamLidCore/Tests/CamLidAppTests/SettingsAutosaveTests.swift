@@ -89,9 +89,13 @@ struct SettingsAutosaveTests {
             current = try! current.applying(patch); revision += 1
             return .saved(revision: revision)
         }
+        editor.badges = AgentProviderCatalog.providers.filter(\.supportsDetection).map {
+            AgentBadgeState(provider: $0.id, enabled: false, tasks: [], cliDetected: true)
+        }
         editor.enableAllProviders()
         #expect(await editor.settle())
-        #expect(Set(current.adapterEnrollment) == Set(AgentBadgeState.providers))
+        #expect(Set(current.adapterEnrollment) == AgentProviderCatalog.supportedIDs,
+            "enrolled: \(current.adapterEnrollment.sorted())")
         #expect(current.mode == .auto && current.completionDelayMinutes == 2)
         #expect(!editor.isDirty)
     }

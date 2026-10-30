@@ -91,6 +91,7 @@ public struct ActivityLogView: View {
     @State private var pendingSessionDelete: String?
     @State private var confirmingDeleteAll = false
     @State private var lastReceiptText: String?
+    @State private var showsSensorUpdates = false
 
     public init(
         transitions: [StoredTransition],
@@ -111,39 +112,29 @@ public struct ActivityLogView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             filterBar
             if !transitions.isEmpty {
-                Text(countText).font(.caption).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("camlid.activity.count")
-            }
-            if isLoading {
-                ProgressView(transitions.isEmpty ? "Loading activity…" : "Refreshing activity…")
-                    .controlSize(.small).accessibilityIdentifier("camlid.activity.loading")
+                summaryRow
             }
             if storageError != nil {
-                HStack(alignment: .top) {
-                    Label(transitions.isEmpty ? "History could not be read." : "History could not be refreshed. Showing previously loaded activity.",
-                          systemImage: "exclamationmark.triangle")
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                    Button("Retry", action: onRefresh)
-                }.accessibilityIdentifier("camlid.activity.error")
-                Text("Check storage permissions and available space.").font(.caption).foregroundStyle(.secondary)
+                errorBanner
             }
-            if transitions.isEmpty {
-                if !isLoading && storageError == nil {
-                    Text("No activity yet. Session and settings changes will appear here.")
-                        .font(.body).foregroundStyle(.secondary)
-                }
-            } else if filtered.isEmpty {
-                Text("No transitions match the current filter.")
-                    .font(.body).foregroundStyle(.secondary)
-            } else {
+            if isLoading && transitions.isEmpty {
+                ProgressView("Loading activity…")
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityIdentifier("camlid.activity.loading")
+            } else if transitions.isEmpty {
+                if storageError == nil { emptyState }
+            } else if filtered.isEmpty && !isLoading {
+                filteredEmptyState
+            } else if !filtered.isEmpty {
                 List(filtered, id: \.id) { record in
                     row(record)
                 }
-                .frame(minHeight: 120)
+                .listStyle(.plain)
+                .frame(minHeight: 120, maxHeight: .infinity)
                 .accessibilityIdentifier(CamLidAccessibility.IDs.activityList)
             }
             if let receipt = outcome ?? lastReceiptText {
@@ -179,6 +170,56 @@ public struct ActivityLogView: View {
         }
     }
 
+    private var summaryRow: some View {
+        HStack(spacing: 8) {
+            Text(countText).font(.caption).foregroundStyle(.secondary)
+            if isLoading {
+                ProgressView().controlSize(.mini)
+                Text("Refreshing…").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if hiddenSensorCount > 0 {
+                Button("Show \(hiddenSensorCount) routine updates") { showsSensorUpdates = true }
+                    .buttonStyle(.link).font(.caption)
+                    .help("Lid and temperature availability changes are routine and hidden by default")
+            } else if showsSensorUpdates && sensorCount > 0 && !filter.isActive {
+                Button("Hide routine updates") { showsSensorUpdates = false }
+                    .buttonStyle(.link).font(.caption)
+            }
+        }
+        .accessibilityIdentifier("camlid.activity.count")
+    }
+
+    private var errorBanner: some View {
+        CamLidNoticeCard(
+            tone: .warning, systemImage: "exclamationmark.triangle.fill",
+            title: transitions.isEmpty ? "History could not be read." : "History could not be refreshed. Showing previously loaded activity.",
+            message: "Your saved activity hasn’t changed. Check available storage and try again.",
+            actionTitle: "Retry", onAction: onRefresh
+        )
+        .accessibilityIdentifier("camlid.activity.error")
+    }
+
+    private var emptyState: some View {
+        CamLidEmptyState(
+            systemImage: "clock.arrow.circlepath", title: "No activity yet",
+            message: "Session, safety and agent changes will appear here.",
+            actionTitle: "Refresh", onAction: onRefresh
+        )
+    }
+
+    private var filteredEmptyState: some View {
+        CamLidEmptyState(
+            systemImage: "line.3.horizontal.decrease.circle",
+            title: hiddenSensorCount > 0 ? "Only routine updates are available." : "No events match these filters.",
+            actionTitle: hiddenSensorCount > 0 ? "Show Sensor Updates" : (filter.isActive ? "Clear Filters" : nil),
+            onAction: {
+                if hiddenSensorCount > 0 { showsSensorUpdates = true }
+                else if filter.isActive { filter = ActivityFilter() }
+            }
+        )
+    }
+
     // MARK: - Filter
 
     private var filterBar: some View {
@@ -211,6 +252,9 @@ public struct ActivityLogView: View {
                     .accessibilityIdentifier(CamLidAccessibility.IDs.activityExport)
                 Menu {
                     Button("Refresh", action: onRefresh).disabled(isLoading)
+                    Divider()
+                    Toggle("Include routine updates", isOn: $showsSensorUpdates)
+                    Divider()
                     Button("Delete all history…", role: .destructive) { confirmingDeleteAll = true }
                         .disabled(isLoading || storageError != nil || transitions.isEmpty)
                         .accessibilityIdentifier(CamLidAccessibility.IDs.activityDelete)
@@ -224,8 +268,10 @@ public struct ActivityLogView: View {
 
 
     private var countText: String {
-        if !filter.isActive { return transitions.count == 1 ? "1 record" : "\(transitions.count) records" }
-        return "\(filtered.count) of \(transitions.count) records"
+        if filter.isActive || hiddenSensorCount > 0 {
+            return "\(filtered.count) of \(transitions.count) events"
+        }
+        return transitions.count == 1 ? "1 event" : "\(transitions.count) events"
     }
 
     private func relativeTimestamp(_ date: Date) -> String {
@@ -240,14 +286,30 @@ public struct ActivityLogView: View {
         Array(Set(transitions.flatMap(\.reasonCodes))).sorted()
     }
 
+    private var sensorCount: Int {
+        transitions.filter(filter.matches).filter(ActivityPresentation.isRoutineSensorUpdate).count
+    }
+
+    private var hidesSensorUpdates: Bool {
+        !filter.isActive && !showsSensorUpdates && sensorCount > 0
+    }
+
+    private var hiddenSensorCount: Int {
+        hidesSensorUpdates ? sensorCount : 0
+    }
+
     private var filtered: [StoredTransition] {
-        transitions.filter(filter.matches).sorted { $0.timestamp > $1.timestamp }
+        var rows = transitions.filter(filter.matches).sorted { $0.timestamp > $1.timestamp }
+        if hidesSensorUpdates {
+            rows.removeAll(where: ActivityPresentation.isRoutineSensorUpdate)
+        }
+        return rows
     }
 
     private func row(_ record: StoredTransition) -> some View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 4) {
-                if [ActivityCategory.configuration, .enrollment].contains(record.category) {
+                if [ActivityCategory.configuration, .enrollment].contains(record.category), !record.reasonCodes.isEmpty {
                     Text(record.reasonCodes.map(ActivityPresentation.readableReason).joined(separator: ", "))
                 }
                 Text("State: " + CamLidAccessibility.StatusStyle.style(for: record.newState).text)
@@ -262,23 +324,31 @@ public struct ActivityLogView: View {
                             .disabled(isLoading || storageError != nil)
                     }
                 }
-                Text("Reason codes: " + record.reasonCodes.joined(separator: ", ")).textSelection(.enabled)
+                if !record.reasonCodes.isEmpty {
+                    Text("Reason codes: " + record.reasonCodes.joined(separator: ", ")).textSelection(.enabled)
+                }
             }.font(.caption).foregroundStyle(.secondary).padding(.vertical, 4)
         } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(ActivityPresentation.title(record)).font(.body)
-                    Spacer()
-                    Text(relativeTimestamp(record.timestamp))
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                        .help(activityDateFormatter.string(from: record.timestamp))
-                }
-                if ![ActivityCategory.configuration, .enrollment].contains(record.category) {
-                    Text(record.reasonCodes.map(ActivityPresentation.readableReason).joined(separator: ", "))
-                        .font(.caption).foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: ActivityPresentation.symbol(record))
+                    .font(.callout)
+                    .foregroundStyle(ActivityPresentation.isAttention(record) ? Color.orange : Color.secondary)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(ActivityPresentation.title(record)).font(.body)
+                        Spacer()
+                        Text(relativeTimestamp(record.timestamp))
+                            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                            .help(activityDateFormatter.string(from: record.timestamp))
+                    }
+                    if ![ActivityCategory.configuration, .enrollment].contains(record.category) {
+                        Text(record.reasonCodes.map(ActivityPresentation.readableReason).joined(separator: ", "))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
-        }.disclosureGroupStyle(RowDisclosureStyle()).padding(.vertical, 2)
+        }.disclosureGroupStyle(RowDisclosureStyle()).padding(.vertical, 3)
     }
 
     /// Hosts feed the returned receipt back here to surface the count.
@@ -300,6 +370,27 @@ enum ActivityPresentation {
         case .configuration: "Settings & sensors"
         }
     }
+    static func isRoutineSensorUpdate(_ record: StoredTransition) -> Bool {
+        record.category == .configuration && record.reasonCodes.contains {
+            $0 == "lidAvailabilityChanged" || $0 == "temperatureAvailabilityChanged"
+        }
+    }
+    static func isAttention(_ record: StoredTransition) -> Bool {
+        record.category == .safetyStop || record.category == .capExpiry || record.category == .recovery
+    }
+    static func symbol(_ record: StoredTransition) -> String {
+        if record.reasonCodes.contains("temperatureAvailabilityChanged") { return "thermometer" }
+        if record.reasonCodes.contains("lidAvailabilityChanged") { return "laptopcomputer" }
+        switch record.category {
+        case .stateTransition: return "arrow.left.arrow.right"
+        case .safetyStop: return "exclamationmark.triangle.fill"
+        case .grace: return "moon.zzz"
+        case .capExpiry: return "timer"
+        case .recovery: return "arrow.counterclockwise"
+        case .enrollment: return "person.2"
+        case .configuration: return "slider.horizontal.3"
+        }
+    }
     static func title(_ record: StoredTransition) -> String {
         if ![ActivityCategory.configuration, .enrollment].contains(record.category),
             let previous = record.previousState, previous != record.newState {
@@ -318,6 +409,7 @@ enum ActivityPresentation {
         case "configApplied": return "Settings updated"
         case "modeChanged": return "Mode changed"
         case "appLaunched": return "CamLid opened"
+        case "appQuitNoOwnedPower": return "CamLid quit without a session"
         case "onboardingComplete": return "Welcome completed"
         case "previewSessionStarted": return "Preview session started"
         case "previewSessionStopped": return "Preview session stopped"

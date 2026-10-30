@@ -22,7 +22,7 @@ struct QAStatusContractTests {
         let temperature = try #require(health["temperature"] as? [String: Any])
         #expect(temperature["valueCelsius"] is NSNull && temperature["source"] is NSNull)
         let providers = try #require(status["agentDetection"] as? [[String: Any]])
-        #expect(providers.count == 4 && providers.allSatisfy { $0["evidenceAgeSeconds"] is NSNull })
+        #expect(providers.count == AgentBadgeState.providers.count && providers.allSatisfy { $0["evidenceAgeSeconds"] is NSNull })
         let config = try JSONDecoder().decode(CLIResult.self, from: app.handleControl(.configGet, payload: Data()))
         let values = try JSONSerialization.jsonObject(with: Data(config.json.utf8)) as! [String: Any]
         #expect(values["revision"] as? Int == status["revision"] as? Int)

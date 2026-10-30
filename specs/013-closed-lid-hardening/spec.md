@@ -3,12 +3,23 @@
 **Feature context:** `013-closed-lid-hardening`; offline implementation complete. No branch
 created.
 **Created:** 2026-10-20
-**Status:** Offline hardening implemented and tested (16/18 tasks). T501/T502 remain blocked.
-No native power action, helper installation, app integration, entitlement change or
+**Status:** Original offline hardening (16/18) plus reproducibility/install-packet follow-up T601–T605
+complete; 22/23 current tasks checked. T501's native foreign-policy row PASS includes explicit
+operator attestation; T502 remains blocked. The owner completed the separately approved
+auth-only install/inspect and native retry. No app integration, entitlement change or
 shipping-gate change was performed. This is not a qualification. Evidence:
 [offline QA note](../../docs/qa/m9-closed-lid-hardening-offline-2026-10-20.md).
 **Input:** Owner request following the LidRun REA review; [closed-lid product path](../../docs/planning/closed-lid-product-path-2026-10-19.md);
 [012 spec](../012-closed-lid-best-effort/spec.md); [012 plan](../012-closed-lid-best-effort/plan.md).
+
+## Reproducibility follow-up — 2026-10-21
+
+Owner authorized safe preparation through the next human gate. Additional tasks T601–T605
+cover committed regression fixtures, new candidate identity/staging, read-only QA readiness,
+fake G2 harness tests and allowlisted root-journal inspection preparation. These do not change
+FR-013's helper policy, actuator or shipping contract. T501 now has a row PASS
+with operator attestation; full G2/G3 remain incomplete. The earlier
+16/18 count describes the original task set. [Current evidence/handoff](../../docs/qa/reproducible-m9-handoff-2026-10-21.md).
 
 ## User Scenarios & Testing
 

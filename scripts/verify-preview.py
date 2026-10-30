@@ -22,19 +22,25 @@ scratch = Path(args.build_directory).resolve() if args.build_directory else Path
 spm = scratch / "spm"
 xcode = scratch / "xcode"
 env = os.environ.copy()
+# Canonical Preview QA must not inherit opt-in live probes or private archive dependencies.
+for key in ("CAMLID_LIVE_ORCA_PROBE", "CAMLID_LIVE_TEMP_PROBE", "CAMLID_INSTALLED_PROVIDER_QA"):
+    env[key] = "0"
+for key in ("CAMLID_CAPTURED_MATRIX_DIRECTORY", "CAMLID_CLI_PATH"):
+    env.pop(key, None)
 report = {"schemaVersion": 1, "startedAt": datetime.now(timezone.utc).isoformat(),
           "scope": "preview-only", "m1Passed": False, "m6Passed": False, "steps": []}
 def source_manifest():
-    files = sorted(list((root / "Tests/Packaging").glob("*.py")) + list((root / "Packages/CamLidCore").glob("Sources/**/*.swift")) + list((root / "Packages/CamLidCore").glob("Tests/**/*.swift")) + [root / "CamLidApp/AppMain.swift", root / "CamLidApp/Info.plist", root / "Packages/CamLidCore/Package.swift", root / "project.yml", root / "CamLid.xcodeproj/project.pbxproj", root / "scripts/verify-preview.py", root / "scripts/hardware-preflight.py", root / "scripts/package-beta.py", root / "Config/Beta.xcconfig", root / "Packages/CamLidCore/Package.resolved"])
+    files = sorted(list((root / "Tests/Packaging").glob("*.py")) + list((root / "Packages/CamLidCore").glob("Sources/**/*.swift")) + list((root / "Packages/CamLidCore").glob("Tests/**/*.swift")) + list((root / "Packages/CamLidCore/Tests/CamLidCoreTests/Fixtures/Matrix").glob("*")) + [root / "CamLidApp/AppMain.swift", root / "CamLidApp/Info.plist", root / "Packages/CamLidCore/Package.swift", root / "project.yml", root / "CamLid.xcodeproj/project.pbxproj", root / "scripts/verify-preview.py", root / "scripts/hardware-preflight.py", root / "scripts/package-beta.py", root / "Config/Beta.xcconfig", root / "Packages/CamLidCore/Package.resolved"])
     return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
 initial_manifest = source_manifest()
 commands = [
     # Native suites share AppKit state and assert short wall-clock deadlines.
     # Suite-level .serialized does not isolate unrelated Swift Testing suites.
     ("swift-tests", ["swift", "test", "--no-parallel", "--scratch-path", str(spm)], root / "Packages/CamLidCore", "clt"),
+    ("release-swift-tests", ["swift", "test", "--no-parallel", "-c", "release", "--scratch-path", str(spm)], root / "Packages/CamLidCore", "clt"),
     ("debug-build", ["xcodebuild", "-project", "CamLid.xcodeproj", "-scheme", "CamLid", "-configuration", "Debug", "-destination", "platform=macOS,arch=arm64", "-derivedDataPath", str(xcode), "CODE_SIGNING_ALLOWED=NO", "build"], root, "xcode"),
     ("release-build", ["xcodebuild", "-project", "CamLid.xcodeproj", "-scheme", "CamLid", "-configuration", "Release", "-destination", "platform=macOS,arch=arm64", "-derivedDataPath", str(xcode), "CODE_SIGNING_ALLOWED=NO", "build"], root, "xcode"),
-    ("binary-integration", ["swift", "test", "--scratch-path", str(spm), "--filter", "ControlIntegrationTests"], root / "Packages/CamLidCore", "clt"),
+    ("binary-integration", ["swift", "test", "--no-parallel", "--scratch-path", str(spm), "--filter", "ControlIntegrationTests"], root / "Packages/CamLidCore", "clt"),
     ("packaging-tests", ["python3", "-m", "unittest", "discover", "-s", "Tests/Packaging"], root, "read-only"),
     ("preview-package-audit", ["python3", str(root / "scripts/package-beta.py"), "--app", str(xcode / "Build/Products/Debug/CamLid.app")], root, "read-only"),
     ("hardware-preflight", ["python3", str(root / "scripts/hardware-preflight.py")], root, "read-only"),

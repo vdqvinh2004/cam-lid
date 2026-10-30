@@ -2,18 +2,16 @@ import SwiftUI
 import AppKit
 import CamLidCore
 
-/// Provider mark: official artwork rendered directly (no tile, no recolor),
-/// except the monochrome OpenCode mark which renders as a template so it stays
-/// legible in both appearances (black in light, white in dark). Generic glyph fallback.
+/// Provider mark: official artwork fitted into one fixed square. Raster marks
+/// scale to fit, the OpenCode vector is scaled from its 24×24 design box, and
+/// unknown providers use a matching glyph fallback.
 struct AgentMarkView: View {
+    static let defaultSize: CGFloat = 28
     let provider: String
+    var size: CGFloat = Self.defaultSize
     static func image(for provider: String) -> NSImage? {
-        let name: String
-        switch provider {
-        case "orca", "codex", "claude": name = "agent-" + provider
-        default: return nil
-        }
-        guard let url = Bundle.module.url(forResource: name, withExtension: "png"),
+        guard let name = AgentProviderCatalog.info(for: provider)?.assetName,
+              let url = Bundle.module.url(forResource: name, withExtension: "png"),
               let image = NSImage(contentsOf: url) else { return nil }
         image.accessibilityDescription = provider
         return image
@@ -21,29 +19,53 @@ struct AgentMarkView: View {
     var body: some View {
         Group {
             if provider == "opencode" {
-                // OpenCode terminal frame, redrawn from CC0 path data (even-odd frame).
-                Path { path in
-                    path.addRect(CGRect(x: 2, y: 0, width: 20, height: 24))
-                    path.addRect(CGRect(x: 7, y: 4.8, width: 10, height: 14.4))
-                }
-                .fill(style: FillStyle(eoFill: true))
-                .foregroundStyle(.primary)
-                .frame(width: 22, height: 22)
+                OpenCodeMark()
             } else if let image = Self.image(for: provider) {
-                Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
-                    .frame(width: 22, height: 22)
-            } else {
-                Image(systemName: "person.crop.circle").resizable().aspectRatio(contentMode: .fit)
+                // Fixed maximum box: landscape marks use the width limit,
+                // portrait marks use the height limit, and smaller artwork is
+                // scaled up while oversized artwork is scaled down.
+                Image(nsImage: image)
+                    .renderingMode(provider == "cline" ? .template : .original)
+                    .resizable().interpolation(.high).scaledToFit()
+                    .foregroundStyle(.primary)
+            } else if let symbol = AgentProviderCatalog.info(for: provider)?.symbolName {
+                Image(systemName: symbol).resizable().scaledToFit()
                     .foregroundStyle(.secondary)
-                    .frame(width: 22, height: 22)
+            } else if let monogram = AgentProviderCatalog.info(for: provider)?.monogram {
+                Text(monogram)
+                    .font(.system(size: size * 0.78, weight: .bold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .minimumScaleFactor(0.6)
+            } else {
+                Image(systemName: "person.crop.circle").resizable().scaledToFit()
+                    .foregroundStyle(.secondary)
             }
         }
+        .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 }
 
+/// OpenCode terminal frame, redrawn from CC0 path data in its native 24×24
+/// coordinate space, then scaled uniformly into the shared square frame.
+private struct OpenCodeMark: View {
+    var body: some View {
+        Canvas { context, size in
+            let scale = min(size.width / 24, size.height / 24)
+            let offset = CGPoint(x: (size.width - 24 * scale) / 2,
+                                 y: (size.height - 24 * scale) / 2)
+            context.translateBy(x: offset.x, y: offset.y)
+            context.scaleBy(x: scale, y: scale)
+            var path = Path()
+            path.addRect(CGRect(x: 2, y: 0, width: 20, height: 24))
+            path.addRect(CGRect(x: 7, y: 4.8, width: 10, height: 14.4))
+            context.fill(path, with: .color(.primary), style: FillStyle(eoFill: true))
+        }
+    }
+}
+
 public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
-    public static let providers = ["orca", "codex", "opencode", "claude"]
+    public static let providers = AgentProviderCatalog.ids
     public var id: String { provider }
     public let provider: String
     public let detectionEnabled: Bool
@@ -56,11 +78,13 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
     public let unknownCount: Int
     public let processCount: Int?
     public let cliDetected: Bool?
-    public init(provider: String, enabled: Bool, tasks: [AgentTask], evidenceAgeSeconds: Double? = nil, processCount: Int = 0, cliDetected: Bool? = nil, observationKnown: Bool = true) {
+    public let appDetected: Bool?
+    public init(provider: String, enabled: Bool, tasks: [AgentTask], evidenceAgeSeconds: Double? = nil, processCount: Int = 0, cliDetected: Bool? = nil, appDetected: Bool = false, observationKnown: Bool = true) {
         self.provider = provider; detectionEnabled = enabled
         self.evidenceAgeSeconds = evidenceAgeSeconds
         self.processCount = min(20, max(0, processCount))
         self.cliDetected = cliDetected
+        self.appDetected = appDetected
         // Caller scopes rows using the normalized provider tuple.
         let rows = tasks
         workingCount = rows.filter { $0.state == .working }.count
@@ -73,7 +97,7 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
             : waitingCount > 0 ? "Waiting" : (evidenceAgeSeconds.map { $0 > 15 } == true ? "Unknown" : "Inactive")
     }
     private enum CodingKeys: String, CodingKey {
-        case provider, detectionEnabled, readiness, observedState, workingCount, waitingCount, unknownCount, evidenceAgeSeconds, confidence, processCount, cliDetected
+        case provider, detectionEnabled, readiness, observedState, workingCount, waitingCount, unknownCount, evidenceAgeSeconds, confidence, processCount, cliDetected, appDetected
     }
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -83,21 +107,35 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
         try c.encode(unknownCount, forKey: .unknownCount); try c.encode(evidenceAgeSeconds, forKey: .evidenceAgeSeconds)
         try c.encode(confidence, forKey: .confidence); try c.encode(processCount ?? 0, forKey: .processCount)
         try c.encodeIfPresent(cliDetected, forKey: .cliDetected)
+        try c.encodeIfPresent(appDetected, forKey: .appDetected)
     }
-    var title: String { switch provider { case "orca": "Orca"; case "opencode": "OpenCode"; default: provider.capitalized } }
-    var isDetected: Bool { (processCount ?? 0) > 0 || readiness == "connected" }
-    var installationText: String { cliDetected.map { $0 ? "CLI detected" : "CLI not detected" } ?? "Checking CLI…" }
+    var title: String { AgentProviderCatalog.title(for: provider) }
+    var supportsDetection: Bool {
+        AgentProviderCatalog.info(for: provider)?.supportsDetection == true
+    }
+    var isDetected: Bool {
+        (processCount ?? 0) > 0 || readiness == "connected"
+            || cliDetected == true || appDetected == true
+    }
+    /// Settings disables unsupported or undetected agents. A supported but
+    /// not-yet-detected agent says so; an unimplemented detector says "Soon".
+    var settingsUnavailableReason: String? {
+        if !supportsDetection { return "Support soon" }
+        if !isDetected { return "Not detected" }
+        return nil
+    }
+    var installationText: String {
+        if cliDetected == true { return "CLI detected" }
+        if appDetected == true { return "App detected" }
+        if cliDetected == false { return "Not detected" }
+        return "Checking…"
+    }
     /// Bundled raster mark, if this provider ships one. OpenCode renders as a vector
     /// below; unknown providers get the generic glyph.
-    var markAssetName: String? {
-        switch provider {
-        case "orca", "codex", "claude": "agent-" + provider
-        default: nil
-        }
-    }
+    var markAssetName: String? { AgentProviderCatalog.info(for: provider)?.assetName }
     /// Providers whose mark is drawn in code rather than bundled raster art.
     var usesVectorMark: Bool { provider == "opencode" }
-    var detail: String { readiness == "disconnected" && (processCount ?? 0) > 0 ? "Process found · task state unknown" : workingCount > 0 ? compactDetail + (unknownCount > 0 ? " · \(unknownCount) unknown" : "") : waitingCount > 0 ? compactDetail : observedState }
+    var detail: String { readiness == "disconnected" && (processCount ?? 0) > 0 ? "Process found · no task reported" : workingCount > 0 ? compactDetail + (unknownCount > 0 ? " · \(unknownCount) unknown" : "") : waitingCount > 0 ? compactDetail : observedState }
     var observationExplanation: String {
         let receipt: String
         if let age = evidenceAgeSeconds, age.isFinite, age >= 0 {
@@ -122,71 +160,160 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
             : count == 1 ? "1 selected agent waiting for user" : "\(count) selected agents waiting for user"
     }
     var compactDetail: String {
-        if readiness == "disconnected" { return observedState == "Unknown" ? "Task unknown" : "Not detected" }
+        if readiness == "disconnected" { return observedState == "Unknown" ? "No task reported" : "Not detected" }
         if workingCount > 0 { return "Active · \(workingCount) " + (workingCount == 1 ? "task" : "tasks") + (waitingCount > 0 ? " · \(waitingCount) waiting" : "") }
         if waitingCount > 0 { return "Waiting for user · \(waitingCount) " + (waitingCount == 1 ? "task" : "tasks") }
-        return observedState == "Unknown" ? "Task unknown" : observedState
+        return observedState == "Unknown" ? "No task reported" : observedState
     }
 
 }
 
-struct AgentBadgeView: View {
+extension Array where Element == AgentBadgeState {
+    /// Display order shared by Settings, Welcome, and the dashboard. Titles
+    /// sort A–Z; Settings additionally puts locally detected agents first.
+    func sortedForAgentDisplay(detectedFirst: Bool = false) -> [AgentBadgeState] {
+        sorted { lhs, rhs in
+            if detectedFirst, lhs.isDetected != rhs.isDetected {
+                return lhs.isDetected
+            }
+            let comparison = lhs.title.localizedStandardCompare(rhs.title)
+            if comparison != .orderedSame { return comparison == .orderedAscending }
+            return lhs.provider < rhs.provider
+        }
+    }
+}
+
+struct SettingsAgentBadge: View {
     let state: AgentBadgeState
     let enabled: Bool
     var showsCLIInstallation = false
     let onToggle: @MainActor @Sendable (Bool) -> Void
-    private var selectionHelp: String {
-        let action = enabled ? "Click to ignore \(state.title) for sleep decisions. " : "Click to include \(state.title) in sleep decisions. "
-        return action + state.observationExplanation
+    private var statusText: String {
+        showsCLIInstallation ? state.installationText : state.compactDetail
     }
     private var accessibilityDescription: String {
-        let selection = !enabled ? "Ignored for sleep, " : state.workingCount > 0 ? "May delay sleep, " : "No working tasks holding power, "
-        let status = showsCLIInstallation ? state.installationText : state.detail
-        return selection + status + ". " + state.observationExplanation
+        let selection = !enabled ? "Ignored for sleep" : state.workingCount > 0 ? "May delay sleep" : "No working tasks holding power"
+        return selection + ". " + statusText + ". " + state.observationExplanation
     }
-    var body: some View {
-        Button { onToggle(!enabled) } label: {
-            HStack(alignment: .center, spacing: 8) {
-                AgentMarkView(provider: state.provider).help(state.title)
-                Text(state.title).font(.callout).bold()
-                Spacer(minLength: 8)
-                if showsCLIInstallation {
-                    Text(state.installationText).font(.callout).foregroundStyle(.secondary)
-                        .help("Checks executable installation on this Mac")
-                } else if state.workingCount > 0 || state.waitingCount > 0 {
-                    HStack(spacing: 6) {
-                        if state.waitingCount > 0 {
-                            Label("\(state.waitingCount)", systemImage: "hourglass")
-                                .font(.callout).monospacedDigit().foregroundStyle(.secondary)
-                                .help("\(state.waitingCount) tasks waiting for user in \(state.title). Waiting never holds power.")
-                        }
-                        if state.workingCount > 0 {
-                            Label("\(state.workingCount)", systemImage: "terminal")
-                                .font(.callout).monospacedDigit().foregroundStyle(.secondary)
-                                .help("\(state.workingCount) working tasks reported by \(state.title)")
-                        }
-                    }
-                } else {
-                    Text(state.compactDetail).font(.callout).foregroundStyle(.secondary)
-                }
-                Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(enabled ? Color.accentColor : Color.secondary)
-                    .help(!enabled ? "Ignored for sleep" : state.workingCount > 0 ? "May delay sleep" : "No working tasks holding power")
-                    .accessibilityHidden(true)
-            }
-                .padding(10)
-                .frame(maxWidth: .infinity)
-                .contentShape(RoundedRectangle(cornerRadius: 8))
-                .background(enabled ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(enabled ? Color.accentColor : Color.primary.opacity(0.15), lineWidth: enabled ? 2 : 1))
+    private var mark: some View {
+        AgentBadge(provider: state.provider, title: state.title,
+                   tone: enabled ? .selected : .neutral)
+    }
+    private var badge: some View {
+        Button {
+            onToggle(!enabled)
+        } label: {
+            mark
         }
-        .buttonStyle(.borderless)
-        .help(selectionHelp)
+        .buttonStyle(.plain)
         .accessibilityIdentifier("camlid.agent." + state.provider)
         .accessibilityLabel(state.title)
         .accessibilityValue(accessibilityDescription)
+        .accessibilityHint(enabled ? "Click to ignore this agent for sleep decisions"
+            : "Click to include this agent in sleep decisions")
         .accessibilityAddTraits(enabled ? .isSelected : [])
-        .accessibilityHint("Choose whether this agent may delay sleep")
+    }
+    var body: some View {
+        if let reason = state.settingsUnavailableReason {
+            ZStack {
+                badge
+                    .disabled(true)
+                    .blur(radius: 0.7)
+                    .opacity(0.6)
+                    .accessibilityHint(reason)
+                // A sibling, not an overlay, so the disabled button's
+                // environment cannot suppress the native hover tooltip.
+                Capsule().fill(.clear).contentShape(Capsule())
+                    .help(reason)
+                    .accessibilityHidden(true)
+            }
+        } else {
+            badge
+        }
+    }
+}
+
+enum AgentBadgeMetrics {
+    /// The artwork itself. Kept smaller than the slot so the mark has breathing
+    /// room inside the capsule.
+    static let markSize: CGFloat = 20
+    /// A fixed square slot shared by raster, vector, and fallback marks.
+    static let markSlotSize: CGFloat = 28
+    static let horizontalPadding: CGFloat = 10
+    static let verticalPadding: CGFloat = 5
+}
+
+/// Single badge shell for every surface that names an agent: Settings, Welcome,
+/// and Dashboard. Surfaces only choose a tone and an optional trailing accessory.
+struct AgentBadge<Accessory: View>: View {
+    let provider: String
+    let title: String
+    var tone: CamLidPillTone = .neutral
+    private let accessory: Accessory
+
+    init(provider: String, title: String, tone: CamLidPillTone = .neutral,
+         @ViewBuilder accessory: () -> Accessory) {
+        self.provider = provider
+        self.title = title
+        self.tone = tone
+        self.accessory = accessory()
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 6) {
+            AgentMarkView(provider: provider, size: AgentBadgeMetrics.markSize)
+                .frame(width: AgentBadgeMetrics.markSlotSize,
+                       height: AgentBadgeMetrics.markSlotSize)
+            Text(title).font(.callout).bold().lineLimit(1)
+            accessory
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, AgentBadgeMetrics.horizontalPadding)
+        .padding(.vertical, AgentBadgeMetrics.verticalPadding)
+        .camLidPill(tone)
+        .fixedSize(horizontal: true, vertical: true)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension AgentBadge where Accessory == EmptyView {
+    init(provider: String, title: String, tone: CamLidPillTone = .neutral) {
+        self.init(provider: provider, title: title, tone: tone) { EmptyView() }
+    }
+}
+
+/// Dashboard badge: mark, name, then the primary activity status and count.
+struct DashboardAgentBadge: View {
+    let agent: AgentBadgeState
+
+    private var isWorking: Bool { agent.workingCount > 0 }
+    private var status: String { isWorking ? "Working" : "Waiting" }
+    private var count: Int { isWorking ? agent.workingCount : agent.waitingCount }
+    private var symbol: String { isWorking ? "terminal" : "hourglass" }
+    private func countText(_ value: Int) -> String {
+        "\(value) " + (value == 1 ? "task" : "tasks")
+    }
+    private var hoverText: String {
+        guard isWorking else { return "Waiting: \(countText(count))" }
+        var text = "Working: \(countText(count))"
+        if agent.waitingCount > 0 {
+            text += " · Waiting: \(countText(agent.waitingCount))"
+        }
+        return text
+    }
+
+    var body: some View {
+        AgentBadge(provider: agent.provider, title: agent.title, tone: .activity) {
+            HStack(spacing: 3) {
+                Image(systemName: symbol).font(.caption2)
+                Text("\(count)").font(.caption).fontWeight(.semibold).monospacedDigit()
+            }
+            .foregroundStyle(.secondary)
+        }
+        .help(hoverText)
+        .accessibilityLabel("\(agent.title), \(status), \(countText(count))")
+        .accessibilityValue(agent.observationExplanation)
+        .accessibilityIdentifier("camlid.observed." + agent.provider)
     }
 }
 
@@ -201,17 +328,15 @@ struct ModeBadges: View {
         HStack(spacing: 5) {
             ForEach([RequestedMode.auto, .timed], id: \.self) { mode in
                 Button { onSelect(mode) } label: {
-                    Text(mode.rawValue.capitalized).font(.callout)
+                    Text(buttonLabel(mode)).font(.callout)
                         .padding(.horizontal, 9).padding(.vertical, 7)
                         .frame(maxWidth: .infinity)
-                        .background(mode == displayedSelection ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.04), in: Capsule())
-                        .overlay(Capsule().strokeBorder(mode == displayedSelection ? Color.accentColor : Color.clear, lineWidth: 2))
-                        .contentShape(Capsule())
+                        .camLidPill(isSelected(mode) ? .selected : .neutral)
                 }
                     .buttonStyle(.borderless)
-                    .accessibilityAddTraits(mode == displayedSelection ? .isSelected : [])
-                    .accessibilityValue(mode == displayedSelection ? "Selected" : "Not selected")
-                    .accessibilityLabel(mode.rawValue.capitalized + " mode")
+                    .accessibilityAddTraits(isSelected(mode) ? .isSelected : [])
+                    .accessibilityValue(isSelected(mode) ? "Selected" : (mode == .auto && !autoEnabled ? "Unavailable" : "Not selected"))
+                    .accessibilityLabel(accessibilityLabel(mode))
                     .accessibilityIdentifier("camlid.mode." + mode.rawValue)
                     .help(modeHelp(mode) + (mode == .auto && !autoEnabled ? " Select an agent in Settings → Agents first." : ""))
                     .disabled(mode == .auto && !autoEnabled)
@@ -220,12 +345,24 @@ struct ModeBadges: View {
             .accessibilityLabel("Session mode")
     }
     private var displayedSelection: RequestedMode { selected == .manual ? .timed : selected }
+    private func isSelected(_ mode: RequestedMode) -> Bool {
+        selected != .off && mode == displayedSelection
+    }
+    private func buttonLabel(_ mode: RequestedMode) -> String {
+        mode.rawValue.capitalized
+    }
+    private func accessibilityLabel(_ mode: RequestedMode) -> String {
+        guard activatesSession else { return mode.rawValue.capitalized + " mode" }
+        return (isSelected(mode) ? "Stop " : "Start ") + mode.rawValue.capitalized + " session"
+    }
     private func modeHelp(_ mode: RequestedMode) -> String {
-        if activatesSession, mode == displayedSelection, mode != .off { return "Click again to turn Off." }
+        if activatesSession, isSelected(mode) {
+            return "Selected. Click again to stop the \(mode.rawValue.capitalized) session."
+        }
         switch mode {
         case .off: return activatesSession ? "End the current session." : "No session can start."
-        case .auto: return activatesSession ? "Start Auto; finish after selected agents and the completion delay." : "Save Auto as the next session mode."
-        case .timed, .manual: return activatesSession ? "Start with the timer choice; safety limits still apply." : "Save Timed as the next session mode."
+        case .auto: return activatesSession ? "Start an Auto session; finish after selected agents and the completion delay." : "Save Auto as the next session mode."
+        case .timed, .manual: return activatesSession ? "Start a Timed session with the timer choice; safety limits still apply." : "Save Timed as the next session mode."
         }
     }
 }

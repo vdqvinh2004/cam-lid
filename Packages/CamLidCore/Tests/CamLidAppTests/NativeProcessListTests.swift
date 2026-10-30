@@ -52,6 +52,6 @@ struct NativeProcessListTests {
     @Test func discoveryPresenceDoesNotCreateActivityOrConnection() {
         let badge = AgentBadgeState(provider: "codex", enabled: true, tasks: [], processCount: 1)
         #expect(badge.observedState == "Unknown" && badge.readiness == "disconnected")
-        #expect(badge.detail == "Process found · task state unknown" && badge.workingCount == 0)
+        #expect(badge.detail == "Process found · no task reported" && badge.workingCount == 0)
     }
 }

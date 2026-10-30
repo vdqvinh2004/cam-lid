@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 import CamLidCore
 
 /// Single-field validation failure. `field` selects where the message renders.
@@ -211,8 +212,8 @@ public struct SettingsView: View {
                 .accessibilityIdentifier("camlid.settings.scroll")
             if let message = editor.message, editor.fieldMessages.isEmpty,
                 !["Applied", "Changes saved.", "Current settings loaded.", "Editing…", "Applying…"].contains(message) {
-                Label(message, systemImage: "exclamationmark.circle")
-                    .font(.callout).foregroundStyle(.red).help(message)
+                CamLidStatusLabel(message, systemImage: "exclamationmark.circle",
+                                  tone: .danger, help: message)
                     .padding(.horizontal, 16).padding(.bottom, 12)
             }
         }
@@ -238,29 +239,38 @@ public struct SettingsView: View {
 private struct SettingsPermissionsPane: View {
     @ObservedObject var editor: SettingsEditor
 
+    private var canRequest: Bool {
+        ["notDetermined", "unavailable"].contains(editor.notificationPermission)
+    }
+
     var body: some View {
         Section {
-            PermissionStatusLabel(status: editor.notificationPermission)
-                .accessibilityIdentifier("camlid.permissions.notifications.status")
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
+                PermissionStatusLabel(status: editor.notificationPermission)
+                    .accessibilityIdentifier("camlid.permissions.notifications.status")
+                Spacer()
+                Button { editor.onRefreshPermissions?() } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Check notification permission again")
+                .accessibilityLabel("Refresh permission status")
+                .accessibilityIdentifier("camlid.permissions.refresh")
+            }
+            if canRequest {
                 Button("Allow Notifications…") { editor.onAuthorizeNotifications?() }
-                    .disabled(!["notDetermined", "unavailable"].contains(editor.notificationPermission))
                     .accessibilityIdentifier("camlid.permissions.notifications.request")
-                Button("Open System Settings…") { editor.onOpenNotificationSettings?() }
-                    .accessibilityLabel("Open Notifications in System Settings")
-                    .accessibilityIdentifier("camlid.permissions.notifications.settings")
+            }
+            Button("Open Notifications Settings…") { editor.onOpenNotificationSettings?() }
+                .accessibilityLabel("Open Notifications in System Settings")
+                .accessibilityIdentifier("camlid.permissions.notifications.settings")
+            if let error = editor.permissionSettingsError {
+                CamLidStatusLabel(error, systemImage: "exclamationmark.triangle", tone: .warning)
             }
         } header: {
             Text("Notifications — optional", bundle: .module)
         } footer: {
-            Text("Enable alert categories in Defaults. Notification permission does not enable power control. Screen Recording and Full Disk Access are not required.", bundle: .module)
-        }
-        Section {
-            Button("Refresh Permissions") { editor.onRefreshPermissions?() }
-                .accessibilityIdentifier("camlid.permissions.refresh")
-            if let error = editor.permissionSettingsError {
-                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
-            }
+            Text("Choose alert categories in Defaults. CamLid doesn’t need Screen Recording or Full Disk Access.", bundle: .module)
         }
     }
 }
@@ -269,13 +279,20 @@ private struct PermissionStatusLabel: View {
     let status: String
     var body: some View {
         switch status {
-        case "granted", "authorized": Label { Text("Allowed", bundle: .module) } icon: { Image(systemName: "checkmark.circle") }
-        case "provisional": Label { Text("Allowed — quiet delivery", bundle: .module) } icon: { Image(systemName: "checkmark.circle") }
-        case "notGranted", "denied": Label { Text("Not allowed", bundle: .module) } icon: { Image(systemName: "lock.circle") }
-        case "notDetermined": Label { Text("Not requested", bundle: .module) } icon: { Image(systemName: "questionmark.circle") }
-        case "requesting": Label { Text("Waiting for macOS approval", bundle: .module) } icon: { Image(systemName: "clock") }
-        case "unavailable": Label { Text("Unavailable in this app host", bundle: .module) } icon: { Image(systemName: "exclamationmark.circle") }
-        default: Label { Text("Unknown", bundle: .module) } icon: { Image(systemName: "questionmark.circle") }
+        case "granted", "authorized":
+            CamLidStatusLabel(Text("Allowed", bundle: .module), systemImage: "checkmark.circle", tone: .success)
+        case "provisional":
+            CamLidStatusLabel(Text("Allowed — quiet delivery", bundle: .module), systemImage: "checkmark.circle", tone: .success)
+        case "notGranted", "denied":
+            CamLidStatusLabel(Text("Not allowed", bundle: .module), systemImage: "lock.circle", tone: .warning)
+        case "notDetermined":
+            CamLidStatusLabel(Text("Not requested", bundle: .module), systemImage: "questionmark.circle")
+        case "requesting":
+            CamLidStatusLabel(Text("Waiting for macOS approval", bundle: .module), systemImage: "clock")
+        case "unavailable":
+            CamLidStatusLabel(Text("Unavailable in this app host", bundle: .module), systemImage: "exclamationmark.circle", tone: .warning)
+        default:
+            CamLidStatusLabel(Text("Unknown", bundle: .module), systemImage: "questionmark.circle")
         }
     }
 }
@@ -337,25 +354,33 @@ private struct SettingsDefaultsPane: View {
         case "requesting": "Waiting for macOS notification approval."
         case "authorized", "provisional": "Notifications allowed by macOS. Preview alerts never claim a power change."
         case "unavailable", "unknown": "Notification permission is unavailable. Retry from an installed app."
-        default: "Local alerts only. Enable a category to request permission; Preview alerts never claim a power change."
+        default: "Alerts are local only. Turn on a category to request permission. Preview alerts never claim a power change."
         }
     }
 }
 
 private struct SettingsAgentsPane: View {
     @ObservedObject var editor: SettingsEditor
+    private var orderedBadges: [AgentBadgeState] {
+        AgentBadgeState.providers.map { provider in
+            editor.badges.first { $0.provider == provider }
+                ?? AgentBadgeState(provider: provider, enabled: editor.draft.parsedAdapters().contains(provider), tasks: [])
+        }.sortedForAgentDisplay(detectedFirst: true)
+    }
     var body: some View {
         Section {
-            VStack(spacing: 8) {
-                ForEach(AgentBadgeState.providers, id: \.self) { provider in
-                    let state = editor.badges.first { $0.provider == provider }
-                        ?? AgentBadgeState(provider: provider, enabled: editor.draft.parsedAdapters().contains(provider), tasks: [])
-                    VStack(alignment: .leading, spacing: 4) {
-                        AgentBadgeView(state: state, enabled: editor.draft.parsedAdapters().contains(provider), showsCLIInstallation: true) {
-                            editor.setProvider(provider, enabled: $0)
+            VStack(alignment: .leading, spacing: 8) {
+                BadgeFlowLayout(spacing: 8, lineSpacing: 8) {
+                    ForEach(orderedBadges) { state in
+                        SettingsAgentBadge(state: state, enabled: editor.draft.parsedAdapters().contains(state.provider), showsCLIInstallation: true) {
+                            editor.setProvider(state.provider, enabled: $0)
                         }
-                        SettingsFieldOutcome(editor: editor, key: "provider:" + provider)
                     }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                ForEach(orderedBadges) { state in
+                    SettingsFieldOutcome(editor: editor, key: "provider:" + state.provider)
                 }
             }
         } header: {
@@ -363,17 +388,10 @@ private struct SettingsAgentsPane: View {
                 Text("Agents that may delay sleep")
                 Spacer()
                 Button("Enable all") { editor.enableAllProviders() }
-                    .disabled(AgentBadgeState.providers.allSatisfy { editor.draft.parsedAdapters().contains($0) })
+                    .disabled(editor.selectableProviders.allSatisfy { editor.draft.parsedAdapters().contains($0) })
                     .help("Include all agents in sleep decisions")
                     .accessibilityIdentifier("camlid.agents.enableAll")
             }
-        }
-        Section {
-            Text("Orca JSON may contain prompts, messages and tool input in temporary memory. CamLid keeps only pane identity, state and timestamps; content is not saved to history, logs or exports, or sent to AI or a server.", bundle: .module)
-        } header: {
-            Text("Orca observation source", bundle: .module)
-        } footer: {
-            Text("Read-only CLI queries run only while Detect is enabled for Orca. Disable Detect to stop queries and discard in-flight results. No Accessibility permission, hooks or agent actions. Query receipt age is not task-state age. Orca state freshness is unverified; pane state does not prove all jobs completed.", bundle: .module)
         }
     }
 }
@@ -386,12 +404,22 @@ private struct SettingsLifetimePane: View {
     @State private var error: String?
 
     private var rules: [LifetimeRule] { editor.draft.lifetimeRules ?? [] }
+    private var selectorTitle: String {
+        selectorKind == .exactExecutablePath ? "Executable path" : "App bundle ID"
+    }
+    private var selectorPlaceholder: String {
+        selectorKind == .exactExecutablePath ? "Path to an installed executable" : "com.example.app"
+    }
 
     var body: some View {
         Section {
             if rules.isEmpty {
-                Text("No watched programs")
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("No watched programs yet", systemImage: "eye.slash")
+                        .font(.callout)
+                    Text("Add a program below to keep an Auto session awake while it runs.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             ForEach(rules) { rule in
                 VStack(alignment: .leading, spacing: 4) {
@@ -418,7 +446,7 @@ private struct SettingsLifetimePane: View {
         } header: {
             Text("Watched programs")
         } footer: {
-            Text("Exact process presence can hold an explicitly started Auto session. It does not report AI activity or completion, and adding a rule never starts a session.")
+            Text("Watching a program doesn’t start a session or prove AI work. It only keeps an already-started Auto session awake while the program runs.")
         }
 
         Section("Add a watched program") {
@@ -427,25 +455,68 @@ private struct SettingsLifetimePane: View {
                 Text("App bundle ID").tag(LifetimeSelectorKind.applicationBundleID)
             }
             .accessibilityIdentifier("camlid.settings.lifetime.selectorKind")
-            TextField(selectorKind == .exactExecutablePath ? "Absolute executable path" : "Application bundle ID", text: $selectorValue)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityIdentifier("camlid.settings.lifetime.selectorValue")
-            TextField("Label", text: $label)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityIdentifier("camlid.settings.lifetime.label")
-            Button("Add") { addRule() }
+            .onChange(of: selectorKind) { _, _ in error = nil }
+            LabeledContent(selectorTitle) {
+                HStack(spacing: 8) {
+                    TextField(selectorPlaceholder, text: $selectorValue)
+                        .labelsHidden().textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("camlid.settings.lifetime.selectorValue")
+                    Button("Choose…") { chooseProgram() }
+                        .help(selectorKind == .exactExecutablePath ? "Choose an installed executable" : "Choose an installed app")
+                }
+            }
+            LabeledContent("Label") {
+                TextField("Name for this program", text: $label)
+                    .labelsHidden().textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("camlid.settings.lifetime.label")
+            }
+            Button("Add Program") { addRule() }
                 .disabled(selectorValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     || label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     || rules.count >= LifetimeRule.maximumRules)
+                .help("Add this program to the watched list")
                 .accessibilityIdentifier("camlid.settings.lifetime.add")
             if rules.count >= LifetimeRule.maximumRules {
                 Text("The limit is 20 rules.").font(.caption).foregroundStyle(.secondary)
             }
             if let error {
-                Text(error).font(.caption).foregroundStyle(.red)
+                CamLidStatusLabel(error, systemImage: "exclamationmark.circle",
+                                  tone: .danger, font: .caption)
                     .accessibilityIdentifier("camlid.settings.lifetime.error")
             }
         }
+    }
+
+    private func chooseProgram() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if selectorKind == .applicationBundleID {
+            panel.allowedContentTypes = [.application]
+            panel.message = "Choose an application to watch."
+        } else {
+            panel.message = "Choose an executable to watch."
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if selectorKind == .applicationBundleID {
+            guard let bundle = Bundle(url: url), let identifier = bundle.bundleIdentifier else {
+                error = "That app doesn’t have a bundle identifier."
+                return
+            }
+            selectorValue = identifier
+            if label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                label = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+                    ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
+                    ?? url.deletingPathExtension().lastPathComponent
+            }
+        } else {
+            selectorValue = url.path
+            if label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                label = url.lastPathComponent
+            }
+        }
+        error = nil
     }
 
     private func addRule() {
@@ -481,40 +552,62 @@ private struct SettingsSafetyPane: View {
     @ObservedObject var editor: SettingsEditor
     let onOpenSleepDiagnostics: (() -> Void)?
     @Binding var isExpanded: Bool
+
+    private var powerSourceSummary: String {
+        if editor.draft.chargingOnly {
+            return editor.draft.batteryModeAllowed
+                ? "Charger required. Battery is allowed but won’t be used until Require charger is off."
+                : "Sessions require the charger. Battery sessions are off."
+        }
+        return editor.draft.batteryModeAllowed
+            ? "Sessions can run on battery within the limits below."
+            : "Sessions won’t start on battery until Allow battery sessions is on."
+    }
+
     var body: some View {
         Section {
-            Label("Preview only · power control unavailable", systemImage: "shield.slash")
-                .help("This preview cannot keep the Mac awake or change lid-close sleep")
-            VStack(alignment: .leading, spacing: 4) {
-                Toggle("Require charger", isOn: Binding(get: { editor.draft.chargingOnly }, set: editor.setChargingOnly))
-                    .accessibilityLabel(Text("Require charger", bundle: .module))
-                    .help("Battery sessions remain blocked while the charger is required")
-                Toggle("Allow battery sessions", isOn: $editor.batterySessionsAllowed)
-                    .accessibilityIdentifier("camlid.settings.batteryMode")
-                    .accessibilityLabel(Text("Allow battery sessions", bundle: .module))
-                Text("To use battery sessions, turn off Require charger and enable Allow battery sessions. Keeping awake drains battery; macOS may still sleep. Preview cannot keep the Mac awake.", bundle: .module)
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+            PreviewBuildNotice()
+        }
+        Section {
+            Toggle("Require charger", isOn: Binding(get: { editor.draft.chargingOnly }, set: editor.setChargingOnly))
+                .accessibilityLabel(Text("Require charger", bundle: .module))
+                .help("Battery sessions remain blocked while the charger is required")
+            Toggle("Allow battery sessions", isOn: $editor.batterySessionsAllowed)
+                .accessibilityIdentifier("camlid.settings.batteryMode")
+                .accessibilityLabel(Text("Allow battery sessions", bundle: .module))
+                .help("Takes effect when Require charger is off")
             SettingsFieldOutcome(editor: editor, key: "chargingOnly")
             SettingsFieldOutcome(editor: editor, key: "batteryModeAllowed")
-            SettingsNumberField(editor: editor, title: "Start on battery at or above", field: .batteryEntry, unit: "%")
-            SettingsNumberField(editor: editor, title: "Battery session limit", field: .batteryCap, unit: "minutes")
-            Text("Battery sessions, including Infinite, stop at the shorter battery or session limit, measured from session start. Reconnecting the charger does not extend this deadline.", bundle: .module)
+            Text(powerSourceSummary)
                 .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } header: {
+            Text("Power source", bundle: .module)
+        }
+        Section {
+            SettingsNumberField(editor: editor, title: "Start on battery at or above", field: .batteryEntry, unit: "%")
             SettingsNumberField(editor: editor, title: "Stop below battery level", field: .batteryFloor, unit: "%")
+            SettingsNumberField(editor: editor, title: "Battery session limit", field: .batteryCap, unit: "minutes")
+            Text("Battery sessions stop at the shorter battery or session limit, measured from session start. Reconnecting the charger doesn’t extend this deadline.", bundle: .module)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } header: {
+            Text("Battery limits", bundle: .module)
+        }
+        Section {
             VStack(alignment: .leading, spacing: 4) {
                 LabeledContent("Overheating protection", value: "Always on")
                     .help("Uses macOS thermal pressure, independently of the temperature reading")
                 Text("Stops immediately at critical thermal pressure, or after 30 seconds at serious pressure.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            VStack(alignment: .leading, spacing: 4) {
-                SettingsNumberField(editor: editor, title: "Session time limit", field: .runCap, unit: "minutes")
-                Text("Auto and finite Timed stop at this limit. Infinite ignores it only on charger power.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+            SettingsNumberField(editor: editor, title: "Session time limit", field: .runCap, unit: "minutes")
+            Text("Auto and finite Timed stop at this limit. Infinite ignores it only on charger power.")
+                .font(.caption).foregroundStyle(.secondary)
+        } header: {
+            Text("Safety limits", bundle: .module)
         } footer: {
-            Text("Low battery and overheating stop every mode. Keep the Mac ventilated.")
+            Text("Low battery and overheating stop every mode. Keep the Mac ventilated.", bundle: .module)
         }
         if let onOpenSleepDiagnostics {
             Section {
@@ -546,14 +639,23 @@ private struct SettingsSafetyPane: View {
 private struct SettingsActivityPane: View {
     let onOpen: () -> Void
     var body: some View {
-        Section("Private history") {
-            Text("Stored locally for 14 days or 20 MiB. No prompts, code or transcripts.")
+        Section {
+            Label("History stays on this Mac", systemImage: "lock.shield")
+                .font(.callout)
+            Text("CamLid records mode changes, safety stops and agent activity — never prompts, code or transcripts.")
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Kept for 14 days or up to 20 MiB, whichever comes first. Exports hide identifiers.")
+                .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Text("Export hides identifiers.").foregroundStyle(.secondary)
                 Spacer()
-                Button("Open Activity…", action: onOpen).help("Search, export or delete local activity")
+                Button("Open Activity…", action: onOpen)
+                    .help("Search, export or delete local activity")
             }
+        } header: {
+            Text("Private history")
+        } footer: {
+            Text("Search, export or delete local activity at any time.")
         }
     }
 }
@@ -564,8 +666,10 @@ private struct SettingsFieldOutcome: View {
     var body: some View {
         if let message = editor.fieldMessages[key] {
             VStack(alignment: .leading, spacing: 4) {
-                Label(message, systemImage: message == "Applying…" ? "clock" : "exclamationmark.circle")
-                    .font(.callout).foregroundStyle(message == "Applying…" ? Color.secondary : Color.red).help(message)
+                CamLidStatusLabel(message,
+                                  systemImage: message == "Applying…" ? "clock" : "exclamationmark.circle",
+                                  tone: message == "Applying…" ? .neutral : .danger,
+                                  help: message)
                 if message != "Applying…" {
                     HStack {
                         if message == "Changed elsewhere" {
@@ -601,8 +705,8 @@ private struct SettingsNumberField: View {
                 CustomNumberInput(editor: editor, title: title, field: field, unit: unit)
             }
             if let error = editor.errors.first(where: { $0.field == field }) {
-                Label(error.message, systemImage: "exclamationmark.circle")
-                    .font(.callout).foregroundStyle(.red).help(error.message)
+                CamLidStatusLabel(error.message, systemImage: "exclamationmark.circle",
+                                  tone: .danger, help: error.message)
             }
             SettingsFieldOutcome(editor: editor, key: SettingsEditor.key(field))
         }

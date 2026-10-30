@@ -3,6 +3,22 @@
 Native macOS menu bar app for AI-aware closed-lid work. **Current build is a preview:
 zero power actuation, no verified closed-lid backend, M6 not passed, M7 blocked.**
 
+**Current handoff — 2026-10-21:** [reproducible Preview/M9 preparation and next gate](docs/qa/reproducible-m9-handoff-2026-10-21.md).
+M9's original offline hardening is complete; R0 was accepted historically. The [M9 G2 foreign-policy row](docs/qa/g2-m9-foreign-policy-result-2026-10-21.md) now has a
+PASS with operator attestation (T501 complete); overall G2 and G3 remain blocked. The owner approved and completed the
+[frozen QA helper installation and one IPC inspect](docs/qa/m9-lock-only-install-packet-2026-10-21.md):
+reported `ready/noPendingIntent`, no mutation or lease, original locks preserved/no journal
+deletion. The main app remains unconnected. Native activation still needs a separate exact
+one-use approval; do not rerun the consumed installer or reset the journal.
+[Next G2 packet](docs/qa/g2-m9-next-qualification-packet-2026-10-21.md): offline preparation
+complete; postboot audit matches the acknowledged G2 journal. A separate
+[archival/restart decision](docs/qa/m9-g2-journal-archival-packet-2026-10-21.md) is next,
+not another activation. Candidate is disarmed; no mutation or new IPC is approved.
+Fresh canonical Preview verification passes Swift Debug/Release (519 declarations per
+configuration, including four explicit skips), both Xcode builds, actual CLI integration and
+packaging/read-only preflight. Earlier dated counts below are historical. This is not M6 or
+native closed-lid acceptance.
+
 [Current continuity-first scope](docs/qa/continuity-first-qualification-2026-10-11.md): owner prioritizes AI workload progress with the physical lid closed; panel-sleep qualification is deferred, not passed. Brightness is optional, no screen-off claim or automatic dimming. Safety, Stop/deadline and physical restoration remain mandatory; historical lab permissions are not reused. Continuity-first experimental preparation has eight Debug/Release fake suites PASS (178 scenarios per configuration), six fresh inert identities and completed bounded code/evidence inspections; a separate disposable workload progressed only inside a simulated lid interval. This does not establish physical closed-lid AI work or restoration.
 [2026-10-11 lab reconciliation](docs/qa/lab-evidence-reconciliation-2026-10-11.md): isolated native lab actions occurred; revised open-lid Stop/API path succeeded, but C's sole closed-lid sample reports panel awake and a safety refusal. No sustained closed-lid/display-off or physical-restoration qualification; experimental source gate currently false. Lab results do not enable Preview or pass M1/M6.
 Dashboard, Settings, Welcome, Activity and Updates run in an owned UI subprocess that exits when its last surface closes. The persistent menu-bar process remains the sole policy, preferences, history, update-check and CLI authority; private anonymous pipes carry projections and actions. This releases UI framework resident memory after close; combined RSS while UI is open is higher. See [post-UI memory evidence](docs/qa/preview-evidence/memory-peak-fix-2026-10-05/README.md) and [current UI/UX implementation QA](docs/qa/uiux-implementation-2026-10-07.md). Battery/thermal/normalized
@@ -62,7 +78,7 @@ rtk /tmp/camlid-xcode/Build/Products/Debug/camlid watch remove <rule-id>
 rtk /tmp/camlid-xcode/Build/Products/Debug/camlid logs export --redacted --output events.json
 ```
 
-`diagnose` and the “Why is my Mac awake?” window share a bounded on-demand report. JSON removes owner names/PIDs and raw assertion reasons; missing coverage stays explicit. Status separates saved `configuredMode` from nullable `activeSessionMode`. Diagnostics never clears another app’s request.
+`diagnose` and the “Why is my Mac awake?” window share a bounded on-demand report. JSON removes owner/preventer names, PIDs and raw assertion reasons; missing coverage stays explicit. Status separates saved `configuredMode` from nullable `activeSessionMode`. Diagnostics never clears another app’s request.
 `sleep --dry-run` reports blockers without mutation; actual `sleep` refuses in Preview, with no force option. Legacy `run` refuses unconditionally under the third-person architecture; no agent is launched or wrapped. See the [M8 command contract](specs/011-awake-automation/contracts/awake-automation.md) for implemented versus deferred paths.
 `watch` edits exact lifetime-rule preferences through revision-checked config; Settings also lists, adds, enables, and removes watched programs. During an explicitly active Auto session, CamLid samples same-user executable paths and app bundle IDs, reports a separate lifetime reason, and blocks completion sleep while presence or uncertainty remains. Process presence never creates AI activity or an AI completion event; saved rules do not start a session. Preview still performs no power actuation.
 Current owner-directed source changes: Settings → Permissions keeps optional Notifications only; CamLid no longer requests Accessibility or polls agent UI. Settings → Agents uses Detect Orca as the only switch for read-only CLI observation and keeps the mixed-JSON disclosure. The legacy `orcaMetadataConsent` key remains readable for compatibility but no longer controls observation. No Screen Recording or Full Disk Access is required. Software verification passed 489 tests in each Debug/Release plus Xcode build; isolated QA updated. Sanitized live status now shows Orca Working1, Codex process2 and OpenCode process4, with standalone task states Unknown. Native QA confirmed Notifications-only Permissions and fully visible Orca source disclosure at the new default Agents size; comprehensive accessibility/appearance and standalone activity qualification remain open. Orca queries run only when Orca is selected for detection; turning Detect off discards late results. [Current verification boundary](docs/qa/no-ax-terminal-observation-2026-10-14.md).
@@ -102,8 +118,8 @@ native accessibility/performance QA, and consenting real-user trials remain open
 No fixed recovery deadline is promised after helper/OS hangs. No fan/charging control exists.
 
 Spec Kit uses one folder per milestone M0–M8 (including M4a/M4b). Explicit `SPECIFY_FEATURE_DIRECTORY` scopes
-skill work; the selected feature does not imply gate completion. No Git repository or external
-publication was created. New user instructions authorize preview implementation and QA.
+skill work; the selected feature does not imply gate completion. This repository now tracks the source and documentation; generated binaries and private
+raw QA archives remain ignored. Preview implementation and QA do not authorize native actions.
 
 ### Passive agent supervision
 

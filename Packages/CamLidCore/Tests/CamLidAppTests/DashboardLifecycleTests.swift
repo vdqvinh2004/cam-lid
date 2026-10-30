@@ -44,6 +44,23 @@ struct DashboardLifecycleTests {
             #expect(!lifecycle.monitoring)
         }
     }
+    @Test @MainActor func rightAndControlClicksOpenMenuWhileLeftClickTogglesDashboard() {
+        #expect(MenuBarController.opensContextMenu(eventType: .rightMouseUp, control: false))
+        #expect(MenuBarController.opensContextMenu(eventType: .leftMouseUp, control: true))
+        #expect(!MenuBarController.opensContextMenu(eventType: .leftMouseUp, control: false))
+        #expect(!MenuBarController.opensContextMenu(eventType: nil, control: false))
+    }
+    @Test @MainActor func updatingClosedUtilityDoesNotCreateDashboardWindow() throws {
+        let app = NSApplication.shared
+        let coordinator = UtilityUICoordinator()
+        let fixture = QARefinementSupport()
+        let state = UtilityUIState(dashboard: fixture.dashboardFixture(), configuration: try Configuration(),
+            revision: 1, protection: fixture.protectionFixture(), settingsSection: .agents,
+            anchorFrame: .zero, installationPending: false)
+        let existingWindows = Set(app.windows.map(ObjectIdentifier.init))
+        for _ in 0..<5 { coordinator.update(state) }
+        #expect(Set(app.windows.map(ObjectIdentifier.init)) == existingWindows)
+    }
     @Test @MainActor func ownedWindowsAndNestedMenusDoNotConsumeInsideClicks() {
         let panel = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: true)
         let anchor = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: true)

@@ -216,11 +216,18 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
 
     static func batteryAndPower() -> (Double?, PowerSource) {
         guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-            let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef],
-            let source = list.first,
-            let info = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue()
-                as? [String: Any]
+            let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef]
         else { return (nil, .unknown) }
+        let descriptions = list.compactMap {
+            IOPSGetPowerSourceDescription(blob, $0)?.takeUnretainedValue() as? [String: Any]
+        }
+        return batteryAndPower(from: descriptions)
+    }
+
+    static func batteryAndPower(from descriptions: [[String: Any]]) -> (Double?, PowerSource) {
+        // UPS ordering must not override the Mac's internal battery safety inputs.
+        let batteries = descriptions.filter { $0[kIOPSTypeKey] as? String == kIOPSInternalBatteryType }
+        guard batteries.count == 1, let info = batteries.first else { return (nil, .unknown) }
         let current = info[kIOPSCurrentCapacityKey as String] as? Double
         let capacity = info[kIOPSMaxCapacityKey as String] as? Double
         let battery: Double? =

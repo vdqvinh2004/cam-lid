@@ -57,7 +57,45 @@ Review [contracts/status.md](contracts/status.md) and verify:
 - No G2 native foreign-policy row. That row needs a separate one-use approval and is outside
   M9's offline exit gate.
 
-## 5. M9 completion evidence
+## 5. Reproducibility follow-up (2026-10-21)
+
+```sh
+python3 -m unittest discover -s Tests/Hardware -p 'test_*.py' -v
+python3 Tests/Hardware/g2-foreign-policy-row.py --self-test
+python3 Tests/Hardware/audit-m9-host-readonly.py --self-test
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  python3 scripts/verify-preview.py --output docs/qa/preview-evidence/my-new-preview-run
+```
+
+The hardware Python tests use fakes/owned PTYs only. Canonical Preview verification also
+performs read-only hardware preflight, but never installs/starts a helper or actuates power.
+The 40-run private archive is an explicitly opted-in historical test, not a mandatory fixture
+or current product-source qualification. See the committed fixture README for its invocation.
+
+For candidate staging, use the existing `Packages/CamLidPowerHelper/Support/stage-local-candidate.py`
+with newly compiled helper/client paths under `.pi/qa-builds` and `--lid-specific-best-effort`.
+It signs locally and never installs or registers the bundle. Every rebuild requires a new
+review/freeze; do not update pins automatically or reuse a prior approval.
+The current exact freeze, source manifest and human-only read-only root-journal gate are in
+[the handoff](../../docs/qa/reproducible-m9-handoff-2026-10-21.md). `--prepare-readonly` requires
+that exact staging; `--run-approved` remains blocked with no approved boot pin.
+
+The owner-confirmed lock-only profile has a separate
+[auth-only installation packet](../../docs/qa/m9-lock-only-install-packet-2026-10-21.md).
+Its `python3 Tests/Hardware/install-m9-lock-only-qa.py --self-test` only verifies staging;
+it never installs or contacts the helper. Do not run its approval flag/launcher as part of
+software verification. Root install/bootstrap/one-inspect consent is a separate human gate, now completed per the
+owner-returned receipts. Do not rerun that consumed launcher as a verification step. Native
+G2 still requires its own exact approval; software tests/metadata do not contact the helper.
+
+The [next G2 packet](../../docs/qa/g2-m9-next-qualification-packet-2026-10-21.md) includes a
+pure `review-m9-postboot-audit.py --review <saved-owner-JSON>` tool. A matching report only
+supports review; it never grants recovery, journal deletion, IPC or native execution.
+Postboot owner audit now matches the old G2 acknowledged journal. The separate disarmed
+archival/restart packet is the next decision; its native flags are not software-test commands. Do not substitute an old
+v9 Sleep recorder or reset packet.
+
+## 6. M9 completion evidence
 
 Record:
 

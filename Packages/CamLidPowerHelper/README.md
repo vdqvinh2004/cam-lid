@@ -1,10 +1,20 @@
 # CamLid competitor-style power helper candidate
 
+**Current handoff — 2026-10-21:** [reproducible M9 preparation](../../docs/qa/reproducible-m9-handoff-2026-10-21.md).
+The source supports the lid-specific M9 path; prior installed/staged v3/v8/v9 statements below
+are dated history, not current-host inventory. The owner completed the
+[exact auth-only M9 installation and one positive IPC inspect](../../docs/qa/m9-lock-only-install-packet-2026-10-21.md).
+The receipt reports `ready/noPendingIntent`, no mutation/lease, preserved original locks and
+no journal deletion. Read-only disk hashing independently matches the frozen M9 helper.
+This consumes the install/one-inspect scope; no further IPC or native session is authorized. Do not run historical reset/upgrade
+packets. `camlid-power-qa --readiness` reads unprivileged safety metadata only, before any XPC
+client is constructed; it does not authorize a session or qualify the root helper.
+
 Original implementation of the persistent SleepDisabled + authenticated recovery-helper architecture documented by LidRun and Amphetamine Power Protect. No competitor code copied. No Apple contact needed or proposed.
 
 **Not wired into CamLid, qualified or shippable.** A frozen v3 QA helper was subsequently installed under exact owner approval; its short closed-work and client-failure tests succeeded, but an owner-performed Apple-menu Sleep test was blocked. Therefore the pmset candidate fails the retained manual-Sleep criterion and must not be promoted into the main app. Chronological evidence/permissions: [QA report](../../docs/qa/power-helper-candidate-2026-10-16.md).
 
-Current source also contains an unselected lid-specific IOKit primitive reusing `LidNativeAdapter`, with process-owned timed idle assertion and distinct shared clamshell control, no global pmset mutation. It is deliberately not adapted to a Boolean global-setting getter or claimed restoration guarantee. Mechanism-specific journal/lease integration and separately approved native testing remain necessary; compilation does not change the already-installed frozen v3 helper. No executable currently selects the new primitive. Tests inject fake boundaries. Existing main app remains Preview; do not install/update/activate native code without exact approval.
+The original increment also contained an unselected lid-specific IOKit primitive reusing `LidNativeAdapter`, with process-owned timed idle assertion and distinct shared clamshell control, no global pmset mutation. It is deliberately not adapted to a Boolean global-setting getter or claimed restoration guarantee. Mechanism-specific journal/lease integration and separately approved native testing remain necessary; compilation does not change the already-installed frozen v3 helper. That original restriction was superseded by the explicitly selected lid-specific QA modes documented below; the shipping app remains unconnected. Tests inject fake boundaries. Existing main app remains Preview; do not install/update/activate native code without exact approval.
 
 ## Implemented path
 

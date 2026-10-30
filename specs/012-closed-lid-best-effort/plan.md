@@ -206,9 +206,14 @@ and [`r0-owner-acceptance-2026-10-20.md`](../../docs/qa/r0-owner-acceptance-2026
 
 ## 4. G2 — native qualification (after R0)
 
-- Full system Sleep: proposed ≥3 independent observations across ≥2 boots with clean
-  termination, zero unexplained darkwakes and operator attestation; failure rejects the
-  backend (proposal §9.3).
+- Full system Sleep: owner froze ≥3 independent observations across ≥2 boots on
+  2026-10-21, with clean termination, zero unexplained darkwakes and operator attestation.
+  A genuine backend failure under a valid procedure rejects the backend (proposal §9.3).
+  Invalid/incomplete procedures do not count as PASS and never authorize automatic retry.
+  This policy decision is not native episode authority; wake/cue/window timing and each
+  one-use live scope still need separate review/approval. The current
+  [offline timing/evidence packet](../../docs/qa/m9-manual-sleep-timing-draft-2026-10-21.md)
+  keeps qualification false and records the separately approved passive grammar snapshot.
 - Closed-lid continuity: sustained attended sessions with independent progress; no seconds-long
   claim; display behaviour within the current continuity-first scope.
 - Failure classes: app crash, helper crash/hang, journal corruption/permission error, AC loss,

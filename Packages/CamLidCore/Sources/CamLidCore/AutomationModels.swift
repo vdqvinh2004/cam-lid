@@ -6,8 +6,10 @@ public enum SleepEffect: String, Codable, Sendable {
     case systemIdle, displayIdle, userActivity, global, kernel, unknown
     public static func assertion(_ type: String) -> Self {
         switch type {
-        case "PreventUserIdleSystemSleep", "PreventSystemSleep": .systemIdle
-        case "PreventUserIdleDisplaySleep": .displayIdle
+        case "PreventUserIdleSystemSleep", "PreventSystemSleep",
+             "BackgroundTask", "ApplePushServiceTask", "NetworkClientActive", "SystemIsActive":
+            .systemIdle
+        case "PreventUserIdleDisplaySleep", "InternalPreventDisplaySleep": .displayIdle
         case "UserIsActive": .userActivity
         default: .unknown
         }
@@ -48,15 +50,24 @@ public struct DiagnosticSnapshot: Codable, Equatable, Sendable {
     public var protection: ProtectionOutcome
     public var restoration: String
     public var blockers: [DiagnosticBlocker]
+    /// Process names macOS itself listed in `sleep ... (sleep prevented by ...)`.
+    /// Empty when the line said nothing is preventing sleep *or* when it could
+    /// not be read; check `coverage["preventing"]` to tell those apart.
+    public var preventedBy: [String]
     public init(observedAt: Date = Date(), coverage: [String: DiagnosticCoverage] = [:], errors: [String] = [],
                 configuredMode: RequestedMode = .off, activeSessionMode: RequestedMode? = nil,
                 protection: ProtectionOutcome = .preview, restoration: String = "noPowerResourcesOwned",
-                blockers: [DiagnosticBlocker] = []) {
+                blockers: [DiagnosticBlocker] = [], preventedBy: [String] = []) {
         self.observedAt = observedAt; self.coverage = coverage; self.errors = errors
         self.configuredMode = configuredMode; self.activeSessionMode = activeSessionMode
         self.protection = protection; self.restoration = restoration; self.blockers = blockers
+        self.preventedBy = preventedBy
     }
     public var hasCoverage: Bool { coverage.values.contains { $0 != .unavailable } }
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, observedAt, coverage, errors, configuredMode, activeSessionMode
+        case protection, restoration, blockers, preventedBy
+    }
     public func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(schemaVersion, forKey: .schemaVersion)
@@ -68,9 +79,24 @@ public struct DiagnosticSnapshot: Codable, Equatable, Sendable {
         try values.encode(protection, forKey: .protection)
         try values.encode(restoration, forKey: .restoration)
         try values.encode(blockers, forKey: .blockers)
+        try values.encode(preventedBy, forKey: .preventedBy)
+    }
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try values.decode(Int.self, forKey: .schemaVersion)
+        observedAt = try values.decode(Date.self, forKey: .observedAt)
+        coverage = try values.decode([String: DiagnosticCoverage].self, forKey: .coverage)
+        errors = try values.decode([String].self, forKey: .errors)
+        configuredMode = try values.decode(RequestedMode.self, forKey: .configuredMode)
+        activeSessionMode = try values.decodeIfPresent(RequestedMode.self, forKey: .activeSessionMode)
+        protection = try values.decode(ProtectionOutcome.self, forKey: .protection)
+        restoration = try values.decode(String.self, forKey: .restoration)
+        blockers = try values.decode([DiagnosticBlocker].self, forKey: .blockers)
+        preventedBy = try values.decodeIfPresent([String].self, forKey: .preventedBy) ?? []
     }
     public func redacted() -> Self {
         var result = self
+        result.preventedBy = []
         for index in result.blockers.indices {
             result.blockers[index].id = "request-\(index)"
             result.blockers[index].owner = nil; result.blockers[index].pid = nil
@@ -102,7 +128,7 @@ public struct DiagnosticSnapshot: Codable, Equatable, Sendable {
 public enum NotificationCategory: String, Codable, CaseIterable, Sendable {
     case completion, failure, safety, restoration
     public var title: String {
-        switch self { case .completion: "Work finished"; case .failure: "Work failed"; case .safety: "Safety stops"; case .restoration: "Restoration problems" }
+        switch self { case .completion: "Work finished"; case .failure: "Work failed"; case .safety: "Safety stops"; case .restoration: "Recovery problems" }
     }
 }
 

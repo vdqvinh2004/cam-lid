@@ -108,6 +108,28 @@ struct UIUXRefinementTests {
         }
     }
 
+    @Test func routineSensorUpdatesStayOutOfTheDefaultTimeline() throws {
+        let lid = try StoredTransition(stateRevision: 0, category: .configuration,
+            newState: .off, reasonCodes: ["lidAvailabilityChanged"])
+        let temperature = try StoredTransition(stateRevision: 0, category: .configuration,
+            newState: .off, reasonCodes: ["temperatureAvailabilityChanged"])
+        let settings = try StoredTransition(stateRevision: 0, category: .configuration,
+            newState: .off, reasonCodes: ["configApplied"])
+        #expect(ActivityPresentation.isRoutineSensorUpdate(lid))
+        #expect(ActivityPresentation.isRoutineSensorUpdate(temperature))
+        #expect(!ActivityPresentation.isRoutineSensorUpdate(settings))
+        #expect(ActivityPresentation.readableReason("appQuitNoOwnedPower") == "CamLid quit without a session")
+    }
+
+    @Test @MainActor func updatesUnavailableExplainsThePreviewWithoutImplyingInstallation() throws {
+        let snapshot = UpdateSnapshot(phase: .unavailable, reason: "developerIDRequired")
+        let view = UpdatesView(snapshot: snapshot, canCheck: false, onCheck: {})
+        #expect(view.title == "Updates unavailable")
+        #expect(view.detail.contains("release version"))
+        #expect(!view.detail.lowercased().contains("install"))
+        #expect(view.preferredHeight < 185)
+    }
+
     @Test func updateProjectionCannotEnableInstallation() throws {
         let payload = Data(#"{"phase":"available","reason":"updateAvailable","version":"2.0","installationAvailable":true}"#.utf8)
         let snapshot = try JSONDecoder().decode(UpdateSnapshot.self, from: payload)

@@ -242,8 +242,16 @@ public final class SettingsEditor: ObservableObject {
         fieldMessages.removeValue(forKey: "lifetimeRules")
         apply(key: "lifetimeRules") { _ in var patch = ConfigPatch(); patch.lifetimeRules = rules; return patch }
     }
+    /// Providers that are detected and have a working detector. Unsupported or
+    /// absent agents stay visible in Settings but cannot be enabled.
+    var selectableProviders: [String] {
+        AgentBadgeState.providers.filter { provider in
+            guard let badge = badges.first(where: { $0.provider == provider }) else { return false }
+            return badge.settingsUnavailableReason == nil
+        }
+    }
     public func enableAllProviders() {
-        for provider in AgentBadgeState.providers where !draft.parsedAdapters().contains(provider) {
+        for provider in selectableProviders where !draft.parsedAdapters().contains(provider) {
             setProvider(provider, enabled: true)
         }
     }
@@ -426,7 +434,7 @@ public final class SettingsEditor: ObservableObject {
         if pending.contains("launchAtLogin") { draft.launchAtLogin = oldDraft.launchAtLogin }
         if pending.contains("notificationCategories") { draft.notificationCategories = oldDraft.notificationCategories }
         if pending.contains("cpuStopEnabled") { draft.cpuStopEnabled = oldDraft.cpuStopEnabled }
-        for provider in ["orca", "codex", "opencode", "claude"] where pending.contains("provider:" + provider) {
+        for provider in AgentBadgeState.providers where pending.contains("provider:" + provider) {
             var selected = draft.parsedAdapters().filter { $0 != provider }
             if oldDraft.parsedAdapters().contains(provider) { selected.append(provider) }
             draft.adapterEnrollmentText = selected.joined(separator: "\n")

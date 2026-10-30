@@ -7,7 +7,7 @@ import CamLidCore
 struct NativeProcessList: ProcessListProvider {
     static let maximumProcesses = LifetimeProcessSnapshot.maximumProcesses
     static let maximumExecutablePathBytes = 4096
-    static let executableNames: Set<String> = ["codex", "opencode", "claude", "orca"]
+    static let executableNames: Set<String> = AgentProviderCatalog.processNames
 
     struct AgentSnapshot: Sendable {
         let records: [ProcessRecord]

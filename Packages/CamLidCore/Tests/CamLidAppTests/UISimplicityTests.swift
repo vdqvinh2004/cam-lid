@@ -29,7 +29,8 @@ struct UISimplicityTests {
         #expect(ActivityLogView.preferredHeight(recordCount: 100_000, hasError: true) <= 480)
         let unavailable = UpdatesView(snapshot: UpdateSnapshot(phase: .unavailable, reason: "developerIDRequired"), canCheck: false, onCheck: {})
         let checking = UpdatesView(snapshot: UpdateSnapshot(phase: .checking, reason: "checkingSignedFeed"), canCheck: false, onCheck: {})
-        #expect(unavailable.preferredHeight == checking.preferredHeight)
+        #expect(unavailable.preferredHeight < checking.preferredHeight)
+        #expect(unavailable.preferredHeight >= 110)
         #expect(Set(OnboardingPage.allCases.map(\.preferredHeight)).count == 1)
     }
     @Test @MainActor func infiniteChoiceSurvivesAutoAndMenusHideStopWhenIdle() async throws {

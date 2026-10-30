@@ -37,11 +37,18 @@ public struct MenuBarStatus: Sendable, Equatable {
     public let state: EffectiveState
     public let reasonText: String?
     public let leaseVerified: Bool
+    /// Auto mode: true while any enabled agent reports work.
+    public let agentWorking: Bool
+    /// Timed/manual mode: live remaining seconds, or nil for Infinite.
+    public let timerRemainingSeconds: Double?
 
-    public init(state: EffectiveState, reasonText: String? = nil, leaseVerified: Bool = false) {
+    public init(state: EffectiveState, reasonText: String? = nil, leaseVerified: Bool = false,
+                agentWorking: Bool = false, timerRemainingSeconds: Double? = nil) {
         self.state = state
         self.reasonText = reasonText
         self.leaseVerified = leaseVerified
+        self.agentWorking = agentWorking
+        self.timerRemainingSeconds = timerRemainingSeconds
     }
 
     /// MASTER: do not claim protected until the backend lease is verified.
@@ -91,6 +98,24 @@ public struct MenuBarStatus: Sendable, Equatable {
     }
 }
 
+/// Compact live countdown rendered directly in the menu bar.
+enum MenuBarCountdown {
+    /// Finite remaining time as menu-bar text. Infinite sessions have no
+    /// countdown and render the infinity glyph instead.
+    static func text(remaining: Double?) -> String? {
+        guard let remaining else { return nil }
+        let total = max(0, Int(remaining.rounded(.up)))
+        let hours = total / 3_600
+        let minutes = (total % 3_600) / 60
+        let seconds = total % 60
+        if hours > 0 {
+            // Above one hour, seconds are noise in the menu bar.
+            return String(format: "%d:%02d", hours, minutes)
+        }
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
 /// Left-click toggles the dashboard; right/Control-click closes it before
 /// opening native options. Timer updates change labels without activation.
 @MainActor
@@ -105,6 +130,9 @@ public final class MenuBarController: NSObject {
     private var lastStatus = MenuBarStatus(state: .unavailable)
     private var renderedStatus: MenuBarStatus?
     private var renderedMode: RequestedMode?
+    private var renderedTimerText: String?
+    private var autoAnimationTimer: Timer?
+    private var autoAnimationIndex = 0
 
     public override init() {
         super.init()
@@ -129,12 +157,14 @@ public final class MenuBarController: NSObject {
     }
 
     public func remove() {
+        stopAutoAnimation()
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
         statusItem = nil
         renderedStatus = nil
         renderedMode = nil
+        renderedTimerText = nil
     }
 
     /// Reflects Core state in icon + label. Unknown stays untinted.
@@ -149,17 +179,101 @@ public final class MenuBarController: NSObject {
             menu.item(withTag: 2)?.isHidden = actions?.menuBarCanStop != true
         }
         let activeMode = actions?.menuBarActiveMode
-        guard status != renderedStatus || activeMode != renderedMode else { return }
+        let isTimedSession = activeMode == .timed || activeMode == .manual
+        let timerText = Self.timerText(for: activeMode, status: status)
+        let showsInfinite = isTimedSession && status.tone != .stopped && status.timerRemainingSeconds == nil
+        guard status != renderedStatus || activeMode != renderedMode || timerText != renderedTimerText else { return }
         renderedStatus = status
         renderedMode = activeMode
-        button.image = CamLidStatusIcon.image(for: status.tone, activeMode: activeMode)
-        // Active marks stay white; the glyph and accessible label convey state.
-        button.contentTintColor = activeMode == nil ? nil : .white
-        let label = status.accessibilityLabel + (activeMode.map { " · " + ($0 == .manual ? "Timed" : $0.rawValue.capitalized) + " session" } ?? "")
+        renderedTimerText = timerText
+
+        let autoWorking = activeMode == .auto && status.tone != .stopped && status.agentWorking
+        if let timerText {
+            // Timed/manual sessions replace the clock icon with the actual
+            // remaining time, updating once per second.
+            stopAutoAnimation()
+            button.image = nil
+            button.title = timerText
+            button.imagePosition = .noImage
+            button.font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+            button.contentTintColor = nil
+        } else if showsInfinite {
+            // Infinite has no clock to show: use a native infinity glyph and
+            // leave the title empty so no time counter appears.
+            stopAutoAnimation()
+            button.title = ""
+            button.imagePosition = .imageOnly
+            button.font = nil
+            button.image = CamLidStatusIcon.infinityImage()
+            button.contentTintColor = nil
+        } else {
+            button.title = ""
+            button.imagePosition = .imageOnly
+            button.font = nil
+            if autoWorking {
+                button.contentTintColor = .white
+                startAutoAnimation()
+            } else {
+                stopAutoAnimation()
+                let iconMode: RequestedMode? = activeMode == .auto ? .auto : nil
+                button.image = CamLidStatusIcon.image(for: status.tone, activeMode: iconMode,
+                                                      agentWorking: false)
+                // Active marks stay white; the glyph and accessible label convey state.
+                button.contentTintColor = iconMode == nil ? nil : .white
+            }
+        }
+
+        let modeText = activeMode.map { " · " + ($0 == .manual ? "Timed" : $0.rawValue.capitalized) + " session" } ?? ""
+        let countdownText: String
+        if showsInfinite {
+            countdownText = ", no time limit"
+        } else if let timerText {
+            countdownText = ", \(timerText) remaining"
+        } else {
+            countdownText = ""
+        }
+        let workingText = activeMode == .auto
+            ? (status.agentWorking ? ", agent working" : ", no agent working") : ""
+        let label = status.accessibilityLabel + modeText + countdownText + workingText
         button.setAccessibilityLabel(label)
         button.setAccessibilityValue(label)
         button.toolTip = label
         if shouldNotify { NSAccessibility.post(element: button, notification: .valueChanged) }
+    }
+
+    private static func timerText(for activeMode: RequestedMode?, status: MenuBarStatus) -> String? {
+        guard activeMode == .timed || activeMode == .manual, status.tone != .stopped else { return nil }
+        return MenuBarCountdown.text(remaining: status.timerRemainingSeconds)
+    }
+
+    private func startAutoAnimation() {
+        guard autoAnimationTimer == nil else { return }
+        guard let button = statusItem?.button else { return }
+        let frames = CamLidStatusIcon.autoSpinnerFrames
+        autoAnimationIndex = 0
+        button.image = frames.first
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.advanceAutoAnimation() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        autoAnimationTimer = timer
+    }
+
+    private func advanceAutoAnimation() {
+        guard let button = statusItem?.button else {
+            stopAutoAnimation()
+            return
+        }
+        let frames = CamLidStatusIcon.autoSpinnerFrames
+        guard !frames.isEmpty else { return }
+        autoAnimationIndex = (autoAnimationIndex + 1) % frames.count
+        button.image = frames[autoAnimationIndex]
+    }
+
+    private func stopAutoAnimation() {
+        autoAnimationTimer?.invalidate()
+        autoAnimationTimer = nil
+        autoAnimationIndex = 0
     }
 
     /// Call from the dashboard panel dismissal path (including Esc) so
@@ -171,13 +285,15 @@ public final class MenuBarController: NSObject {
     // MARK: - Click routing
 
     @objc private func handleClick(_ sender: Any?) {
-        // Right-click (incl. Control-click, reported as rightMouseUp) opens the
-        // menu; anything else toggles the dashboard panel.
-        if NSApp.currentEvent?.type == .rightMouseUp || NSApp.currentEvent?.modifierFlags.contains(.control) == true {
+        if Self.opensContextMenu(eventType: NSApp.currentEvent?.type, control: NSApp.currentEvent?.modifierFlags.contains(.control) == true) {
             showMenu()
         } else {
             onToggleDashboard?()
         }
+    }
+    /// Right-click and Control-click open the menu; any other click toggles the dashboard.
+    static func opensContextMenu(eventType: NSEvent.EventType?, control: Bool) -> Bool {
+        eventType == .rightMouseUp || control
     }
 
     public var anchorButton: NSStatusBarButton? { statusItem?.button }

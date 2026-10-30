@@ -122,7 +122,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
             onDurationChange: { [weak self] minutes in
                 guard let self, let state = self.state else { return }
                 self.send(.timerDuration(minutes, state.revision))
-            }, maximumDurationMinutes: state.configuration.runCapMinutes,
+            }, maximumDurationMinutes: state.dashboard.timerMaximumMinutes ?? state.configuration.runCapMinutes,
             sleepDelayMinutes: state.dashboard.sleepDelayMinutes ?? state.configuration.completionDelayMinutes,
             onSleepDelayChange: { [weak self] minutes in
                 guard let self, let state = self.state else { return }
@@ -297,7 +297,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         }
     }
     private func showSleepDiagnostics() {
-        present(SleepDiagnosticsView(read: { [weak self] in await self?.readDiagnostics() ?? DiagnosticSnapshot(errors: ["appUnavailable"]) }), title: "Sleep Requests · CamLid", window: &sleepDiagnosticsWindow, width: 580, height: 380)
+        present(SleepDiagnosticsView(read: { [weak self] in await self?.readDiagnostics() ?? DiagnosticSnapshot(errors: ["appUnavailable"]) }), title: "Why is my Mac awake? · CamLid", window: &sleepDiagnosticsWindow, width: 600, height: 480)
     }
     private func showUpdates(show: Bool = true) {
         guard let state else { return }

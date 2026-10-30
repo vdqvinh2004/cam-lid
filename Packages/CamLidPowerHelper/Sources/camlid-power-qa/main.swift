@@ -5,7 +5,7 @@ import CamLidPowerService
 
 @MainActor
 private enum QACommand: String {
-    case version = "--version", inspect = "--inspect"
+    case version = "--version", inspect = "--inspect", readiness = "--readiness"
     case registrationStatus = "--registration-status", acquire = "--acquire-24s"
     case acquireBestEffort = "--acquire-best-effort-900s"
     static func parse(_ arguments: [String]) -> QACommand? {
@@ -20,7 +20,7 @@ private enum QACommand: String {
                                             deadlineSeconds: 27)
         case .acquireBestEffort: return BoundedRunPlan(sessionSeconds: 900, stopAfterSeconds: 894,
                                                       deadlineSeconds: 903)
-        case .version, .inspect, .registrationStatus: return nil
+        case .version, .inspect, .readiness, .registrationStatus: return nil
         }
     }
 }
@@ -150,6 +150,7 @@ private func runMainForever() -> Never {
 let arguments = Array(CommandLine.arguments.dropFirst())
 if arguments == ["--self-test"] {
     guard QACommand.parse(["--inspect"]) == .inspect,
+          QACommand.parse(["--readiness"]) == .readiness,
           QACommand.parse(["--acquire-24s"]) == .acquire,
           QACommand.parse(["--acquire-best-effort-900s"]) == .acquireBestEffort,
           QACommand.parse([]) == nil,
@@ -162,6 +163,7 @@ if arguments == ["--self-test"] {
           QACommand.acquireBestEffort.runPlan == BoundedRunPlan(sessionSeconds: 900, stopAfterSeconds: 894,
                                                                 deadlineSeconds: 903),
           QACommand.inspect.runPlan == nil, QACommand.version.runPlan == nil,
+          QACommand.readiness.runPlan == nil,
           QACommand.registrationStatus.runPlan == nil else { fatalError("run plan boundary failed") }
     guard QAExit.forRelease(state: "restored") == 0,
           QAExit.forRelease(state: "cleanupAcknowledged") == 5,
@@ -171,7 +173,7 @@ if arguments == ["--self-test"] {
     exit(0)
 }
 guard let command = QACommand.parse(arguments) else {
-    print("CamLid power candidate QA: --version | --registration-status | --inspect")
+    print("CamLid power candidate QA: --version | --readiness | --registration-status | --inspect")
     print("--acquire-24s requires separate exact approval. --acquire-best-effort-900s is a single finite")
     print("900s candidate session, not a product mode. Local daemon installation is external to this client.")
     print("No command executed.")
@@ -183,6 +185,24 @@ if command == .version {
 }
 
 do {
+    // Read-only, unprivileged safety snapshot; no XPC client, journal or power binding.
+    if command == .readiness {
+        guard geteuid() > 0 else { throw PowerServiceFailure.invalidRequest }
+        let before = NativeHelperEnvironment.now
+        let value = try NativeHelperEnvironment.safety()
+        let elapsed = NativeHelperEnvironment.now - before
+        let sample: [String: Any] = [
+            "source": "unprivileged native reader, not root helper",
+            "onAC": value.onAC, "batteryPercent": value.batteryPercent.map { $0 as Any } ?? NSNull(),
+            "thermalNominal": value.thermalNominal, "consoleUID": value.consoleUID.map { $0 as Any } ?? NSNull(),
+            "lidClosed": value.lidClosed.map { $0 as Any } ?? NSNull(),
+            "externalDisplays": value.externalDisplays.map { $0 as Any } ?? NSNull(),
+            "readDurationSeconds": elapsed, "withinOneSecond": elapsed.isFinite && elapsed >= 0 && elapsed <= 1,
+            "powerActuation": false, "physicalQualification": false,
+        ]
+        print(String(decoding: try JSONSerialization.data(withJSONObject: sample, options: [.sortedKeys]), as: UTF8.self))
+        exit(0)
+    }
     guard geteuid() > 0, Bundle.main.bundleURL.pathExtension == "app" else { throw PowerServiceFailure.invalidRequest }
     if command == .registrationStatus {
         let status = SMAppService.statusForLegacyPlist(at: URL(fileURLWithPath: "/Library/LaunchDaemons/com.camlid.power-helper.plist"))

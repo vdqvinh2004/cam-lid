@@ -57,6 +57,56 @@ struct SleepDiagnosticsTests {
         #expect(json["powerActuation"] as? Bool == false)
     }
 
+    @Test func backgroundAndPushAssertionsMapToSystemIdle() {
+        #expect(SleepEffect.assertion("BackgroundTask") == .systemIdle)
+        #expect(SleepEffect.assertion("ApplePushServiceTask") == .systemIdle)
+        #expect(SleepEffect.assertion("NetworkClientActive") == .systemIdle)
+        #expect(SleepEffect.assertion("SystemIsActive") == .systemIdle)
+        #expect(SleepEffect.assertion("InternalPreventDisplaySleep") == .displayIdle)
+        #expect(SleepEffect.assertion("PreventUserIdleDisplaySleep") == .displayIdle)
+        #expect(SleepEffect.assertion("UserIsActive") == .userActivity)
+        #expect(SleepEffect.assertion("FutureAssertion") == .unknown)
+    }
+
+    @Test func backgroundTasksAreProjectedWhenSystemActive() {
+        let rows = SleepDiagnosticsSnapshot.project(processes: [9: [
+            ["AssertLevel": 255, "AssertType": "BackgroundTask", "AssertionId": 1, "Process Name": "dasd"],
+            ["AssertLevel": 255, "AssertType": "ApplePushServiceTask", "AssertionId": 2, "Process Name": "apsd"],
+        ]], status: ["BackgroundTask": 1, "ApplePushServiceTask": 1])
+        #expect(rows.count == 2)
+        #expect(rows.allSatisfy { SleepEffect.assertion($0.type) == .systemIdle })
+    }
+
+    @Test func preventingLineIsParsedDedupedAndRedacted() throws {
+        let parsed = SleepDiagnosticReader.powerCategories(
+            settings: "System-wide power settings:\n SleepDisabled 0\n sleep 1 (sleep prevented by dasd, nsurlsessiond, dasd, FaceTime)",
+            assertions: "Kernel Assertions: None")
+        #expect(parsed.coverage["preventing"] == .complete)
+        #expect(parsed.preventedBy == ["dasd", "nsurlsessiond", "FaceTime"])
+        #expect(parsed.coverage["global"] == .complete)
+        #expect(!String(describing: parsed.redacted()).contains("FaceTime"))
+
+        let idle = SleepDiagnosticReader.powerCategories(settings: " SleepDisabled 0\n sleep 1",
+            assertions: "Kernel Assertions: None")
+        #expect(idle.preventedBy.isEmpty && idle.coverage["preventing"] == .complete)
+
+        let unavailable = SleepDiagnosticReader.powerCategories(settings: "new format", assertions: "new format")
+        #expect(unavailable.coverage["preventing"] == .unavailable)
+
+        let snapshot = DiagnosticSnapshot(blockers: [
+            DiagnosticBlocker(id: "1", type: "BackgroundTask", effect: .systemIdle, source: "IOKit",
+                owner: "dasd", pid: 42, explanation: "Keeps system awake"),
+        ], preventedBy: ["dasd"])
+        #expect(snapshot.redacted().preventedBy.isEmpty)
+        #expect(snapshot.redacted().blockers.first?.owner == nil)
+
+        let encoded = try JSONEncoder().encode(DiagnosticSnapshot())
+        var object = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
+        object.removeValue(forKey: "preventedBy")
+        let older = try JSONSerialization.data(withJSONObject: object)
+        #expect(try JSONDecoder().decode(DiagnosticSnapshot.self, from: older).preventedBy.isEmpty)
+    }
+
     @Test func activeRequestsDistinguishSystemDisplayAndUserActivity() {
         let entries: [[String: Any]] = [
             ["AssertLevel": 255, "AssertType": "UserIsActive", "AssertionId": 1],

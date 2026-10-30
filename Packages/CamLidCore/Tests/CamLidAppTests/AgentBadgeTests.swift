@@ -1,8 +1,18 @@
 import Testing
 import AppKit
+import SwiftUI
 import CamLidCore
 @testable import CamLidApp
 struct AgentBadgeTests {
+    @Test @MainActor func agentBadgeKeepsMarkInsidePaddedSlot() {
+        let badge = AgentBadge(provider: "orca", title: "Orca")
+        let host = NSHostingController(rootView: badge)
+        host.sizingOptions = []
+        let size = host.sizeThatFits(in: NSSize(width: 400, height: 100))
+        #expect(AgentBadgeMetrics.markSize < AgentBadgeMetrics.markSlotSize)
+        #expect(size.height >= AgentBadgeMetrics.markSlotSize + AgentBadgeMetrics.verticalPadding * 2)
+    }
+
     @Test func orcaExplanationSeparatesReceiptAgeFromStateFreshness() throws {
         let task = try AgentTask(id: "orca/pane", sessionID: "outside", runID: "pane",
             state: .working, evidenceKind: .lifecycle, confidence: .inferred)
@@ -36,7 +46,7 @@ struct AgentBadgeTests {
     }
     @Test func unknownCoverageIsNotPresentedAsAbsenceInCompactBadge() {
         let badge = AgentBadgeState(provider: "orca", enabled: true, tasks: [], observationKnown: false)
-        #expect(badge.observedState == "Unknown" && badge.compactDetail == "Task unknown")
+        #expect(badge.observedState == "Unknown" && badge.compactDetail == "No task reported")
     }
     @Test func enrollmentDoesNotInventActivity() {
         #expect(AgentBadgeState(provider: "codex", enabled: true, tasks: []).observedState == "Not detected")
@@ -63,19 +73,31 @@ struct AgentBadgeTests {
         #expect(data.workingAgents.map(\.provider) == ["orca"])
         #expect(DashboardData(mode: .off, state: .off, reasonText: "").workingAgents.isEmpty)
     }
+    @Test func settingsAvailabilityReflectsDetectionSupport() {
+        let soon = AgentBadgeState(provider: "vscode-copilot", enabled: false, tasks: [])
+        #expect(!soon.supportsDetection && soon.settingsUnavailableReason == "Support soon")
+        let absent = AgentBadgeState(provider: "claude", enabled: false, tasks: [])
+        #expect(absent.supportsDetection && absent.settingsUnavailableReason == "Not detected")
+        let cli = AgentBadgeState(provider: "freebuff", enabled: false, tasks: [], cliDetected: true)
+        #expect(cli.settingsUnavailableReason == nil && cli.isDetected)
+        let app = AgentBadgeState(provider: "claude-app", enabled: false, tasks: [], appDetected: true)
+        #expect(app.settingsUnavailableReason == nil && app.installationText == "App detected")
+    }
+
     @Test func providerMarksMapToBundledAssets() {
-        #expect(AgentBadgeState(provider: "orca", enabled: true, tasks: []).markAssetName == "agent-orca")
-        #expect(AgentBadgeState(provider: "codex", enabled: true, tasks: []).markAssetName == "agent-codex")
-        #expect(AgentBadgeState(provider: "claude", enabled: true, tasks: []).markAssetName == "agent-claude")
+        for info in AgentProviderCatalog.providers {
+            let state = AgentBadgeState(provider: info.id, enabled: true, tasks: [])
+            #expect(state.markAssetName == info.assetName)
+        }
         #expect(AgentBadgeState(provider: "opencode", enabled: true, tasks: []).markAssetName == nil)
         #expect(AgentBadgeState(provider: "opencode", enabled: true, tasks: []).usesVectorMark)
         #expect(AgentBadgeState(provider: "mystery", enabled: true, tasks: []).markAssetName == nil)
     }
     @Test @MainActor func bundledMarksLoadAtRuntime() {
         // Exercises the real production path (Bundle.module inside CamLidApp).
-        for provider in ["orca", "codex", "claude"] {
-            guard let image = AgentMarkView.image(for: provider) else {
-                Issue.record("missing bundled mark: \(provider)")
+        for info in AgentProviderCatalog.providers where info.assetName != nil {
+            guard let image = AgentMarkView.image(for: info.id) else {
+                Issue.record("missing bundled mark: \(info.id)")
                 continue
             }
             #expect(image.size.width > 0 && image.size.height > 0)
@@ -101,8 +123,21 @@ struct AgentBadgeTests {
         let both = AgentBadgeState(provider: "codex", enabled: true, tasks: [try row("c", .working), try row("d", .waiting)])
         let data = DashboardData(mode: .auto, state: .ready, reasonText: "",
             agents: [working, waiting, both])
-        #expect(data.workingAgents.map(\.provider) == ["orca", "codex"])
+        #expect(data.workingAgents.map(\.provider) == ["codex", "orca"])
         #expect(data.waitingAgents.map(\.provider) == ["opencode"])
+        #expect(data.listedAgents.map(\.provider) == ["codex", "opencode", "orca"])
+    }
+    @Test func agentBadgeDisplayOrderIsAlphabeticalAndDetectedFirst() {
+        let windsurf = AgentBadgeState(provider: "windsurf", enabled: true, tasks: [])
+        let codex = AgentBadgeState(provider: "codex", enabled: true, tasks: [], cliDetected: true)
+        let aider = AgentBadgeState(provider: "aider", enabled: true, tasks: [])
+        let claudeApp = AgentBadgeState(provider: "claude-app", enabled: true, tasks: [], appDetected: true)
+        let agents = [windsurf, codex, aider, claudeApp]
+
+        #expect(agents.sortedForAgentDisplay().map(\.title)
+            == ["Aider", "Claude app", "Codex", "Windsurf / Devin"])
+        #expect(agents.sortedForAgentDisplay(detectedFirst: true).map(\.provider)
+            == ["claude-app", "codex", "aider", "windsurf"])
     }
     @Test func mixedWorkingAndWaitingShowsBothCountsWaitingFirst() throws {
         let mixed = AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("w", .working), try row("q", .waiting)])

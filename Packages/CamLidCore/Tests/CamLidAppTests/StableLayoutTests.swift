@@ -36,6 +36,24 @@ import CamLidCore
         }
     }
 
+    @Test func dashboardAgentBadgesWrapToNextLine() throws {
+        let agents = try AgentBadgeState.providers.map { provider in
+            let task = try AgentTask(id: "\(provider)/work", sessionID: "s", runID: "r",
+                state: .working, evidenceKind: .lifecycle, confidence: .exact)
+            return AgentBadgeState(provider: provider, enabled: true, tasks: [task])
+        }
+        let data = DashboardData(mode: .auto, state: .ready, reasonText: "",
+            stopEnabled: true, agents: agents)
+        let host = NSHostingController(rootView: DashboardView(data: data,
+            onOpenLog: {}, onClose: {}, onModeChange: { _ in },
+            onDurationChange: { _ in }, onSleepDelayChange: { _ in }, onOpenAgents: {}))
+        host.sizingOptions = []
+        let wide = host.sizeThatFits(in: NSSize(width: 390, height: CGFloat.greatestFiniteMagnitude))
+        let narrow = host.sizeThatFits(in: NSSize(width: 240, height: CGFloat.greatestFiniteMagnitude))
+        #expect(narrow.height > wide.height + 20,
+            "Badges should flow onto additional lines at a narrow dashboard width")
+    }
+
     @Test func settingsTabsKeepWindowFrame() throws {
         let editor = SettingsEditor(configuration: try Configuration(), revision: 1)
         let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 580, height: 540),

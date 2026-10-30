@@ -2,8 +2,10 @@
 
 **Feature context:** `013-closed-lid-hardening`
 **Status:** Offline tasks T001–T004, T101–T104, T201–T203, T301–T302 and T401–T403 are
-complete (2026-10-20). T501/T502 remain blocked on separate approvals. No native action,
-install, app integration or shipping-gate change was performed.
+complete (2026-10-20). Reproducibility/install-packet follow-up T601–T605 is complete (2026-10-21);
+22/23 total tasks checked. The owner-approved M9 install and native foreign-policy retry
+completed; driver row PASS plus explicit operator attestation complete T501. T502 remains
+blocked; full G2, app integration and shipping/qualification gates are unchanged.
 **Sources:** [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md),
 [data-model.md](data-model.md), [status contract](contracts/status.md).
 
@@ -107,12 +109,49 @@ install, app integration or shipping-gate change was performed.
   blocked and that R0 was accepted on 2026-10-20 (with re-arm still an explicit qualification
   input). *Done when:* links resolve and no qualification is implied.
 
+## Reproducibility follow-up — 2026-10-21 (offline)
+
+Original M9 exit is unchanged (16/18 original tasks); these additional tasks repair the
+clean-checkout/handoff gaps without authorizing T501/T502.
+
+- [x] **T601 — Make Preview regressions reproducible from Git.** Reuse the committed benchmark
+  fixtures for mandatory stream/runtime checks; separate opt-in 40-run archive verification.
+  Explicit missing-archive requests must fail. Run full Debug/Release Swift suites and Xcode
+  builds, isolated binary integration and packaging; record skips and source fingerprints.
+- [x] **T602 — Rebuild and freeze the actual M9 candidate.** Use the existing local staging
+  script, exact role-separated hashes and hardened-runtime signatures; verify sources unchanged
+  during the build. Replace the missing private readiness probe with a read-only QA command.
+  No registration/install/IPC/acquisition occurs in staging.
+- [x] **T603 — Repair and fake-test the G2 handoff.** Pin the new candidate, verify signatures,
+  preserve PTY EOF/final replies, use monotonic waits and fresh post-cleanup status. Add offline
+  PTY/fake-episode/identity-refusal regressions. Native entry stays blocked without a newly
+  approved boot; do not reuse attempt #3's pins/latch or old approval.
+- [x] **T604 — Reconcile docs and prepare the human gate.** Record actual host inventory and
+  the unreadable root journal; provide a fixed-path, read-only allowlisted audit with inert
+  self-tests. Update README/roadmap/spec index and handoff evidence. No journal deletion,
+  root install packet or native action is inferred from an unknown journal.
+
+- [x] **T605 — Prepare the lock-only auth installation packet.** After the owner-provided
+  root audit confirms only the two safe lock files/no journal, freeze a boot/profile-specific
+  first-install packet and short hash-checked launcher. Preserve locks, refuse any journal or
+  existing destination/loaded job, validate ACL/role/signature/source inputs, publish exclusively
+  without overwrite, report partial uncertainty, and test the root path with fakes/owned temps
+  only. Packet prepared; owner subsequently approved and returned successful auth-only
+  install/bootstrap/one-inspect receipts. No native power action or G2 approval follows. Evidence: [auth-only packet](../../docs/qa/m9-lock-only-install-packet-2026-10-21.md).
+
 ## Phase 5 — Native/G3 handoff (blocked; separate approvals)
 
-- [ ] **T501 — G2 native foreign-policy failure row.**
+- [x] **T501 — G2 native foreign-policy failure row.**
   Under a new explicit one-use approval, test that a foreign global policy during a real
   session stops CamLid without clearing the foreign flag and produces the expected recovery
-  state. *Blocked:* native action approval; not part of M9's offline exit.
+  state. *PASS with operator attestation:* separately approved retry `b81e0919a`
+  acquired the frozen M9 helper, observed foreign-policy recovery without clearing the foreign
+  flag, then fresh final recovery after operator cleanup. Evidence:
+  [row result](../../docs/qa/g2-m9-foreign-policy-result-2026-10-21.md). Owner reported reboot;
+  independent boot metadata confirms a new boot. The owner selected “Đúng, không có sai lệch”,
+  confirming cue timing, AC/open-lid attendance and no unexpected Sleep/wake/anomaly.
+  Driver disarmed; latch preserved, no further retry authority.
+  Earlier preflight rejection remains recorded, not overwritten. Not overall G2 qualification.
 
 - [ ] **T502 — G3 app/CLI integration.**
   Wire the M9 contract into the app behind the experimental flag, with consent/banner/recovery
@@ -154,3 +193,24 @@ Offline exit gate met at the model/helper/test level. Evidence:
 T501 (G2 native row) and T502 (G3 app/CLI wiring) remain **blocked** and are not part of this
 offline completion. `qualifiedClosedLidProtection=false`; full system Sleep and verified
 restoration remain unqualified.
+
+### Reproducibility completion — 2026-10-21
+
+T601–T604 complete; [handoff and exact evidence](../../docs/qa/reproducible-m9-handoff-2026-10-21.md).
+Full Preview Swift Debug/Release (519 declarations/config, four explicit skips), both Xcode
+builds, actual CLI integration and packaging/read-only preflight pass. Final helper 49 and
+best-effort 62 tests pass per configuration; 25 fake hardware Python tests pass, including
+the paste-safe hash-checked read-only audit launcher and root lock-metadata cases (no sudo
+in tests). The new
+candidate was initially staged/signed/hash-pinned only. The second owner root audit confirmed
+both safe lock files/no journal/no unknown entry. T605's packet passed 45 offline tests, then
+received separate owner approval and owner-returned successful installation/one-inspect
+receipts. Root payloads/daemon are now installed per that receipt; original locks were preserved
+and no journal was deleted. The one positive inspect reports `ready/noPendingIntent`, no
+mutation or lease. Independent read-only disk hashing matches the frozen helper. Post-install
+G2 metadata guidance/strict CLI-entry regressions bring the fake hardware suite to 47 tests.
+Those offline/auth-only checks performed no native power action. A later separately approved
+retry produced the [foreign-policy driver row PASS](../../docs/qa/g2-m9-foreign-policy-result-2026-10-21.md),
+with explicit operator attestation. Owner reboot is confirmed by a new boot ID. Driver is
+disarmed; latch retained, no repeat or reset authority. T501 complete, T502 remains
+blocked and all overall native/shipping qualification flags remain unchanged.

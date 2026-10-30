@@ -85,7 +85,7 @@ struct NotificationBudget {
         case .completion: content.body = preview ? "Preview work settled. No power or sleep change was made." : "Tracked work settled. Check Activity for the sleep outcome."
         case .failure: content.body = "Tracked work reported a failure. Check Activity for details."
         case .safety: content.body = preview ? "A safety condition stopped preview protection. No host power change was made." : "A safety condition stopped protection. Check Activity for details."
-        case .restoration: content.body = "Restoration needs attention. Check Activity before starting another session."
+        case .restoration: content.body = "Recovery needs attention. Check Activity before starting another session."
         }
         content.sound = .default
         return content

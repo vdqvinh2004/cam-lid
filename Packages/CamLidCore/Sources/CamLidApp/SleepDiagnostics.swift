@@ -123,6 +123,7 @@ public final class SleepDiagnosticReader: @unchecked Sendable {
                         let power = try powerReader()
                         result.coverage.merge(power.coverage) { _, new in new }
                         result.blockers += power.blockers
+                        result.preventedBy = power.preventedBy
                         result.errors += power.errors
                     } catch { result.errors.append("powerCategoriesUnavailable") }
                 } else { result.errors.append("powerCategoriesDeadline") }
@@ -136,13 +137,32 @@ public final class SleepDiagnosticReader: @unchecked Sendable {
         }
     }
     static func powerCategories(settings: String, assertions: String) -> DiagnosticSnapshot {
-        var result = DiagnosticSnapshot(coverage: ["global": .unavailable, "kernel": .unavailable])
-        if let line = settings.split(separator: "\n").first(where: { $0.split(whereSeparator: \.isWhitespace).first == "SleepDisabled" }),
+        var result = DiagnosticSnapshot(coverage: ["global": .unavailable, "kernel": .unavailable, "preventing": .unavailable])
+        let settingsLines = settings.split(separator: "\n")
+        if let line = settingsLines.first(where: { $0.split(whereSeparator: \.isWhitespace).first == "SleepDisabled" }),
            let value = line.split(whereSeparator: \.isWhitespace).last, ["0", "1"].contains(value) {
             result.coverage["global"] = .complete
             if value == "1" { result.blockers.append(DiagnosticBlocker(id: "global-sleepDisabled", type: "SleepDisabled",
                 effect: .global, source: "pmset", explanation: "System-wide sleep is disabled. CamLid does not change this setting.")) }
         } else { result.errors.append("globalSettingUnknown") }
+        if let line = settingsLines.first(where: { $0.split(whereSeparator: \.isWhitespace).first == "sleep" }) {
+            let text = String(line)
+            if let marker = text.range(of: "(sleep prevented by ") {
+                let tail = text[marker.upperBound...]
+                if let close = tail.firstIndex(of: ")") {
+                    var seen = Set<String>()
+                    result.preventedBy = tail[..<close].split(separator: ",")
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+                    result.coverage["preventing"] = .complete
+                } else { result.errors.append("preventingUnknown") }
+            } else if text.contains("sleep prevented by") {
+                result.errors.append("preventingUnknown")
+            } else {
+                // pmset omits the parenthetical when nothing is preventing idle sleep.
+                result.coverage["preventing"] = .complete
+            }
+        }
         if let line = assertions.split(separator: "\n").first(where: { $0.hasPrefix("Kernel Assertions:") }) {
             let value = line.dropFirst("Kernel Assertions:".count).trimmingCharacters(in: .whitespaces)
             if value == "None" || value == "0x0" { result.coverage["kernel"] = .complete }

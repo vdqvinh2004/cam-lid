@@ -87,7 +87,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var lastProcessSuccess = -Double.infinity
     private var lastProcessObservation = -Double.infinity
     private var processCandidates: [ProcessCandidate] = []
-    private var installedCLIs: Set<String>?
+    private var installationSnapshot: AgentInstallationSnapshot?
     private var lifetimeTracker = LifetimeRuleTracker()
     private var lifetimeProcessSnapshot: LifetimeProcessSnapshot?
     private var exactTaskEpoch: String?
@@ -326,7 +326,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             capDeadlineMonotonic: config.sessionDurationMinutes(for: mode, powerSource: health.powerSource).map { now + Double($0) * 60 }
         ) else { return }
         session = created
-        sessionTimerMinutes = config.timedDurationMinutes == 0 ? 0 : min(config.timedDurationMinutes, config.runCapMinutes)
+        let startTimerMaximum = sessionBatteryDeadline.map { max(0, Int(($0 - now) / 60)) }
+            ?? (health.powerSource == .ac ? config.runCapMinutes : min(config.runCapMinutes, config.batteryCapMinutes))
+        sessionTimerMinutes = config.timedDurationMinutes == 0 ? 0 : min(config.timedDurationMinutes, startTimerMaximum)
         sessionSleepDelayMinutes = config.completionDelayMinutes
         record(category: .enrollment, newState: created.effectiveState, reasons: ["previewSessionStarted"])
         refresh()
@@ -358,17 +360,52 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     @discardableResult
     func changeTimerDuration(_ minutes: Int, expectedRevision: Int) -> Bool {
+        let now = uptime()
+        let maximum = timerMaximumMinutes(now: now)
         guard !authorityUnavailable, !terminationFlowActive, !hasPendingSettingsWork,
               revision == expectedRevision, var active = session,
-              let duration = active.restartTimer(minutes: minutes, maximumMinutes: config.runCapMinutes, now: uptime()) else {
+              let duration = active.restartTimer(minutes: minutes, maximumMinutes: maximum, now: now) else {
             refusalNotice = "Timer not changed. Retry in a running Timed session."; refresh(); return false
         }
         sessionTimerMinutes = duration
         session = active
-        refusalNotice = nil
+        let batteryLimited = sessionBatteryDeadline != nil || latestHealth?.powerSource != .ac
+        let batteryRemaining = sessionBatteryDeadline.map { max(0, Int(($0 - now) / 60)) }
+        if minutes > 0, let batteryRemaining, batteryRemaining < duration {
+            refusalNotice = "Timer capped at \(batteryRemaining) min remaining by the battery safety limit. Connect power for a longer timer."
+        } else if minutes > 0, duration < minutes {
+            refusalNotice = batteryLimited
+                ? "Timer capped at \(duration) min by the battery safety limit. Connect power for a longer timer."
+                : "Timer capped at \(duration) min by the session limit."
+        } else {
+            refusalNotice = nil
+        }
         record(category: .configuration, newState: active.effectiveState, reasons: ["sessionTimerChanged"])
         refresh()
         return true
+    }
+
+    /// Longest finite timer the active session can accept without extending
+    /// the latched battery deadline. This is the stable safety cap, not the
+    /// shrinking remaining time, so the picker always has a valid selection.
+    /// Unknown power is treated conservatively as battery.
+    private func timerMaximumMinutes(now: Double) -> Int {
+        if sessionBatteryDeadline != nil || latestHealth?.powerSource != .ac {
+            return min(config.runCapMinutes, config.batteryCapMinutes)
+        }
+        return config.runCapMinutes
+    }
+
+    private func timerLimitText(now: Double) -> String? {
+        let power = latestHealth?.powerSource ?? .unknown
+        let maximum = timerMaximumMinutes(now: now)
+        guard let deadline = sessionBatteryDeadline else {
+            guard power != .ac, maximum < config.runCapMinutes else { return nil }
+            return "Battery safety limit: \(maximum) min. Connect power for a longer timer."
+        }
+        let remaining = max(0, Int((deadline - now) / 60))
+        if remaining <= 0 { return "Battery safety limit reached. Connect power to start another timer." }
+        return "Battery safety limit: \(maximum) min · \(remaining) min remaining."
     }
 
     @discardableResult
@@ -431,6 +468,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 sessionBatteryDeadline = min(sessionBatteryDeadline ?? deadline, deadline)
                 if let batteryDeadline = sessionBatteryDeadline {
                     active.capDeadlineMonotonic = min(active.capDeadlineMonotonic ?? batteryDeadline, batteryDeadline)
+                    if sessionTimerMinutes ?? 0 > 0 {
+                        sessionTimerMinutes = min(sessionTimerMinutes ?? 0,
+                                                   min(config.runCapMinutes, config.batteryCapMinutes))
+                    }
                 }
             }
             var policyConfig = config
@@ -459,8 +500,18 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             lastReportedState = shown
         }
         latestReason = statusReason(signal: signal)
+        let activeMode = session?.requestedMode
+        let agentWorking = activeMode == .auto && badgeStates().contains {
+            $0.detectionEnabled && $0.workingCount > 0
+        }
+        let timerRemaining: Double? = if activeMode == .timed || activeMode == .manual {
+            session?.capDeadlineMonotonic.map { max(0, $0 - now) }
+        } else {
+            nil
+        }
         menuBar.update(status: MenuBarStatus(
-            state: shown, reasonText: latestReason, leaseVerified: false))
+            state: shown, reasonText: latestReason, leaseVerified: false,
+            agentWorking: agentWorking, timerRemainingSeconds: timerRemaining))
         updates.refreshSafety()
         if utilityUI?.isRunning == true { utilityUI?.send(.update(utilityUIState())) }
     }
@@ -494,7 +545,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         AgentBadgeState.providers.map { provider in
             AgentBadgeState(provider: provider, enabled: config.adapterEnrollment.contains(provider), tasks: agents.tasks(provider: provider, now: uptime()), evidenceAgeSeconds: agents.lastReceipt(provider: provider).map { max(0, uptime() - $0) },
                 processCount: uptime() - lastProcessObservation <= 15 ? processCandidates.filter { $0.provider == provider }.count : 0,
-                cliDetected: installedCLIs?.contains(provider),
+                cliDetected: installationSnapshot?.cliDetected.contains(provider),
+                appDetected: installationSnapshot?.appDetected.contains(provider) ?? false,
                 observationKnown: uptime() - lastProcessSuccess <= 15
                     || (provider == "orca" && config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= 15))
         }
@@ -705,7 +757,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             banner: .unsupported, bannerMessage: notices.isEmpty ? nil : notices.joined(separator: " "),
             lastSessionText: active.map { "Session \($0.id.prefix(8)) rev \($0.stateRevision)" },
             stopEnabled: active != nil, startEnabled: menuBarCanStart && menuBarAutoAvailable, metrics: DashboardMetric.from(health), agents: badges,
-            timerMinutes: active == nil ? nil : sessionTimerMinutes, sleepDelayMinutes: active == nil ? nil : sessionSleepDelayMinutes)
+            timerMinutes: active == nil ? nil : sessionTimerMinutes,
+            timerMaximumMinutes: active == nil ? nil : timerMaximumMinutes(now: now),
+            timerLimitText: active == nil ? nil : timerLimitText(now: now),
+            sleepDelayMinutes: active == nil ? nil : sessionSleepDelayMinutes)
         return data
     }
 
@@ -875,18 +930,18 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         lastProcessPoll = started
         let scanLifetimeRules = hasLifetimeRules && session?.requestedMode == .auto
         Task { [weak self] in
-            let (candidates, complete, installed, lifetime) = await Task.detached(priority: .utility) {
-                let installed = AgentCLIInstallation.detected()
+            let (candidates, complete, installation, lifetime) = await Task.detached(priority: .utility) {
+                let installation = AgentCLIInstallation.snapshot()
                 let processList = NativeProcessList()
                 let snapshot = processList.agentSnapshot()
                 let candidates = ProcessDiscovery(provider: InMemoryProcessList(records: snapshot.records),
-                    patterns: AgentBadgeState.providers.map { CandidatePattern(executableContains: $0, provider: $0) }, maxFallbackEntries: 20).discover()
+                    patterns: AgentProviderCatalog.processPatterns, maxFallbackEntries: 20).discover()
                 let lifetime = scanLifetimeRules ? processList.lifetimeSnapshot() : nil
-                return (candidates, snapshot.complete, installed, lifetime)
+                return (candidates, snapshot.complete, installation, lifetime)
             }.value
             guard let self else { return }
             self.processPolling = false
-            self.installedCLIs = installed
+            self.installationSnapshot = installation
             self.lifetimeProcessSnapshot = lifetime
             self.receiveProcessSnapshot(candidates, complete: complete, observedAt: started)
             // Presence never fabricates working/idle/completion or an Auto hold.
@@ -1236,7 +1291,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         if config.mode == .off, session != nil {
             record(category: .stateTransition, newState: .off, reasons: ["modeOffPreview"]); session = nil
         } else if var active = session, active.requestedMode != config.mode {
-            sessionTimerMinutes = config.timedDurationMinutes == 0 ? 0 : min(config.timedDurationMinutes, config.runCapMinutes)
+            sessionTimerMinutes = config.timedDurationMinutes == 0
+                ? 0 : min(config.timedDurationMinutes, timerMaximumMinutes(now: uptime()))
             sessionSleepDelayMinutes = config.completionDelayMinutes
             if config.sessionDurationMinutes(for: config.mode) == nil {
                 active.capDeadlineMonotonic = nil
