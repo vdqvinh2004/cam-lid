@@ -7,6 +7,14 @@ step needs an administrator password where marked. This is not G2 and passes no 
 Use the app from one fixed path for the whole trial; the helper pins that build's CDHash. Rebuilding changes it
 (then run `helper trust`).
 
+## Known state of the owner's Mac (found 2026-10-31)
+An earlier **Strict** helper is still loaded in launchd under the same label: `launchctl print system/com.camlid.power-helper`
+shows `state = running`, `--lid-specific-best-effort-v1`, although its plist and binary are gone. Standard mode shares
+that label, so the installer refuses with `labelInUse` and never boots it out. `SleepDisabled` was 0. Decide before
+step 3: leave it (no install possible) or remove it yourself with
+`sudo launchctl bootout system/com.camlid.power-helper`. Its journal under `/private/var/db/CamLidPowerHelper*` and
+the scope evidence under `/Library/Application Support/CamLidPowerHelper/` are not touched by either path.
+
 ```sh
 # 0. Build (no password)
 xcodebuild -project CamLid.xcodeproj -scheme CamLid -configuration Debug -destination 'platform=macOS,arch=arm64' \
@@ -25,6 +33,8 @@ launchctl print system/com.camlid.power-helper 2>&1 | head -2
 # 2. Read-only unreachable check (no password). Expect: "helper-inspect: unreachable", exit 1.
 "$APP/Contents/MacOS/CamLid" --helper-inspect; echo "exit=$?"
 
+# 2b. Optional (password): remove the leftover Strict service named above, then re-check:
+#     sudo launchctl bootout system/com.camlid.power-helper ; launchctl print system/com.camlid.power-helper
 # 3. Install (password). Expect: "accepted":true,"reason":"installed". Without --replace-pins and with an old
 #    identity.json present, expect "foreignPinsPresent" and no change. With it, the old file is kept as
 #    identity.json.previous and the other files in that directory (QA scope evidence) are not touched.
@@ -62,3 +72,10 @@ during the trial: a shipped build has no qualified support row, so it would not 
 
 If step 4 prints `unreachable` while the helper is installed, check `launchctl print system/com.camlid.power-helper`
 (is it running?) and the app's signature flags (`codesign -dvvv "$APP"` must show `runtime`).
+
+## Result of the first run (2026-10-31)
+Steps 2b, 3, 4 and 7 were run by the owner; steps 5 and 6 were not. Install returned `installed`, status `installed` with
+`serviceLoaded:true`, `--helper-inspect` returned `accepted=true state=ready reason=noPendingIntent` (exit 0),
+`SleepDisabled` stayed 0, uninstall returned `uninstalled`, the earlier `identity.json` and the scope directories were
+intact and no `identity.json.previous` remained. Paste commands without trailing `#` comments: interactive zsh passes
+them as arguments.

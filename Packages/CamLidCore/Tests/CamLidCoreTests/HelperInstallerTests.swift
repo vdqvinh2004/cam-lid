@@ -6,10 +6,24 @@ private final class FakeRunner: HelperCommandRunning, @unchecked Sendable {
     var hashes: [String: String] = [:]          // path suffix -> cdhash
     var failing: Set<String> = []               // "executable arg0" prefixes that exit 1
     var calls: [String] = []
+    var loaded: Set<String> = []                // launchd labels currently loaded
+    private func label(in path: String) -> String? {
+        let name = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+        return name.hasPrefix("com.camlid.") ? name : nil
+    }
     func run(_ executable: String, _ arguments: [String]) -> (status: Int32, output: String) {
         let line = ([executable] + arguments).joined(separator: " ")
         calls.append(line)
         if failing.contains(where: { line.hasPrefix($0) }) { return (1, "failed") }
+        if executable == "/bin/launchctl", let verb = arguments.first {
+            let target = arguments.last ?? ""
+            switch verb {
+            case "print": return loaded.contains(String(target.dropFirst("system/".count))) ? (0, "") : (113, "Could not find service")
+            case "bootstrap": if let l = label(in: target) { loaded.insert(l) }; return (0, "")
+            case "bootout": loaded.remove(String(target.dropFirst("system/".count))); return (0, "")
+            default: return (0, "")
+            }
+        }
         if executable == "/usr/bin/codesign", arguments.first == "-dvvv", let path = arguments.last {
             guard let hash = hashes.first(where: { path.hasSuffix($0.key) })?.value else { return (1, "") }
             return (0, "Identifier=x\nCDHash=\(hash)\n")
@@ -197,5 +211,27 @@ private struct Rig {
         #expect(rig.installer().install(appBundle: rig.app).accepted)
         #expect(rig.installer().uninstall().accepted)
         #expect(!FileManager.default.fileExists(atPath: rig.paths.supportDirectory.path))
+    }
+}
+
+@Suite struct HelperInstallerLoadedServiceTests {
+    @Test func aServiceAlreadyLoadedUnderOurLabelIsNeverReplacedOrBootedOut() throws {
+        let rig = try Rig()
+        rig.runner.loaded = [HelperInstallPaths.helperLabel]       // e.g. an earlier Strict helper still running
+        let result = rig.installer().install(appBundle: rig.app)
+        #expect(!result.accepted && result.reason == "labelInUse")
+        #expect(rig.runner.loaded == [HelperInstallPaths.helperLabel])
+        #expect(!rig.runner.calls.contains { $0.hasPrefix("/bin/launchctl bootout") || $0.hasPrefix("/bin/launchctl bootstrap") })
+        #expect(!FileManager.default.fileExists(atPath: rig.paths.helperBinary.path))
+    }
+
+    @Test func aFailedBootstrapOnlyStopsServicesThisRunStarted() throws {
+        let rig = try Rig()
+        rig.runner.failing = ["/bin/launchctl bootstrap system \(rig.paths.recoveryPlist.path)"]
+        let result = rig.installer().install(appBundle: rig.app)
+        #expect(!result.accepted && result.reason == "bootstrapFailed")
+        #expect(rig.runner.loaded.isEmpty)                             // the helper it did start was booted out again
+        let bootouts = rig.runner.calls.filter { $0.hasPrefix("/bin/launchctl bootout") }
+        #expect(bootouts == ["/bin/launchctl bootout system/\(HelperInstallPaths.helperLabel)"])
     }
 }

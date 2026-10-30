@@ -90,8 +90,7 @@ public struct HelperInstaller: Sendable {
         guard let pins = readPins() else { return .partial(missing: ["validPins"]) }
         guard let helperHash = cdHash(of: paths.helperBinary), helperHash == pins.helperCDHash else { return .helperIdentityMismatch }
         guard let appHash = cdHash(of: appBundle), appHash == pins.appCDHash else { return .needsReauthorization }
-        let loaded = runner.run("/bin/launchctl", ["print", "system/\(HelperInstallPaths.helperLabel)"]).status == 0
-        return .installed(loaded: loaded)
+        return .installed(loaded: isLoaded(HelperInstallPaths.helperLabel))
     }
 
     // MARK: Install
@@ -130,10 +129,17 @@ public struct HelperInstaller: Sendable {
             return .refused("alreadyInstalledDifferently", "Run: sudo camlid helper uninstall, then install; or helper trust after a rebuild.")
         }
 
+        // A service already loaded under one of our labels is not ours (this install has no files yet):
+        // never replace it, and never boot it out.
+        for label in [HelperInstallPaths.helperLabel, HelperInstallPaths.recoveryLabel] where isLoaded(label) {
+            return .refused("labelInUse", "launchd already runs \(label) from an earlier install. Inspect it with `launchctl print system/\(label)` and remove it yourself if you intend to.")
+        }
+
         var written: [URL] = []
+        var bootstrapped: [String] = []
         func rollback() {
-            _ = runner.run("/bin/launchctl", ["bootout", "system/\(HelperInstallPaths.recoveryLabel)"])
-            _ = runner.run("/bin/launchctl", ["bootout", "system/\(HelperInstallPaths.helperLabel)"])
+            // Only services this run started are stopped.
+            for label in bootstrapped.reversed() { _ = runner.run("/bin/launchctl", ["bootout", "system/\(label)"]) }
             for url in written.reversed() { try? FileManager.default.removeItem(at: url) }
             if movedPins { try? FileManager.default.moveItem(at: previousPinFile, to: paths.pinFile) }
         }
@@ -159,12 +165,13 @@ public struct HelperInstaller: Sendable {
             rollback()
             return .refused("installFailed", String(describing: error))
         }
-        for plist in [paths.helperPlist, paths.recoveryPlist] {
+        for (plist, label) in [(paths.helperPlist, HelperInstallPaths.helperLabel), (paths.recoveryPlist, HelperInstallPaths.recoveryLabel)] {
             let result = runner.run("/bin/launchctl", ["bootstrap", "system", plist.path])
             guard result.status == 0 else {
                 rollback()
                 return .refused("bootstrapFailed", result.output)
             }
+            bootstrapped.append(label)
         }
         return .ok("installed")
     }
@@ -220,6 +227,13 @@ public struct HelperInstaller: Sendable {
     }
 
     // MARK: Helpers
+
+    /// Whether launchd currently has a service under the helper label, whoever installed it.
+    public func serviceLoaded() -> Bool { isLoaded(HelperInstallPaths.helperLabel) }
+
+    private func isLoaded(_ label: String) -> Bool {
+        runner.run("/bin/launchctl", ["print", "system/\(label)"]).status == 0
+    }
 
     private var previousPinFile: URL { paths.supportDirectory.appendingPathComponent("identity.json.previous") }
 

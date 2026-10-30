@@ -16,7 +16,7 @@ private struct RecordingRunner: HelperCommandRunning {
 
     @Test func statusIsReadOnlyAndMutatingCommandsNeedAdministrator() {
         let status = Commands.helperCommand(name: "helper status", options: CLIOptions(), installer: installer())
-        #expect(status.exitCode == 0 && status.json.contains("\"status\":\"notInstalled\""))
+        #expect(status.exitCode == 0 && status.json.contains("\"status\":\"notInstalled\"") && status.json.contains("\"serviceLoaded\":false"))
         for name in ["helper install", "helper trust", "helper uninstall"] {
             let result = Commands.helperCommand(name: name, options: CLIOptions(), installer: installer())
             #expect(result.exitCode == 77 && result.json.contains("administratorRequired"))

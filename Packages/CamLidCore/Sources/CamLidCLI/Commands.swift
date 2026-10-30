@@ -671,7 +671,7 @@ public enum Commands {
             case .helperIdentityMismatch: label = "helperIdentityMismatch"
             case .partial: label = "partial"
             }
-            var dict: [String: Any] = ["command": "helperStatus", "status": label]
+            var dict: [String: Any] = ["command": "helperStatus", "status": label, "serviceLoaded": installer.serviceLoaded()]
             if case .partial(let missing) = status { dict["missing"] = missing }
             return cliJSON(0, dict)
         }
