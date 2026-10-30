@@ -87,3 +87,7 @@ Second run (2026-10-31): both daemons loaded (`com.camlid.power-helper` running,
 `last exit code = 0`); `--recover-v1` as root returned `recovery: nothingToRecover` (exit 0) with `SleepDisabled` 0; uninstall
 again restored the earlier files. The re-signed copy was **accepted** (same CDHash, same identity), which corrected the
 step 5 design above; the helper-side refusal of a different peer is checked with `scripts/helper-peer-probe.swift`.
+
+Third run (2026-10-31): with the helper installed, the control (`--helper-inspect`) returned `accepted=true state=ready`
+and the unpinned probe returned `refused: connection interrupted` (exit 0). With no helper installed the same probe
+reports `connection invalidated`, so the two outcomes differ. Install and uninstall again left the earlier files intact.
