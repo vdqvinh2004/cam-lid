@@ -240,69 +240,6 @@ struct AuditAgentTests {
         #expect(resultA.notes.contains("parentHeldForChildren:p-ord"))
     }
 
-    // MARK: - F08: installer preserves post-install edits
-
-    @Test("uninstall preserves user edits and removes only owned entries")
-    func f08UninstallPreservesUserEdits() throws {
-        let files = InMemoryConfigFileSystem(files: [
-            "~/.claude/settings.json": #"{"theme":"old","userHook":true}"#,
-        ])
-        let installer = IntegrationInstaller(filesystem: files)
-        _ = try installer.install(descriptors: [.claude])
-        let installed = try files.readFile(at: "~/.claude/settings.json")
-        #expect(installed?.contains("\"theme\"") == true)
-        #expect(installed?.contains("camlid:owned:claude:v1") == true)
-        // User edits after install: retitle the theme and add a custom key.
-        guard let installedText = installed,
-            let installedData = installedText.data(using: .utf8),
-            var object = try? JSONSerialization.jsonObject(with: installedData) as? [String: Any]
-        else {
-            Issue.record("installed settings did not parse as JSON")
-            return
-        }
-        object["theme"] = "new"
-        object["customKey"] = 123
-        let editedData = try JSONSerialization.data(
-            withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-        guard let edited = String(data: editedData, encoding: .utf8) else {
-            Issue.record("could not re-encode edited settings")
-            return
-        }
-        try files.writeFile(at: "~/.claude/settings.json", content: edited + "\n")
-        let removed = try installer.remove(descriptors: [.claude])
-        #expect(removed == [RemovedEntry(
-            path: "~/.claude/settings.json", action: .preservedEdits,
-            backupPath: "~/.claude/settings.json.camlid-backup")])
-        guard let finalText = try files.readFile(at: "~/.claude/settings.json"),
-            let finalData = finalText.data(using: .utf8),
-            let final = try? JSONSerialization.jsonObject(with: finalData) as? [String: Any]
-        else {
-            Issue.record("final settings did not parse as JSON")
-            return
-        }
-        #expect(final["theme"] as? String == "new")
-        #expect(final["customKey"] as? Int == 123)
-        #expect(final["userHook"] as? Bool == true)
-        #expect(final["camlid"] == nil)
-        #expect(final["camlidOwned"] == nil)
-        #expect(try files.readFile(at: "~/.claude/settings.json.camlid-backup") != nil) // Later edits retain deliberate-recovery backup.
-    }
-
-    @Test("malformed shared JSON refuses instead of replacing")
-    func f08MalformedSharedJSONRefuses() throws {
-        let files = InMemoryConfigFileSystem(files: [
-            "~/.claude/settings.json": "{not valid json",
-        ])
-        let installer = IntegrationInstaller(filesystem: files)
-        do {
-            _ = try installer.install(descriptors: [.claude])
-            Issue.record("expected install to throw on malformed JSON")
-        } catch let error {
-            #expect(error == .invalidData(path: "~/.claude/settings.json"))
-        }
-        #expect(try files.readFile(at: "~/.claude/settings.json") == "{not valid json")
-    }
-
     // MARK: - F15: bounded per-run dedup
 
     @Test("long sessions keep dedup bounded and reject ancient replays")

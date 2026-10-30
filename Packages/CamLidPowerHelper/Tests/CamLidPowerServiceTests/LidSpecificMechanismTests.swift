@@ -303,7 +303,7 @@ private final class LidLeaseFixture {
         #expect(f.store.entry?.ownerIdentity.hasPrefix("lid-specific-v1:") == true)
         let stopped = f.service.handle(PowerRequest(operation: .release, token: started.token), owner: f.owner, uid: 501)
         #expect(!stopped.accepted && stopped.state == "cleanupAcknowledged")
-        #expect(stopped.reason == "userStop")
+        #expect(stopped.reason == "clientRelease")
         #expect(!stopped.qualifiedClosedLidProtection)
         let second = f.service.handle(PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 24), owner: f.owner, uid: 501)
         #expect(!second.accepted && second.reason == "notReady")

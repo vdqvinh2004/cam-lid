@@ -2,6 +2,14 @@ import Foundation
 import Darwin
 import CamLidPowerService
 
+// Exit callbacks are plain functions, not closure literals: closures written in top-level code are inferred to be
+// main-actor isolated, and these run on the runtime's queue (that mismatch was logged as a data race at shutdown).
+func exitAfterShutdown() { exit(0) }
+func exitAfterFailedStart() {
+    logLine("exiting after a failed start so launchd restarts the helper with a fresh pmset runner")
+    exit(75)
+}
+
 /// One line per state transition, timestamped, to stdout (launchd writes it to the daemon's log file).
 func logLine(_ text: String) {
     print("\(Date().formatted(.iso8601)) pid=\(getpid()) \(text)")
@@ -60,10 +68,7 @@ do {
             safety: NativeHelperEnvironment.safety)
     }
     controller.log = logLine
-    let runtime = PowerHelperRuntime(service: controller, onStartupFailure: {
-        logLine("exiting after a failed start so launchd restarts the helper with a fresh pmset runner")
-        exit(75)
-    })
+    let runtime = PowerHelperRuntime(service: controller, onStartupFailure: exitAfterFailedStart)
     let sleepObserver = bestEffortLidMode ? try RootDomainGeneralInterestObserver { reason in
         runtime.observeSystemEvent(reason: reason)
     } : nil
@@ -81,7 +86,7 @@ do {
         source.setEventHandler {
             sleepObserver?.invalidate()
             listener.invalidate()
-            runtime.shutdown { exit(0) }
+            runtime.shutdown(completion: exitAfterShutdown)
         }
         source.resume()
         return source

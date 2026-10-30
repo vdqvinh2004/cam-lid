@@ -308,7 +308,7 @@ public final class PowerLeaseService {
             case .release:
                 guard let current = lease, current.owner == owner, current.uid == uid,
                       current.token == request.token else { return reply(false, "invalidLease") }
-                try restore(reason: "userStop")
+                try restore(reason: "clientRelease")   // the client may release for Stop, a cap or a safety stop
                 return reply(state == "restored", reason)
             }
         } catch {

@@ -23,7 +23,7 @@ CPU is the growth of CPU time of the agent's whole process subtree, as a fractio
   0.015. Occasional spikes above 0.03 while waiting only delay sleep by one quiet period; they never cause an early one.
 - **`quietSeconds = 45`.** Unchanged: answering windows never dropped below the threshold in these runs, so the quiet
   period only has to bridge short pauses between steps.
-- **Session-file signal dropped.** The calibration sessions wrote no transcript under `~/.claude/projects`, and that
+- **Session-file signal dropped.** The interactive calibration sessions wrote no transcript under `~/.claude/projects` (only the `claude -p` run did, at its end), and that
   directory is shared by every Claude Code session, so another active session (including the one running this
   calibration) would keep every Claude Code process "working". Codex and OpenCode keep similarly shared directories.
   The app uses process lifetime and subtree CPU only.
