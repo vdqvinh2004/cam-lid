@@ -10,7 +10,10 @@ let package = Package(
         .library(name: "CamLidApp", targets: ["CamLidApp"]),
         .executable(name: "camlid", targets: ["camlid"]),
     ],
-    dependencies: [.package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0")],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
+        .package(path: "../CamLidPowerWire"),
+    ],
     targets: [
         .target(
             name: "CamLidCore",
@@ -23,7 +26,8 @@ let package = Package(
         ),
         .target(
             name: "CamLidApp",
-            dependencies: ["CamLidCore", "CamLidCLI", .product(name: "Sparkle", package: "Sparkle")],
+            dependencies: ["CamLidCore", "CamLidCLI", .product(name: "Sparkle", package: "Sparkle"),
+                           .product(name: "CamLidPowerWire", package: "CamLidPowerWire")],
             path: "Sources/CamLidApp",
             resources: [.process("Resources")]
         ),

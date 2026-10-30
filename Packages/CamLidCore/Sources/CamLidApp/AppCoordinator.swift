@@ -8,9 +8,10 @@ import Darwin
 /// a real ActivityStore recording genuine local transitions, and live
 /// PolicyEngine/SafetyPolicy evaluation on a 1s tick.
 ///
-/// HONESTY BOUNDARY: nothing here actuates host power. There is no backend
-/// (M1 pending), read-only telemetry, and every
-/// surface carries the preview banner. Closed-lid arming is refused outright.
+/// HONESTY BOUNDARY: host power is actuated only through the closed-lid helper, and only when a qualified
+/// support row is supplied (`closedLidSupportRow`, nil in every shipped build today), the user opted in and
+/// the helper is installed. Otherwise there is no backend, telemetry is read-only, every surface carries the
+/// preview banner and closed-lid arming is refused.
 /// Start creates a *preview* session so grace/safety/cap transitions are
 /// observable and recorded — safety immediately latches on unknown sensors,
 /// which is the correct unknown-is-not-healthy behavior, not a bug.
@@ -40,7 +41,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private let sensors = LiveSensorProvider()
     private let healthReader: (() -> HealthSnapshot)?
     private let loginItem = LoginItemController()
-    private let helper = HelperController()
+    private let helper: HelperController
+    private var holdReconciler = PowerHoldReconciler()
+    private var holdTransport: (any PowerHoldTransport)?
+    private let makeHoldTransport: () -> any PowerHoldTransport
+    /// Support row that qualifies closed-lid actuation on this Mac/OS/build, or nil. No row is qualified in
+    /// code today, so the helper is never asked to hold power in a shipped build (owner-approved G2 row required).
+    private let closedLidSupportRow: () -> String?
     private let outcomeNotifications: OutcomeNotifications
     private let permissions: AppPermissions
     private var latestHealth: HealthSnapshot?
@@ -129,8 +136,14 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
          preferences: UserDefaults = .standard, settingsWriter: (@Sendable (Data, URL) throws -> Void)? = nil,
          settingsInstaller: (@Sendable (URL, URL) throws -> Void)? = nil,
          outcomeNotifications: OutcomeNotifications? = nil, permissions: AppPermissions? = nil,
-         healthReader: (() -> HealthSnapshot)? = nil) {
+         healthReader: (() -> HealthSnapshot)? = nil,
+         helperController: HelperController? = nil,
+         holdTransportFactory: (() -> any PowerHoldTransport)? = nil,
+         closedLidSupportRow: (() -> String?)? = nil) {
         self.healthReader = healthReader
+        self.helper = helperController ?? HelperController()
+        self.makeHoldTransport = holdTransportFactory ?? { XPCPowerHoldTransport() }
+        self.closedLidSupportRow = closedLidSupportRow ?? { nil }
         self.preferences = preferences
         self.outcomeNotifications = outcomeNotifications ?? OutcomeNotifications()
         self.permissions = permissions ?? AppPermissions()
@@ -165,6 +178,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     public func applicationWillTerminate(_ notification: Notification) {
         timer?.invalidate()
+        // Closing the connection makes the helper restore at once; a crash does the same.
+        holdTransport?.close()
         controlServer.stop()
         if let thermalObserver { NotificationCenter.default.removeObserver(thermalObserver) }
         utilityUI?.close(); utilityUI = nil
@@ -304,7 +319,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             refusalNotice = "Choose a mode before starting."
             refresh(); toggleDashboard(show: true); return
         }
-        if config.closedLidOptIn {
+        if config.closedLidOptIn, closedLidSupportRow() == nil {
             refusalNotice = "Closed-lid preview refused: power control is unavailable."
             record(category: .configuration, newState: sessionStateForRecord(), reasons: ["backendUnverified"])
             refresh()
@@ -353,9 +368,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     public func menuBarOpenSleepDiagnostics() { showUtility(.sleepDiagnostics) }
     public func menuBarOpenActivityLog() { showActivityLog() }
     public func menuBarQuit() {
-        // No owned power state exists (preview never actuates), so immediate
-        // terminate is safe. Cleanup confirmation activates with actuation.
+        // Without a qualified row no power state is owned. With one, closing the helper connection below makes
+        // the helper restore at once, so an immediate terminate is still safe.
         record(category: .configuration, newState: .off, reasons: ["appQuitNoOwnedPower"])
+        holdTransport?.close()
         NSApp.terminate(nil)
     }
 
@@ -446,6 +462,61 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         session?.effectiveState ?? (config.mode == .off ? .off : .ready)
     }
 
+    private var holdDesired: Bool {
+        guard closedLidSupportRow() != nil, config.closedLidOptIn, helper.state == "installed",
+              let state = session?.effectiveState else { return false }
+        return state == .protected || state == .completionGrace
+    }
+
+    /// Reconciles the helper lease with the policy state after each evaluation. Never called with a held
+    /// lease and no session: `desired` turns false, which releases it.
+    private func driveHold(now: Double) {
+        let remaining = session.map {
+            min($0.capDeadlineMonotonic.map { $0 - now } ?? .infinity, Double(PowerHoldReconciler.maximumSessionSeconds))
+        }
+        guard let action = holdReconciler.next(desired: holdDesired, remainingSessionSeconds: remaining, now: now) else { return }
+        let transport = holdTransport ?? makeHoldTransport()
+        holdTransport = transport
+        Task { @MainActor [weak self] in
+            let reply = await transport.send(action)
+            guard let self else { return }
+            let finished = self.uptime()
+            if let reply {
+                self.holdReconciler.received(reply, now: finished)
+                if case .acquire(let seconds) = action, reply.accepted, var active = self.session {
+                    // A fresh lease is bounded by the helper; the policy cap must not outlive it.
+                    let limit = finished + Double(seconds)
+                    active.capDeadlineMonotonic = min(active.capDeadlineMonotonic ?? limit, limit)
+                    self.session = active
+                }
+            } else {
+                self.holdReconciler.failed(now: finished)
+            }
+            self.refresh()
+        }
+    }
+
+    private func closedLidMessage() -> String? {
+        guard config.closedLidOptIn, session != nil else { return nil }
+        if closedLidSupportRow() == nil { return "Closed lid is unavailable: this Mac and build haven’t been qualified." }
+        if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Safety." }
+        switch holdReconciler.status {
+        case .refused(let reason): return Self.helperReasonText(reason)
+        case .lost: return "Closed lid lost contact with the helper; sleep will be restored automatically."
+        case .releaseFailed: return "The sleep setting could not be restored yet. CamLid is retrying."
+        default: return holdReconciler.unavailableReason == nil ? nil : "Closed lid can’t reach the helper. Retrying."
+        }
+    }
+
+    static func helperReasonText(_ reason: String) -> String {
+        switch reason {
+        case "safetyRefused": "Closed lid declined for safety: it needs AC power, at least 20% battery, normal temperature and no external display."
+        case "preexistingOverride", "foreignGlobalSleepDisabled": "Another app already disables sleep, so CamLid left it alone."
+        case "recoveryRequired": "The helper needs recovery before it can hold the Mac awake."
+        default: "The helper ended closed lid (\(reason))."
+        }
+    }
+
     private var helperSummary: String {
         switch helper.state {
         case "installed": "helper installed"
@@ -474,8 +545,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 reasons: agents.lastRejection.map { ["agentEvidenceRejected", $0] } ?? ["agentEvidenceRecovered"])
         }
         let cpuEvaluation = cpu.evaluate(cpuPercent: health.cpuPercent, cpuStopEnabled: config.cpuStopEnabled, now: now)
-        let signal = safety.evaluate(
+        let baseSignal = safety.evaluate(
             health: health, config: config, cpuStop: cpuEvaluation.stop, now: now)
+        // The helper's refusal or stop ends a closed-lid session; the app never works around it.
+        let signal = SafetySignal(reasons: baseSignal.reasons + holdReconciler.stopReasons)
         let lifetime = updateLifetimePolicy(now: now)
         if var active = session {
             // Battery exposure latches a cap from session start; AC return and timer edits cannot extend it.
@@ -511,6 +584,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                     newState: decision.state, reasons: decision.reasons)
             }
         }
+        driveHold(now: now)
         let shown = session?.effectiveState ?? (config.mode == .off ? .off : .ready)
         if shown != lastReportedState {
             lastReportedState = shown
@@ -526,7 +600,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             nil
         }
         menuBar.update(status: MenuBarStatus(
-            state: shown, reasonText: latestReason, leaseVerified: false,
+            state: shown, reasonText: latestReason, leaseVerified: holdReconciler.leaseVerified(now: now),
             agentWorking: agentWorking, timerRemainingSeconds: timerRemaining))
         updates.refreshSafety()
         if utilityUI?.isRunning == true { utilityUI?.send(.update(utilityUIState())) }
@@ -549,11 +623,22 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     }
 
     private func protectionReadiness() -> ProtectionReadiness {
-        ProtectionReadiness(facts: ProtectionReadinessFacts(buildKind: .preview,
-            supportRowID: nil, supportRowQualified: false, helperTrusted: false,
-            helperAvailable: false, recoveryRequired: false, recoveryJournalReady: false,
-            ownershipEvidence: .unknown, matchingGlobalOverrideObserved: false,
-            backendVerified: false, leaseVerified: false, safetyQualifying: false,
+        let now = uptime()
+        let row = closedLidSupportRow()
+        let installed = helper.state == "installed"
+        let leaseVerified = holdReconciler.leaseVerified(now: now)
+        let ownership: ProtectionOwnershipEvidence = switch (holdReconciler.restoration, leaseVerified, installed) {
+        case (.conflict, _, _): .conflict
+        case (_, true, _): .verifiedCamLidOwnership
+        case (_, _, true): .noExternalOverride
+        default: .unknown
+        }
+        return ProtectionReadiness(facts: ProtectionReadinessFacts(buildKind: .preview,
+            supportRowID: row, supportRowQualified: row != nil, helperTrusted: installed,
+            helperAvailable: installed, recoveryRequired: holdReconciler.restoration == .failed,
+            recoveryJournalReady: installed, ownershipEvidence: ownership, matchingGlobalOverrideObserved: false,
+            backendVerified: installed && holdReconciler.status != .lost, leaseVerified: leaseVerified,
+            safetyQualifying: leaseVerified && holdReconciler.stopReasons.isEmpty,
             requestedClosedLidIntent: config.closedLidOptIn))
     }
 
@@ -746,6 +831,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let capRemaining = active?.capDeadlineMonotonic.map { max(0, $0 - now) }
         var notices: [String] = []
         if let notice = refusalNotice { notices.append(notice) }
+        if let notice = closedLidMessage() { notices.append(notice) }
         let health = latestHealth
         let summary = health.map(HealthSummary.from) ?? .unknown
         if let failure = history.lastError { notices.append("History unavailable: " + failure + ".") }
@@ -758,7 +844,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let data = DashboardData(
             mode: active?.requestedMode ?? config.mode, state: state,
             reasonText: latestReason ?? "",
-            leaseVerified: false,
+            leaseVerified: holdReconciler.leaseVerified(now: now),
+            powerActuationAvailable: holdReconciler.leaseVerified(now: now),
             lidDisplayText: summary.lidDisplay,
             tasks: agents.tasks(now: now).map {
                 DashboardTaskRow(id: $0.id, provider: agents.provider(for: $0.id) ?? "agent",
@@ -1144,9 +1231,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case .status, .doctor, .agentsList:
             latestHealth = currentHealth()
             var object: [String: Any] = ["schemaVersion": 1, "available": true, "preview": true,
-                "powerActuation": false, "leaseVerified": false, "backendVerified": false,
+                "powerActuation": holdReconciler.leaseVerified(now: uptime()),
+                "leaseVerified": holdReconciler.leaseVerified(now: uptime()),
+                "backendVerified": holdReconciler.leaseVerified(now: uptime()),
                 "configuredMode": config.mode.rawValue, "activeSessionMode": session?.requestedMode.rawValue as Any? ?? NSNull(),
-                "restoration": "noPowerResourcesOwned",
+                "restoration": holdReconciler.status == .inactive && holdReconciler.restoration == .verified
+                    ? "noPowerResourcesOwned" : "\(holdReconciler.restoration)",
                 "mode": config.mode.rawValue, "effectiveState": "unavailable", "policyState": sessionStateForRecord().rawValue,
                 "revision": revision, "reasonCodes": ["backendPendingM1"],
                 "settingsCommitPending": hasPendingSettingsWork,
