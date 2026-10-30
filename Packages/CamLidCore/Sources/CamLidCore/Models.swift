@@ -46,7 +46,8 @@ public enum TaskState: String, Sendable, Codable, CaseIterable {
 }
 
 public enum EvidenceKind: String, Sendable, Codable, CaseIterable {
-    case lifecycle, wrapper, process
+    /// `activity`: working/idle inferred from outside (process lifetime, CPU, session-file times; spec 015).
+    case lifecycle, wrapper, activity, process
 }
 
 public enum Confidence: String, Sendable, Codable, CaseIterable {

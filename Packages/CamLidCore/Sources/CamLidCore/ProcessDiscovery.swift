@@ -112,11 +112,12 @@ public struct ProcessDiscovery: Sendable {
         self.maxFallbackEntries = maxFallbackEntries
     }
 
-    /// Ladder rank for evidence precedence: lifecycle 2, wrapper 1, process 0.
+    /// Ladder rank for evidence precedence: lifecycle 3, wrapper 2, activity 1, process 0.
     public static func rank(kind: EvidenceKind) -> Int {
         switch kind {
-        case .lifecycle: return 2
-        case .wrapper: return 1
+        case .lifecycle: return 3
+        case .wrapper: return 2
+        case .activity: return 1
         case .process: return 0
         }
     }
@@ -126,7 +127,7 @@ public struct ProcessDiscovery: Sendable {
     public static func confidenceCap(for kind: EvidenceKind) -> Confidence {
         switch kind {
         case .lifecycle: return .exact
-        case .wrapper, .process: return .inferred
+        case .wrapper, .activity, .process: return .inferred
         }
     }
 

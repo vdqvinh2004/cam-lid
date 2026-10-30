@@ -20,7 +20,9 @@ Infer working or idle from signals the agent produces anyway, observed read-only
 3. **Session-file activity.** Each agent writes its own session files while working (Claude Code
    `~/.claude/projects`, Codex `~/.codex/sessions`, OpenCode `~/.local/share/opencode`). CamLid reads only the newest
    modification time in that directory, never file contents or names into logs.
-4. **Tool subprocesses.** Live child processes (shells, compilers, git) mean a tool is running.
+4. **Tool subprocesses.** Shells, compilers and git started by the agent count through the CPU of the agent's
+   process subtree. A plain count of children is not used: agents keep long-lived children (MCP servers) that would
+   make them look busy forever.
 
 A task is **working** if any signal was active in the last activity window, **idle** after all signals have been
 quiet for the quiet period, and **unknown** when signals cannot be read. The evidence kind is a new `activity`, with

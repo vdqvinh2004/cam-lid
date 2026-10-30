@@ -32,9 +32,9 @@ struct NativeProcessList: ProcessListProvider {
             let result = withUnsafeMutablePointer(to: &info) { proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, $0, Int32(size)) }
             guard result == size else { complete = false; continue }
             guard info.pbi_uid == getuid(), info.pbi_ruid == getuid() else { continue }
-            let name = withUnsafeBytes(of: info.pbi_name) { bytes in
+            let name = Self.agentName(pid: pid, processName: withUnsafeBytes(of: info.pbi_name) { bytes in
                 String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
-            }.lowercased()
+            }.lowercased())
             guard Self.executableNames.contains(name),
                   let identity = try? ProcessIdentity(pid: pid, startTime: Double(info.pbi_start_tvsec) + Double(info.pbi_start_tvusec) / 1_000_000),
                   let record = try? ProcessRecord(identity: identity, executableName: name, lastSeenMonotonic: now) else { continue }

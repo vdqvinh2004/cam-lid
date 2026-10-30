@@ -97,6 +97,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var lastProcessSuccess = -Double.infinity
     private var lastProcessObservation = -Double.infinity
     private var processCandidates: [ProcessCandidate] = []
+    /// Spec 015: outside-observed working/idle tasks for directly run agents, by provider.
+    private var activityTasks: [String: [AgentTask]] = [:]
+    private var activityMemory: [String: AgentActivityMemory] = [:]
+    private let sessionProbe = SessionActivityProbe()
     private var installationSnapshot: AgentInstallationSnapshot?
     private var lifetimeTracker = LifetimeRuleTracker()
     private var lifetimeProcessSnapshot: LifetimeProcessSnapshot?
@@ -724,7 +728,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     private func badgeStates() -> [AgentBadgeState] {
         AgentBadgeState.providers.map { provider in
-            AgentBadgeState(provider: provider, enabled: config.adapterEnrollment.contains(provider), tasks: agents.tasks(provider: provider, now: uptime()), evidenceAgeSeconds: agents.lastReceipt(provider: provider).map { max(0, uptime() - $0) },
+            AgentBadgeState(provider: provider, enabled: config.adapterEnrollment.contains(provider), tasks: observedTasks(provider: provider, now: uptime()), evidenceAgeSeconds: agents.lastReceipt(provider: provider).map { max(0, uptime() - $0) },
                 processCount: uptime() - lastProcessObservation <= 15 ? processCandidates.filter { $0.provider == provider }.count : 0,
                 cliDetected: installationSnapshot?.cliDetected.contains(provider),
                 appDetected: installationSnapshot?.appDetected.contains(provider) ?? false,
@@ -736,7 +740,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private func agentCompletionUncertain() -> Bool {
         // Orca receipt freshness does not qualify underlying state freshness or completion coverage.
         config.adapterEnrollment.contains("orca") || badgeStates().contains {
-            $0.detectionEnabled && ($0.observedState == "Unknown" || ($0.processCount ?? 0) > 0)
+            $0.detectionEnabled && ($0.observedState == "Unknown" || (($0.processCount ?? 0) > 0 && !activityClassified($0.provider)))
         }
     }
 
@@ -745,7 +749,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         agents.tasks(now: now).filter { task in
             guard let provider = agents.provider(for: task.id) else { return false }
             return config.adapterEnrollment.contains(provider)
-        }
+        } + activityTasks.filter { config.adapterEnrollment.contains($0.key) }.values.flatMap { $0 }
     }
 
     private var hasLifetimeRules: Bool {
@@ -932,8 +936,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             powerActuationAvailable: holdReconciler.leaseVerified(now: now),
             lidDisplayText: summary.lidDisplay,
             capabilityText: closedLidCapabilityText,
-            tasks: agents.tasks(now: now).map {
-                DashboardTaskRow(id: $0.id, provider: agents.provider(for: $0.id) ?? "agent",
+            tasks: allObservedTasks(now: now).map {
+                DashboardTaskRow(id: $0.id, provider: agents.provider(for: $0.id) ?? activityProvider(for: $0.id) ?? "agent",
                     stateText: $0.state.rawValue, confidenceText: $0.confidence.rawValue)
             },
             taskSummaryText: taskSummary,
@@ -1054,7 +1058,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         context.sessionActive = session != nil
         context.recoveryRequired = session?.effectiveState == .recoveryRequired
         context.unsavedSettings = hasPendingSettingsWork || utilityUI?.settingsDirty == true
-        context.agentWorkActive = agents.tasks(now: uptime()).contains { [.working, .waiting, .unknown].contains($0.state) }
+        context.agentWorkActive = allObservedTasks(now: uptime()).contains { [.working, .waiting, .unknown].contains($0.state) }
         return context
     }
 
@@ -1121,21 +1125,23 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let started = uptime()
         lastProcessPoll = started
         let scanLifetimeRules = hasLifetimeRules && session?.requestedMode == .auto
+        let probe = sessionProbe
         Task { [weak self] in
-            let (candidates, complete, installation, lifetime) = await Task.detached(priority: .utility) {
+            let (candidates, complete, installation, lifetime, activity) = await Task.detached(priority: .utility) {
                 let installation = AgentCLIInstallation.snapshot()
                 let processList = NativeProcessList()
                 let snapshot = processList.agentSnapshot()
                 let candidates = ProcessDiscovery(provider: InMemoryProcessList(records: snapshot.records),
                     patterns: AgentProviderCatalog.processPatterns, maxFallbackEntries: 20).discover()
                 let lifetime = scanLifetimeRules ? processList.lifetimeSnapshot() : nil
-                return (candidates, snapshot.complete, installation, lifetime)
+                return (candidates, snapshot.complete, installation, lifetime, AppCoordinator.sampleActivity(processList, probe: probe))
             }.value
             guard let self else { return }
             self.processPolling = false
             self.installationSnapshot = installation
             self.lifetimeProcessSnapshot = lifetime
             self.receiveProcessSnapshot(candidates, complete: complete, observedAt: started)
+            self.receiveActivity(activity.processes, sessionAges: activity.ages, at: activity.at)
             // Presence never fabricates working/idle/completion or an Auto hold.
         }
     }
@@ -1197,6 +1203,62 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         } catch {
             orcaUIIssue = (error as? OrcaUIReadError)?.code ?? "orcaUIObservationRejected"
         }
+    }
+
+    /// Providers observed for activity: those with a known session directory (spec 015).
+    nonisolated static func sampleActivity(_ list: NativeProcessList, probe: SessionActivityProbe)
+        -> (processes: [AgentActivityProcess], ages: [String: Double], at: Double) {
+        let observed = Set(SessionActivityProbe.directories.keys)
+        var byName: [String: String] = [:]
+        for info in AgentProviderCatalog.providers where observed.contains(info.id) {
+            for name in info.processNames { byName[name] = info.id }
+        }
+        let orcaNames = Set(AgentProviderCatalog.info(for: "orca")?.processNames ?? [])
+        let processes = list.activityProcesses(providerByName: byName, orcaNames: orcaNames)
+        var ages: [String: Double] = [:]
+        for provider in Set(processes.map(\.provider)) { ages[provider] = probe.ageSeconds(provider: provider) }
+        return (processes, ages, ContinuousTime.now)
+    }
+
+    /// Classifies each observed agent process and keeps the result as `activity` tasks. A process that is gone has
+    /// finished; its task is dropped, so the policy sees no holding work and runs its normal completion grace.
+    func receiveActivity(_ processes: [AgentActivityProcess], sessionAges: [String: Double], at: Double) {
+        var tasks: [String: [AgentTask]] = [:]
+        var memory: [String: AgentActivityMemory] = [:]
+        for process in processes {
+            let key = "activity-\(process.provider)-\(process.pid)-\(String(process.startTime.bitPattern, radix: 16))"
+            var state = activityMemory[key] ?? AgentActivityMemory()
+            let result = AgentActivityClassifier.step(&state, AgentActivitySample(at: at, alive: true,
+                cpuSeconds: process.cpuSeconds, sessionFileAgeSeconds: sessionAges[process.provider]))
+            memory[key] = state
+            guard let task = try? AgentTask(id: key, sessionID: "activity-\(process.provider)", runID: key,
+                state: result.state, evidenceKind: .activity, confidence: .inferred,
+                unknownUntilMonotonic: result.state == .unknown ? at + AgentActivityClassifier.unknownHoldSeconds : nil) else { continue }
+            tasks[process.provider, default: []].append(task)
+        }
+        activityMemory = memory
+        activityTasks = tasks
+    }
+
+    /// Reported tasks plus outside-observed activity tasks for one provider.
+    func sleepRelevantTasksForTesting(provider: String) -> [AgentTask] { activityTasks[provider] ?? [] }
+
+    /// True when outside activity classifies this provider's running processes (none unknown).
+    private func activityClassified(_ provider: String) -> Bool {
+        guard let tasks = activityTasks[provider], !tasks.isEmpty else { return false }
+        return !tasks.contains { $0.state == .unknown }
+    }
+
+    private func activityProvider(for id: String) -> String? {
+        activityTasks.first { $0.value.contains { $0.id == id } }?.key
+    }
+
+    private func observedTasks(provider: String, now: Double) -> [AgentTask] {
+        agents.tasks(provider: provider, now: now) + (activityTasks[provider] ?? [])
+    }
+
+    private func allObservedTasks(now: Double) -> [AgentTask] {
+        agents.tasks(now: now) + activityTasks.values.flatMap { $0 }
     }
 
     func receiveProcessSnapshot(_ candidates: [ProcessCandidate], complete: Bool, observedAt: Double) {
@@ -1361,7 +1423,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             object["permissions"] = ["accessibility": permissions.accessibility,
                 "notifications": outcomeNotifications.permissionState,
                 "settingsError": permissions.settingsError as Any? ?? NSNull()] as [String: Any]
-            object["evidenceCapacity"] = ["holdingTasks": agents.tasks(now: uptime()).filter { PolicyEngine.holdsSession($0, now: uptime()) }.count,
+            object["evidenceCapacity"] = ["holdingTasks": allObservedTasks(now: uptime()).filter { PolicyEngine.holdsSession($0, now: uptime()) }.count,
                 "maxHoldingTasks": PolicyLimits.maxEnrolledTasks, "trackedRuns": agents.trackedRunCount,
                 "retiredRuns": agents.retiredRunCount, "lastRejection": agents.lastRejection as Any? ?? NSNull()] as [String: Any]
             object["agentDetection"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(badgeStates()))
@@ -1383,7 +1445,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 object["health"] = health
             }
             if let session { object["session"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(session)) }
-            object["tasks"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(agents.tasks(now: uptime())))
+            object["tasks"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(allObservedTasks(now: uptime())))
             result = CLIResult(json: String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self), exitCode: 0)
         case .admitCommand, .renewCommand, .finishCommand:
             result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"backendPendingM1\",\"preview\":true,\"powerActuation\":false}", exitCode: 3)

@@ -79,6 +79,8 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
     public let processCount: Int?
     public let cliDetected: Bool?
     public let appDetected: Bool?
+    /// Working/idle comes only from outside activity inference (spec 015), so it is an estimate.
+    public let estimated: Bool
     public init(provider: String, enabled: Bool, tasks: [AgentTask], evidenceAgeSeconds: Double? = nil, processCount: Int = 0, cliDetected: Bool? = nil, appDetected: Bool = false, observationKnown: Bool = true) {
         self.provider = provider; detectionEnabled = enabled
         self.evidenceAgeSeconds = evidenceAgeSeconds
@@ -87,6 +89,7 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
         self.appDetected = appDetected
         // Caller scopes rows using the normalized provider tuple.
         let rows = tasks
+        estimated = rows.contains { $0.evidenceKind == .activity } && !rows.contains { $0.evidenceKind == .lifecycle }
         workingCount = rows.filter { $0.state == .working }.count
         waitingCount = rows.filter { $0.state == .waiting }.count
         unknownCount = rows.filter { $0.state == .unknown }.count
@@ -97,7 +100,7 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
             : waitingCount > 0 ? "Waiting" : (evidenceAgeSeconds.map { $0 > 15 } == true ? "Unknown" : "Inactive")
     }
     private enum CodingKeys: String, CodingKey {
-        case provider, detectionEnabled, readiness, observedState, workingCount, waitingCount, unknownCount, evidenceAgeSeconds, confidence, processCount, cliDetected, appDetected
+        case provider, detectionEnabled, readiness, observedState, workingCount, waitingCount, unknownCount, evidenceAgeSeconds, confidence, processCount, cliDetected, appDetected, estimated
     }
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -108,6 +111,7 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
         try c.encode(confidence, forKey: .confidence); try c.encode(processCount ?? 0, forKey: .processCount)
         try c.encodeIfPresent(cliDetected, forKey: .cliDetected)
         try c.encodeIfPresent(appDetected, forKey: .appDetected)
+        try c.encode(estimated, forKey: .estimated)
     }
     var title: String { AgentProviderCatalog.title(for: provider) }
     var supportsDetection: Bool {
@@ -160,6 +164,11 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
             : count == 1 ? "1 selected agent waiting for user" : "\(count) selected agents waiting for user"
     }
     var compactDetail: String {
+        let text = baseCompactDetail
+        return estimated && readiness == "connected" ? text + " (estimated)" : text
+    }
+
+    private var baseCompactDetail: String {
         if readiness == "disconnected" { return observedState == "Unknown" ? "No task reported" : "Not detected" }
         if workingCount > 0 { return "Active · \(workingCount) " + (workingCount == 1 ? "task" : "tasks") + (waitingCount > 0 ? " · \(waitingCount) waiting" : "") }
         if waitingCount > 0 { return "Waiting for user · \(waitingCount) " + (waitingCount == 1 ? "task" : "tasks") }
