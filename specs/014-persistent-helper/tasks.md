@@ -30,7 +30,7 @@
 - [x] T403 Concurrent clients; clock change; corrupt journal. — added `SessionIsolationTests` (second client, unreadable journal); clock regression test already existed.
 
 ## Phase 5 — Physical qualification (owner-approved, attended; not started)
-- [ ] T501 Sustained closed-lid progress, manual Sleep, app kill, helper kill, reboot with record, low battery, thermal pressure on the exact hardware/OS row.
+- [ ] T501 Sustained closed-lid progress, manual Sleep, app kill, helper kill, reboot with record, low battery, thermal pressure on the exact hardware/OS row. Runbook: [g2-trial.md](g2-trial.md) (trials 1–7 and 9); the support row is `QualifiedSupportRows` in CamLidCore, empty by test.
 
 ## Phase 7 — Wiring Auto, Timed and Manual to the helper (design in plan D7; T701–T705 done)
 Open owner decisions, recommended defaults used until changed: (1) closed lid stays AC-only (helper requires AC, battery at least 20%, nominal thermal); battery sessions remain preview. (2) An external display refuses closed-lid use for now, with a visible reason; revisit after G2 data. (3) Sessions with closed lid are capped at 4 h; Auto does not extend past it.
@@ -39,7 +39,7 @@ Open owner decisions, recommended defaults used until changed: (1) closed lid st
 - [x] T703 `PowerHoldReconciler`: pure step function `(desired, last reply, now) -> acquire | renew | release | none`; table tests for acquire, renew every 10 s, release, refusal, lost connection, cap reached, unreadable reply. — `PowerHoldReconciler` + `PowerHoldTransport` in CamLidCore; 13 table tests (clamp to 4 h, 10 s renewal, lease window, lost, refusal not retried, foreign policy, failed release retried).
 - [x] T704 Call the reconciler at the end of each `AppCoordinator` tick after `PolicyEngine`; feed helper stop reasons into `SafetySignal` / `recoveryConflict`, restoration evidence into `RestoreState`, and clamp the cap to 4 h. — `AppCoordinator.driveHold` after each policy evaluation; helper stops feed `SafetySignal`; reconciler restoration feeds readiness; policy cap clamped to the lease; connection closed on quit. Actuation requires a qualified `closedLidSupportRow` (nil in shipped builds), opt-in and an installed helper. 2 integration tests with a fake transport.
 - [x] T705 Truthful UI: Protected only when the lease is held and read back (`leaseVerified`, `powerActuationAvailable`); show the specific reason when closed lid is unavailable (no opt-in, helper missing, battery, external display, helper refused). — Dashboard/menu bar `leaseVerified` and `powerActuationAvailable` come from the reconciler; banner explains why closed lid is unavailable (unqualified build, helper missing, refusal, lost contact, retrying); CLI status reports lease state instead of constants. Not checked visually.
-- [ ] T706 Attended physical qualification of Auto with a real agent: start, hold, completion grace, release, Sleep after verified restore; app kill and helper kill mid-session. Owner-approved, not started.
+- [ ] T706 Attended physical qualification of Auto with a real agent: start, hold, completion grace, release, Sleep after verified restore; app kill and helper kill mid-session. Owner-approved, not started. Runbook: [g2-trial.md](g2-trial.md) trial 8.
 
 ## Phase 6 — Integration
 - [ ] T601 App/CLI integration sign-off after T501 and T706; replaces the blocked 013 T502 path.

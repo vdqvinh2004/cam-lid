@@ -45,8 +45,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var holdReconciler = PowerHoldReconciler()
     private var holdTransport: (any PowerHoldTransport)?
     private let makeHoldTransport: () -> any PowerHoldTransport
-    /// Support row that qualifies closed-lid actuation on this Mac/OS/build, or nil. No row is qualified in
-    /// code today, so the helper is never asked to hold power in a shipped build (owner-approved G2 row required).
+    /// Support row that qualifies closed-lid actuation on this Mac and OS build, or nil. `QualifiedSupportRows`
+    /// is empty today, so the helper is never asked to hold power in a shipped build.
     private let closedLidSupportRow: () -> String?
     private let outcomeNotifications: OutcomeNotifications
     private let permissions: AppPermissions
@@ -143,7 +143,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         self.healthReader = healthReader
         self.helper = helperController ?? HelperController()
         self.makeHoldTransport = holdTransportFactory ?? { XPCPowerHoldTransport() }
-        self.closedLidSupportRow = closedLidSupportRow ?? { nil }
+        self.closedLidSupportRow = closedLidSupportRow ?? {
+            let system = QualifiedSupportRows.currentSystem()
+            return QualifiedSupportRows.matching(model: system.model, osBuild: system.osBuild)
+        }
         self.preferences = preferences
         self.outcomeNotifications = outcomeNotifications ?? OutcomeNotifications()
         self.permissions = permissions ?? AppPermissions()
