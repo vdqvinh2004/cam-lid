@@ -631,7 +631,7 @@ private struct SettingsClosedLidSection: View {
         } header: {
             Text("Closed lid")
         } footer: {
-            Text("Installing the helper doesn’t start a session or change sleep settings by itself. Keep awake with the lid closed turns off whenever CamLid restarts, so a restart never resumes it silently.")
+            Text("Installing the helper doesn’t start a session or change sleep settings by itself. Settings are kept when CamLid quits; a running session is never resumed after a restart.")
         }
         .alert("Allow closed lid on an untested Mac?", isPresented: $confirmingUntested) {
             Button("Allow") { editor.onSetUntestedAcknowledgement?(true) }

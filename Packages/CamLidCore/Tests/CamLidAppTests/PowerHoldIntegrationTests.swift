@@ -153,4 +153,31 @@ struct PowerHoldIntegrationTests {
         }
         #expect(AppCoordinator.helperReasonText("somethingNew") == "Closed lid stopped.")
     }
+
+    @Test @MainActor func settingsAndTheUntestedAcceptanceSurviveAnAppRestart() async throws {
+        let support = QARefinementSupport()
+        defer { support.cleanup() }
+        let helper = HelperController(status: { .installed(loaded: true) }, runAdmin: { _ in
+            HelperOperationResult(accepted: false, reason: "cancelled", detail: nil) }, keepAwakeApps: { [] })
+        helper.refresh()
+        await settle { helper.state == "installed" }
+        func launch() -> AppCoordinator {
+            AppCoordinator(historyDirectory: support.root.appendingPathComponent("history"),
+                controlDirectory: support.root.appendingPathComponent("control"),
+                preferences: UserDefaults(suiteName: support.suite)!,
+                healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) },
+                helperController: helper, holdTransportFactory: { FakeHoldTransport() }, closedLidSupportRow: { nil },
+                systemIdentity: { ("Mac99,1", "99Z1") })
+        }
+        let first = launch()
+        var patch = ConfigPatch(); patch.closedLidOptIn = true; patch.completionDelayMinutes = 7
+        guard case .saved = first.applySettingsPatch(patch, expectedRevision: 1) else { Issue.record("settings not saved"); return }
+        first.changeMode(.timed)
+        first.setUntestedAcknowledgement(true)
+
+        let second = launch()                                   // same storage, as after quitting and reopening
+        #expect(second.closedLidCapabilityText == "Closed lid ready · untested Mac")
+        #expect(second.dashboardData().mode == .timed)
+        #expect(second.dashboardData().state != .protected)     // a session is never resumed by a restart
+    }
 }
