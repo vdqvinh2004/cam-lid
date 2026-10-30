@@ -29,14 +29,14 @@ private final class FakeHoldTransport: PowerHoldTransport, @unchecked Sendable {
 
 @Suite("Helper hold integration", .serialized)
 struct PowerHoldIntegrationTests {
-    @MainActor private func rig(row: String?, conflicts: [String] = [],
+    @MainActor private func rig(row: String?, keepAwake: [KeepAwakeApp] = [],
                                 system: @escaping () -> (model: String?, osBuild: String?) = { ("Mac99,1", "99Z1") })
         async throws -> (AppCoordinator, FakeHoldTransport, QARefinementSupport) {
         let support = QARefinementSupport()
         let transport = FakeHoldTransport()
         let helper = HelperController(status: { .installed(loaded: true) }, runAdmin: { _ in
             HelperOperationResult(accepted: false, reason: "cancelled", detail: nil)
-        }, conflicts: { conflicts })
+        }, keepAwakeApps: { keepAwake })
         helper.refresh()
         await settle { helper.state == "installed" }
         let app = AppCoordinator(historyDirectory: support.root.appendingPathComponent("history"),
@@ -114,7 +114,7 @@ struct PowerHoldIntegrationTests {
     }
 
     @Test @MainActor func aConflictingHelperIsNamedBeforeTheSessionIsInterrupted() async throws {
-        let (app, _, support) = try await rig(row: "test-row", conflicts: ["LidRun"])
+        let (app, _, support) = try await rig(row: "test-row", keepAwake: [KeepAwakeApp(name: "LidRun", resetsSleepSetting: true)])
         defer { support.cleanup() }
         await app.startPreviewSession()
         await settle { app.dashboardData().bannerMessage?.contains("LidRun") == true }
@@ -123,5 +123,34 @@ struct PowerHoldIntegrationTests {
 
     @Test @MainActor func aSettingChangedUnderTheSessionIsExplained() {
         #expect(AppCoordinator.helperReasonText("overrideChanged").contains("Another app changed the sleep setting"))
+    }
+
+    @Test @MainActor func otherKeepAwakeAppsGetAGeneralNotice() async throws {
+        let (app, _, support) = try await rig(row: "test-row", keepAwake: [KeepAwakeApp(name: "Amphetamine", resetsSleepSetting: false)])
+        defer { support.cleanup() }
+        await app.startPreviewSession()
+        await settle { app.dashboardData().bannerMessage?.contains("Amphetamine") == true }
+        #expect(app.dashboardData().bannerMessage?.contains("Another keep-awake app is running (Amphetamine)") == true)
+    }
+
+    @Test @MainActor func theNoticeLineTellsWhetherThisMacCanKeepAwake() async throws {
+        let (untested, _, a) = try await rig(row: nil)
+        defer { a.cleanup() }
+        #expect(untested.closedLidCapabilityText == "Can’t keep your Mac awake · this Mac isn’t tested")
+        untested.setUntestedAcknowledgement(true)
+        #expect(untested.closedLidCapabilityText == "Closed lid ready · untested Mac")
+        #expect(untested.dashboardData().capabilityText == "Closed lid ready · untested Mac")
+        let (tested, _, b) = try await rig(row: "test-row")
+        defer { b.cleanup() }
+        #expect(tested.closedLidCapabilityText == "Closed lid ready · tested Mac")
+    }
+
+    @Test @MainActor func helperReasonsNeverShowARawCode() {
+        for code in ["notReady", "invalidLease", "renewalRefused", "heartbeatExpired", "safetyStop", "sessionExpired",
+                     "startupInspectionFailed", "restorationFailed", "clientDisconnected", "monitorFailed", "somethingNew"] {
+            let text = AppCoordinator.helperReasonText(code)
+            #expect(!text.contains(code), "raw code shown for \(code): \(text)")
+        }
+        #expect(AppCoordinator.helperReasonText("somethingNew") == "Closed lid stopped.")
     }
 }

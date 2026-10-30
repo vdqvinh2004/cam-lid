@@ -223,15 +223,21 @@ extension View {
 
 /// The one preview-build message shared by the dashboard and Settings.
 struct PreviewBuildNotice: View {
+    /// Closed-lid readiness from the app; nil keeps the generic preview line (fixtures, before the first update).
+    var text: String? = nil
     var font: Font = .callout
+
+    private var ready: Bool { text?.hasPrefix("Closed lid ready") == true }
 
     var body: some View {
         CamLidStatusLabel(
-            "Preview build · can’t keep your Mac awake",
-            systemImage: "info.circle",
-            tone: .info,
+            text ?? "Preview build · can’t keep your Mac awake",
+            systemImage: ready ? "checkmark.circle" : "info.circle",
+            tone: ready ? .success : .info,
             font: font,
-            help: "Sessions preview CamLid behavior. This build does not keep the Mac awake or change lid-close sleep."
+            help: ready
+                ? "Sessions can keep this Mac awake with the lid closed, within the safety limits."
+                : "Sessions show CamLid's behavior but don't keep the Mac awake until closed lid is available on this Mac."
         )
     }
 }

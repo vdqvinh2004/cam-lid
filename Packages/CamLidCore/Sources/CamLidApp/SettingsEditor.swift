@@ -55,7 +55,8 @@ public final class SettingsEditor: ObservableObject {
     @Published public var closedLidPermit = "notPermitted"
     @Published public var systemModel = ""
     @Published public var systemBuild = ""
-    @Published public var conflictingHelpers: [String] = []
+    @Published public var keepAwakeApps: [KeepAwakeApp] = []
+    @Published public var capabilityText = ""
     public var onSetUntestedAcknowledgement: ((Bool) -> Void)?
     public var onInstallHelper: (() -> Void)?
     public var onUninstallHelper: (() -> Void)?

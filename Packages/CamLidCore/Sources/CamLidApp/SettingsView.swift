@@ -593,9 +593,16 @@ private struct SettingsClosedLidSection: View {
                     .help("Closed lid has not been tested on this model and macOS build")
                     .accessibilityIdentifier("camlid.settings.closedLid.allowUntested")
             }
-            ForEach(editor.conflictingHelpers, id: \.self) { app in
-                Label("\(app) resets the sleep setting and will interrupt closed lid. Quit \(app) or remove its helper.",
+            ForEach(editor.keepAwakeApps.filter(\.resetsSleepSetting), id: \.self) { app in
+                Label("\(app.name) resets the sleep setting and will interrupt closed lid. Quit \(app.name) or remove its helper.",
                       systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            let others = editor.keepAwakeApps.filter { !$0.resetsSleepSetting }.map(\.name)
+            if !others.isEmpty {
+                Label("Other keep-awake apps are running: \(others.joined(separator: ", ")). They won’t stop closed lid, but your Mac may stay awake after CamLid finishes.",
+                      systemImage: "info.circle")
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -658,7 +665,7 @@ private struct SettingsSafetyPane: View {
 
     var body: some View {
         Section {
-            PreviewBuildNotice()
+            PreviewBuildNotice(text: editor.capabilityText.isEmpty ? nil : editor.capabilityText)
         }
         SettingsClosedLidSection(editor: editor)
         Section {

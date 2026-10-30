@@ -108,8 +108,8 @@ private struct OnboardingContent: View {
             case .welcome:
                 Text("Follow your local coding agents from the menu bar.")
                 CamLidNoticeCard(
-                    tone: .info, systemImage: "info.circle", title: "Preview build",
-                    message: "This build can’t keep your Mac awake or change lid-close sleep. You can still explore sessions, agents and safety limits."
+                    tone: .info, systemImage: "info.circle", title: "Closed lid",
+                    message: "Keeping the Mac awake with the lid closed needs the CamLid helper, and works on tested Macs or on this Mac after you allow it in Settings › Safety. Until then you can explore sessions, agents and safety limits."
                 )
                 Text("Click the menu-bar icon for the dashboard. Right-click or Control-click for options.")
                     .font(.callout)

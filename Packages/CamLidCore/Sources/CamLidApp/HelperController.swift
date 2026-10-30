@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import CamLidCore
 
 /// Reports the Standard-mode helper's real install state and runs the fixed install/remove commands behind
@@ -8,18 +8,18 @@ import CamLidCore
     public private(set) var state = "unknown"
     public private(set) var message = "Helper status has not been checked."
     public private(set) var busy = false
-    /// Names of loaded apps known to reset the sleep setting (spec 014 FR-019).
-    public private(set) var conflicts: [String] = []
+    /// Other keep-awake apps currently running or loaded (spec 014 FR-019).
+    public private(set) var keepAwakeApps: [KeepAwakeApp] = []
     private let readStatus: @Sendable () -> HelperInstallStatus
-    private let readConflicts: @Sendable () -> [String]
+    private let readKeepAwakeApps: @Sendable () -> [KeepAwakeApp]
     private let runAdmin: @Sendable (String) -> HelperOperationResult
     private var onChange: () -> Void = {}
 
     public init(status: (@Sendable () -> HelperInstallStatus)? = nil,
                 runAdmin: (@Sendable (String) -> HelperOperationResult)? = nil,
-                conflicts: (@Sendable () -> [String])? = nil) {
+                keepAwakeApps: (@Sendable () -> [KeepAwakeApp])? = nil) {
         readStatus = status ?? { HelperInstaller().status(appBundle: Bundle.main.bundleURL) }
-        readConflicts = conflicts ?? { ConflictingSleepHelpers.detect(isLoaded: HelperInstaller().isServiceLoaded) }
+        readKeepAwakeApps = keepAwakeApps ?? { HelperController.detectKeepAwakeApps() }
         self.runAdmin = runAdmin ?? { HelperController.runWithAdministratorPrompt(operation: $0) }
     }
 
@@ -28,12 +28,12 @@ import CamLidCore
     public func refresh() {
         guard !busy else { return }
         let read = readStatus
-        let readConflicts = readConflicts
+        let readKeepAwakeApps = readKeepAwakeApps
         Task { [weak self] in
             let status = await Task.detached { read() }.value
-            let conflicts = await Task.detached { readConflicts() }.value
+            let apps = await Task.detached { readKeepAwakeApps() }.value
             await MainActor.run {
-                self?.conflicts = conflicts
+                self?.keepAwakeApps = apps
                 self?.apply(status)
             }
         }
@@ -75,6 +75,22 @@ import CamLidCore
         case .partial: state = "partial"; message = "The helper installation is incomplete. Remove it and install again."
         }
         onChange()
+    }
+
+    nonisolated static func detectKeepAwakeApps() -> [KeepAwakeApp] {
+        let bundleIDs = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        let processes = Set(KeepAwakeApps.processNames.keys.filter { name in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+            process.arguments = ["-x", name]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return false }
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        })
+        let installer = HelperInstaller()
+        return KeepAwakeApps.detect(runningBundleIDs: bundleIDs, runningProcesses: processes, isLoaded: installer.isServiceLoaded)
     }
 
     nonisolated static func describe(_ result: HelperOperationResult) -> String {

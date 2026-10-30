@@ -77,6 +77,8 @@ public struct DashboardData: Codable, Sendable, Equatable {
     public let powerActuationAvailable: Bool
     public let leaseVerified: Bool
     public let lidDisplayText: String?
+    /// Replaces the fixed preview notice when set (closed-lid readiness on this Mac).
+    public let capabilityText: String?
     public let tasks: [DashboardTaskRow]
     public let taskSummaryText: String
     public let batteryText: String?
@@ -110,6 +112,7 @@ public struct DashboardData: Codable, Sendable, Equatable {
         leaseVerified: Bool = false,
         powerActuationAvailable: Bool = false,
         lidDisplayText: String? = nil,
+        capabilityText: String? = nil,
         tasks: [DashboardTaskRow] = [],
         taskSummaryText: String = "No selected agents reporting work",
         batteryText: String? = nil,
@@ -134,6 +137,7 @@ public struct DashboardData: Codable, Sendable, Equatable {
         self.leaseVerified = leaseVerified
         self.powerActuationAvailable = powerActuationAvailable
         self.lidDisplayText = lidDisplayText
+        self.capabilityText = capabilityText
         self.tasks = tasks
         self.taskSummaryText = taskSummaryText
         self.batteryText = batteryText
@@ -235,7 +239,7 @@ public struct DashboardView: View {
                     .accessibilityIdentifier(CamLidAccessibility.IDs.reasonText)
             }
             if !data.powerActuationAvailable {
-                PreviewBuildNotice(font: .caption)
+                PreviewBuildNotice(text: data.capabilityText, font: .caption)
             }
             HStack {
                 if let onModeChange {

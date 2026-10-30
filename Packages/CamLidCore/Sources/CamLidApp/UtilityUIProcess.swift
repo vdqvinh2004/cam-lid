@@ -27,7 +27,8 @@ struct UtilityUIState: Codable, Sendable {
     var closedLidPermit = "notPermitted"
     var systemModel = ""
     var systemBuild = ""
-    var conflictingHelpers: [String] = []
+    var keepAwakeApps: [KeepAwakeApp] = []
+    var capabilityText = ""
 }
 enum UtilityUICommand: Codable, Sendable {
     case show(UtilitySurface, UtilityUIState)

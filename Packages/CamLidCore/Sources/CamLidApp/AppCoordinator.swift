@@ -493,6 +493,16 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         refresh()
     }
 
+    /// One line shown in the Dashboard and Settings in place of the old fixed preview notice.
+    var closedLidCapabilityText: String {
+        let permit = closedLidPermit()
+        if !permit.allowsActuation { return "Can’t keep your Mac awake · this Mac isn’t tested" }
+        if helper.state != "installed" { return "Can’t keep your Mac awake · helper not installed" }
+        if !config.closedLidOptIn { return "Closed lid is off" }
+        if case .qualified = permit { return "Closed lid ready · tested Mac" }
+        return "Closed lid ready · untested Mac"
+    }
+
     private var holdDesired: Bool {
         guard closedLidPermit().allowsActuation, config.closedLidOptIn, helper.state == "installed",
               let state = session?.effectiveState else { return false }
@@ -536,7 +546,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             return "Closed lid is off on this untested Mac (\(identity)). To allow it, see Settings › Safety › Closed lid."
         }
         if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Safety." }
-        if let app = helper.conflicts.first {
+        if let app = helper.keepAwakeApps.first(where: \.resetsSleepSetting)?.name {
             return "\(app) resets the sleep setting, so closed lid will be interrupted. Quit \(app) or remove its helper."
         }
         // A stopped session keeps the helper's reason; the reconciler itself resets once the session stops.
@@ -546,6 +556,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             case "helperReleaseFailed": return "The sleep setting could not be restored yet. CamLid is retrying."
             default: return Self.helperReasonText(String(stop.dropFirst("helper:".count)))
             }
+        }
+        let others = helper.keepAwakeApps.filter { !$0.resetsSleepSetting }.map(\.name)
+        if !others.isEmpty {
+            return "Another keep-awake app is running (\(others.joined(separator: ", "))). It won’t stop closed lid, but your Mac may stay awake after CamLid finishes."
         }
         if permit == .untestedAcknowledged { return "Untested configuration: \(identity)." }
         switch holdReconciler.status {
@@ -561,8 +575,16 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case "safetyRefused": "Closed lid declined for safety: it needs AC power, at least 20% battery, normal temperature and no external display."
         case "preexistingOverride", "foreignGlobalSleepDisabled": "Another app already disables sleep, so CamLid left it alone."
         case "overrideChanged": "Another app changed the sleep setting (for example LidRun), so closed lid stopped."
-        case "recoveryRequired": "The helper needs recovery before it can hold the Mac awake."
-        default: "The helper ended closed lid (\(reason))."
+        case "recoveryRequired", "restorationFailed", "startupInspectionFailed":
+            "The helper needs recovery before it can hold the Mac awake. Restart the Mac or reinstall the helper in Settings › Safety."
+        case "notReady": "The helper isn’t ready. Reinstall it in Settings › Safety or restart the Mac."
+        case "safetyStop": "Stopped for safety: check power, battery, temperature and external displays."
+        case "sessionExpired": "The closed-lid time limit was reached."
+        case "invalidLease", "renewalRefused", "renewalExpiredDuringCommit", "heartbeatExpired", "clientDisconnected",
+             "monitorFailed", "helperStopping", "helperRestart", "operationFailed", "operationFailedCleanup":
+            "Closed lid lost its hold, and the sleep setting was restored. Start again to continue."
+        // Unknown codes stay in the log and `camlid status`, never in the interface.
+        default: "Closed lid stopped."
         }
     }
 
@@ -791,7 +813,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             helperState: helper.state, helperMessage: helper.message, helperBusy: helper.busy,
             closedLidPermit: closedLidPermit().statusCode,
             systemModel: systemIdentity().model ?? "unknown", systemBuild: systemIdentity().osBuild ?? "unknown",
-            conflictingHelpers: helper.conflicts)
+            keepAwakeApps: helper.keepAwakeApps, capabilityText: closedLidCapabilityText)
     }
     private func showUtility(_ surface: UtilitySurface) {
         if surface == .settings { loginItem.refresh(); Task { await outcomeNotifications.refresh() } }
@@ -901,6 +923,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             leaseVerified: holdReconciler.leaseVerified(now: now),
             powerActuationAvailable: holdReconciler.leaseVerified(now: now),
             lidDisplayText: summary.lidDisplay,
+            capabilityText: closedLidCapabilityText,
             tasks: agents.tasks(now: now).map {
                 DashboardTaskRow(id: $0.id, provider: agents.provider(for: $0.id) ?? "agent",
                     stateText: $0.state.rawValue, confidenceText: $0.confidence.rawValue)
@@ -1290,7 +1313,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 "backendVerified": holdReconciler.leaseVerified(now: uptime()),
                 "configuredMode": config.mode.rawValue, "activeSessionMode": session?.requestedMode.rawValue as Any? ?? NSNull(),
                 "closedLidPermit": closedLidPermit().statusCode,
-                "conflictingHelpers": helper.conflicts,
+                "keepAwakeApps": helper.keepAwakeApps.map { ["name": $0.name, "resetsSleepSetting": $0.resetsSleepSetting] },
                 "restoration": holdReconciler.status == .inactive && holdReconciler.restoration == .verified
                     ? "noPowerResourcesOwned" : "\(holdReconciler.restoration)",
                 "mode": config.mode.rawValue, "effectiveState": "unavailable", "policyState": sessionStateForRecord().rawValue,

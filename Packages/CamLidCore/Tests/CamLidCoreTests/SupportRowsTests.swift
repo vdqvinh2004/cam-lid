@@ -57,8 +57,19 @@ import Testing
         #expect(ClosedLidPermit.qualified(rowID: "r").statusCode == "qualified:r")
     }
 
-    @Test func conflictingHelpersAreReportedByName() {
-        #expect(ConflictingSleepHelpers.detect { $0 == "com.lidrun.app.helper" } == ["LidRun"])
-        #expect(ConflictingSleepHelpers.detect { _ in false }.isEmpty)
+    @Test func keepAwakeAppsAreFoundFromAppsHelpersAndProcesses() {
+        let found = KeepAwakeApps.detect(runningBundleIDs: ["com.if.Amphetamine", "com.apple.Safari"],
+                                         runningProcesses: ["caffeinate", "zsh"],
+                                         isLoaded: { $0 == "com.lidrun.app.helper" })
+        #expect(found == [KeepAwakeApp(name: "Amphetamine", resetsSleepSetting: false),
+                          KeepAwakeApp(name: "LidRun", resetsSleepSetting: true),
+                          KeepAwakeApp(name: "caffeinate", resetsSleepSetting: false)])
+        #expect(KeepAwakeApps.detect(runningBundleIDs: [], runningProcesses: [], isLoaded: { _ in false }).isEmpty)
+    }
+
+    @Test func anAppSeenThroughTwoSourcesIsListedOnceAndKeepsTheResetFlag() {
+        let found = KeepAwakeApps.detect(runningBundleIDs: ["com.lidrun.app"], runningProcesses: [],
+                                         isLoaded: { $0 == "com.lidrun.app.helper" })
+        #expect(found == [KeepAwakeApp(name: "LidRun", resetsSleepSetting: true)])
     }
 }

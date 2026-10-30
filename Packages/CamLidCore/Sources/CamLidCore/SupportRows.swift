@@ -71,12 +71,42 @@ public enum ClosedLidPermit: Equatable, Sendable {
     }
 }
 
-/// Apps whose helpers are known to reset `pmset disablesleep` set by another process (found in G2: LidRun resets it
-/// 40–60 s later). Detection is read-only; CamLid never stops or changes them.
-public enum ConflictingSleepHelpers {
-    public static let known: [(label: String, name: String)] = [("com.lidrun.app.helper", "LidRun")]
+/// Another keep-awake app found on this Mac. `resetsSleepSetting` marks apps seen to undo `pmset disablesleep` set by
+/// someone else (LidRun, found in G2), which interrupts closed lid; the others only keep the Mac awake alongside CamLid.
+public struct KeepAwakeApp: Codable, Equatable, Hashable, Sendable {
+    public let name: String
+    public let resetsSleepSetting: Bool
+    public init(name: String, resetsSleepSetting: Bool) { self.name = name; self.resetsSleepSetting = resetsSleepSetting }
+}
 
-    public static func detect(isLoaded: (String) -> Bool) -> [String] {
-        known.filter { isLoaded($0.label) }.map(\.name)
+/// Read-only detection of other keep-awake apps (spec 014 FR-019). CamLid never stops or changes them.
+/// shortcut: a fixed list of well-known apps, helpers and `caffeinate`; extend it when another app is found.
+public enum KeepAwakeApps {
+    static let lidRun = KeepAwakeApp(name: "LidRun", resetsSleepSetting: true)
+    public static let bundleIDs: [String: KeepAwakeApp] = [
+        "com.if.Amphetamine": KeepAwakeApp(name: "Amphetamine", resetsSleepSetting: false),
+        "info.marcel-dierkes.KeepingYouAwake": KeepAwakeApp(name: "KeepingYouAwake", resetsSleepSetting: false),
+        "com.sindresorhus.Lungo": KeepAwakeApp(name: "Lungo", resetsSleepSetting: false),
+        "com.lightheadsw.Caffeine": KeepAwakeApp(name: "Caffeine", resetsSleepSetting: false),
+        "com.lidrun.app": lidRun,
+        "com.lidwalk.app": KeepAwakeApp(name: "LidWalk", resetsSleepSetting: false),
+    ]
+    public static let helperLabels: [String: KeepAwakeApp] = [
+        "com.lidrun.app.helper": lidRun,
+        "com.lidwalk.helper": KeepAwakeApp(name: "LidWalk", resetsSleepSetting: false),
+    ]
+    public static let processNames: [String: KeepAwakeApp] = [
+        "caffeinate": KeepAwakeApp(name: "caffeinate", resetsSleepSetting: false),
+    ]
+
+    /// One entry per app name, sorted; an app is marked as resetting if any of its sources is.
+    public static func detect(runningBundleIDs: Set<String>, runningProcesses: Set<String>,
+                              isLoaded: (String) -> Bool) -> [KeepAwakeApp] {
+        let found = bundleIDs.filter { runningBundleIDs.contains($0.key) }.map(\.value)
+            + helperLabels.filter { isLoaded($0.key) }.map(\.value)
+            + processNames.filter { runningProcesses.contains($0.key) }.map(\.value)
+        let byName = Dictionary(grouping: found, by: \.name)
+        return byName.map { KeepAwakeApp(name: $0.key, resetsSleepSetting: $0.value.contains { $0.resetsSleepSetting }) }
+            .sorted { $0.name < $1.name }
     }
 }
