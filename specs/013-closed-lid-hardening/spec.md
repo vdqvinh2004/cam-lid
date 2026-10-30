@@ -1,5 +1,8 @@
 # Feature Specification: Closed-Lid Best-Effort Hardening
 
+> **SUPERSEDED for product deployment (2026-10-30):** the exclusive-create / no-adoption / one-use admission requirements in this document are replaced by the persistent-helper model of [spec 014](../014-persistent-helper/spec.md) and [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md). The mechanism described here remains as the experimental **Strict** mode, frozen. Evidence and dated records below are kept as history; per-episode approval is now an owner QA discipline, not a product requirement. No gate passed by this change.
+
+
 **Feature context:** `013-closed-lid-hardening`; offline implementation complete. No branch
 created.
 **Created:** 2026-10-20

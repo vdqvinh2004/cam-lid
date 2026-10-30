@@ -22,6 +22,8 @@ Experimental feature spec (not a milestone; no gate change):
 
 - [M9: Closed-Lid Best-Effort Hardening (013)](013-closed-lid-hardening/spec.md) — Original offline scope plus reproducibility follow-up complete (22/23 current tasks checked, including auth-only install-packet preparation and T501 foreign-policy row PASS with operator attestation); overall G2 and G3 T502 remain blocked. [Current reproducibility/handoff work](../docs/qa/reproducible-m9-handoff-2026-10-21.md) preserves those gates.
 
+- [Persistent Helper, Standard mode (014)](014-persistent-helper/spec.md) — Draft, 0/20 tasks. Replaces the blocked exclusive-create/one-use admission with a root LaunchDaemon installed once through administrator authentication ([ADR 0001](../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md)). The 012/013 mechanism stays as the experimental, frozen **Strict** mode. No gate passed; native actions still need explicit owner approval.
+
 Each folder contains its scoped spec/plan/tasks; supporting research/model/quickstart/checklists
 exist where applicable (012 uses the linked decision memo and runbooks). Base runtime contracts reside with M2/M3; M8 adds scoped automation extensions while consuming the existing policy/transport/backend contracts.
 Shared [product spec](../docs/planning/product-spec.md), [architecture](../docs/planning/architecture.md),
@@ -31,7 +33,7 @@ preserves all 60 future tasks once. M0's four completed tasks are document work 
 
 ## Feature Selection
 This checkout has no `.specify/feature.json`. Use explicit feature context; current offline
-handoff work is scoped to `SPECIFY_FEATURE_DIRECTORY=specs/013-closed-lid-hardening`.
+current work is scoped to `SPECIFY_FEATURE_DIRECTORY=specs/014-persistent-helper`.
 Selection alone passes no release gate or native-action permission.
 Run Spec Kit against a single folder from repository root, for example:
 ```

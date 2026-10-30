@@ -1,5 +1,8 @@
 # Tasks: Closed-Lid Best-Effort Mode
 
+> **SUPERSEDED for product deployment (2026-10-30):** the exclusive-create / no-adoption / one-use admission requirements in this document are replaced by the persistent-helper model of [spec 014](../014-persistent-helper/spec.md) and [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md). The mechanism described here remains as the experimental **Strict** mode, frozen. Evidence and dated records below are kept as history; per-episode approval is now an owner QA discipline, not a product requirement. No gate passed by this change.
+
+
 **OWNER DECISION: preserve exclusive-create/one-use; Installer continuation closed/NO-GO.** [Decision](../../docs/qa/preview-evidence/macos-auth-v3-installer-contract-design-2026-10-27/owner-preserve-invariants-decision.json); no weaker operator-managed contract, no package/install/sign/receipt/root action or new execution budget. Retain evidence/failures and disabled draft; no equivalent fake/archive loop or task/root/admission/auth/power/feature/shipping credit. Reopen only for a mechanism meeting unchanged invariants or explicit later policy change.
 
 **Latest: [native bound-self-image eight stages reviewed PASS](../../docs/qa/macos-auth-v3-native-bound-self-image-01-result.md)** b4681d175/result00597ec9…/reviewbd5c6d97…; parser+build/display/run0/compiler-native stderr0/9FDs/3SHA/2code samples/54ACLqueries/9closes, UID501.186bound+324QA+323parent matched;scope31a9fa36… consumed. [Deployment decision pending](../../docs/design/baseline-ack-v2/post-composition-deployment-decision-2026-10-27.md): trusted privileged argv/admission still absent; no root/auth/power/task/shipping credit or further execution budget.
