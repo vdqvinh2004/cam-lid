@@ -7,6 +7,8 @@
     <key>ProgramArguments</key><array><string>/Library/PrivilegedHelperTools/com.camlid.power-helper</string><string>--standard-v1</string></array>
     <key>MachServices</key><dict><key>com.camlid.power-helper</key><true/></dict>
     <key>RunAtLoad</key><true/>
+    <key>StandardOutPath</key><string>/var/log/com.camlid.power-helper.log</string>
+    <key>StandardErrorPath</key><string>/var/log/com.camlid.power-helper.log</string>
     <key>KeepAlive</key><true/>
     <key>ThrottleInterval</key><integer>10</integer>
     <key>ProcessType</key><string>Adaptive</string>

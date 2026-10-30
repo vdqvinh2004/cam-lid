@@ -29,17 +29,17 @@ public final class XPCPowerHoldTransport: PowerHoldTransport, @unchecked Sendabl
         guard let data = try? JSONEncoder().encode(request),
               let connection = currentConnection() else { return nil }
         return await withCheckedContinuation { continuation in
-            let once = Once(continuation)
+            let once = ReplyOnce(continuation)
             let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self] _ in
-                self?.drop(connection)
-                once.resume(nil)
+                if once.resume(nil) { self?.drop(connection) }
             } as? any PowerHelperXPC
-            guard let proxy else { once.resume(nil); return }
-            DispatchQueue.global().asyncAfter(deadline: .now() + Self.replyTimeoutSeconds) {
-                self.drop(connection)
-                once.resume(nil)
+            guard let proxy else { _ = once.resume(nil); return }
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.replyTimeoutSeconds) { [weak self] in
+                // Only a call still waiting means the helper is hung; a completed call must leave the shared
+                // connection alone, because dropping it makes the helper restore the sleep setting.
+                if once.resume(nil) { self?.drop(connection) }
             }
-            proxy.perform(data) { reply in once.resume(Self.holdReply(from: reply)) }
+            proxy.perform(data) { reply in _ = once.resume(Self.holdReply(from: reply)) }
         }
     }
 
@@ -83,14 +83,16 @@ public final class XPCPowerHoldTransport: PowerHoldTransport, @unchecked Sendabl
         return HoldReply(accepted: reply.accepted, state: reply.state, reason: reply.reason, token: reply.token)
     }
 
-    /// Resumes exactly once; a late reply or error after a timeout is ignored.
-    private final class Once: @unchecked Sendable {
+    /// Resumes exactly once; a late reply or error after a timeout is ignored. `resume` reports whether this
+    /// call was the one that completed the exchange.
+    final class ReplyOnce: @unchecked Sendable {
         private let lock = NSLock()
         private var continuation: CheckedContinuation<HoldReply?, Never>?
         init(_ continuation: CheckedContinuation<HoldReply?, Never>) { self.continuation = continuation }
-        func resume(_ value: HoldReply?) {
+        @discardableResult func resume(_ value: HoldReply?) -> Bool {
             lock.lock(); let pending = continuation; continuation = nil; lock.unlock()
             pending?.resume(returning: value)
+            return pending != nil
         }
     }
 }

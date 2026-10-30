@@ -223,7 +223,7 @@ public struct HelperInstaller: Sendable {
             try? fm.removeItem(at: paths.supportDirectory)
         }
         if !failed.isEmpty { return .refused("removeIncomplete", failed.joined(separator: ", ")) }
-        return .ok("uninstalled", "Journal and logs under /private/var/db/CamLidPowerHelper were left in place.")
+        return .ok("uninstalled", "Journal under /private/var/db/CamLidPowerHelper and logs under /var/log/com.camlid.power-*.log were left in place.")
     }
 
     // MARK: Helpers
@@ -238,8 +238,9 @@ public struct HelperInstaller: Sendable {
     private var previousPinFile: URL { paths.supportDirectory.appendingPathComponent("identity.json.previous") }
 
     static func plist(label: String, program: String, argument: String, resident: Bool) -> Data {
+        let log = "/var/log/\(label).log"
         var dict: [String: Any] = ["Label": label, "Program": program, "ProgramArguments": [program, argument],
-                                   "RunAtLoad": true]
+                                   "RunAtLoad": true, "StandardOutPath": log, "StandardErrorPath": log]
         if resident {
             dict["MachServices"] = [label: true]
             dict["KeepAlive"] = true

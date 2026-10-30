@@ -2,6 +2,12 @@ import Foundation
 import Darwin
 import CamLidPowerService
 
+/// One line per state transition, timestamped, to stdout (launchd writes it to the daemon's log file).
+func logLine(_ text: String) {
+    print("\(Date().formatted(.iso8601)) pid=\(getpid()) \(text)")
+    fflush(stdout)
+}
+
 let arguments = Array(CommandLine.arguments.dropFirst())
 if arguments == ["--version"] {
     print("CamLid power helper candidate 1; closed-lid qualification: false")
@@ -22,7 +28,9 @@ if launchMode == .recovery || launchMode == .release {
         let service = PowerLeaseService(backend: PMSetBackend(execute: runner.execute), store: storage.journal,
             bootID: try NativeHelperEnvironment.bootID(), clock: { NativeHelperEnvironment.now },
             safety: NativeHelperEnvironment.safety)
+        service.log = logLine
         let outcome = service.recoverOrphanedPolicy(graceSeconds: launchMode == .release ? -.infinity : 10)
+        if outcome != .nothingToRecover { logLine("recovery outcome=\(outcome)") }
         print("recovery: \(outcome)")
         if case .failed = outcome { exit(1) }
         exit(0)
@@ -51,6 +59,7 @@ do {
             bootID: try NativeHelperEnvironment.bootID(), clock: { NativeHelperEnvironment.now },
             safety: NativeHelperEnvironment.safety)
     }
+    controller.log = logLine
     let runtime = PowerHelperRuntime(service: controller)
     let sleepObserver = bestEffortLidMode ? try RootDomainGeneralInterestObserver { reason in
         runtime.observeSystemEvent(reason: reason)

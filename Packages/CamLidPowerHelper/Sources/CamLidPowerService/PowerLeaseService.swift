@@ -69,6 +69,8 @@ public final class PowerLeaseService {
     private var activationLease: Lease?
     private var restoreAttempted = false
     private var terminalEventReason: String?
+    /// Diagnostic sink for state transitions only (never request payloads); a no-op unless the host sets it.
+    public var log: (String) -> Void = { _ in }
     public private(set) var state = "starting"
     public private(set) var reason = "notStarted"
     public private(set) var mutationAttempted = false
@@ -162,6 +164,7 @@ public final class PowerLeaseService {
             state = "recoveryRequired"
             reason = "startupInspectionFailed"
         }
+        log("start state=\(state) reason=\(reason)")
     }
 
     public enum OrphanRecovery: Equatable, Sendable {
@@ -179,8 +182,9 @@ public final class PowerLeaseService {
             guard let loaded = try store.load(), loaded.intent == .enableLidOverride,
                   loaded.disposition == .acknowledged else { return .nothingToRecover }
             record = loaded
-            let expired = loaded.bootID != bootID
-                || current > Double(loaded.continuousDeadlineNanos) / 1_000_000_000 + graceSeconds
+            let deadline = Double(loaded.continuousDeadlineNanos) / 1_000_000_000
+            let expired = loaded.bootID != bootID || current > deadline + graceSeconds
+            log("recover record=\(loaded.intent) boot=\(loaded.bootID == bootID ? "same" : "other") now=\(current) deadline=\(deadline) grace=\(graceSeconds) expired=\(expired)")
             guard expired else { return .leaseStillValid }
             if try mechanism.readApplied() == false {
                 try acknowledgeRestored()
@@ -194,6 +198,7 @@ public final class PowerLeaseService {
     }
 
     public func handle(_ request: PowerRequest, owner: UUID, uid: UInt32) -> PowerReply {
+        if request.operation != .inspect { log("request \(request.operation.rawValue)") }
         poll()
         guard request.version == 1 else { return reply(false, "unsupportedProtocol") }
         do {
@@ -356,6 +361,7 @@ public final class PowerLeaseService {
             }
         } catch { stopReason = "monitorFailed" }
         if let stopReason {
+            log("poll stop reason=\(stopReason)")
             do { try restore(reason: stopReason) }
             catch { state = "recoveryRequired"; reason = "restorationFailed" }
         }
@@ -374,6 +380,8 @@ public final class PowerLeaseService {
     }
 
     private func restore(reason stopReason: String) throws {
+        log("restore begin reason=\(stopReason)")
+        defer { log("restore end state=\(state) reason=\(reason)") }
         guard let record else { throw PowerServiceFailure.journal }
         // Only completed enables or this process's retained success authorize a write.
         guard record.disposition == .acknowledged && record.intent == .enableLidOverride || lease != nil else {
@@ -439,6 +447,7 @@ public final class PowerLeaseService {
     }
 
     private func reply(_ accepted: Bool, _ reason: String, token: UUID? = nil) -> PowerReply {
+        log("reply accepted=\(accepted) reason=\(reason) state=\(state)")
         let time = clock()
         let valid = time.isFinite && lastTime.map { time >= $0 } == true
         return PowerReply(accepted: accepted, state: state, reason: reason, token: token,

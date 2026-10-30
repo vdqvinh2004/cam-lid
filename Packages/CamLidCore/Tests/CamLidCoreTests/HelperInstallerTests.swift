@@ -78,6 +78,8 @@ private struct Rig {
         #expect(plist?["ProgramArguments"] as? [String] == [rig.paths.helperBinary.path, "--standard-v1"])
         let recovery = try PropertyListSerialization.propertyList(from: Data(contentsOf: rig.paths.recoveryPlist), format: nil) as? [String: Any]
         #expect(recovery?["ProgramArguments"] as? [String] == [rig.paths.helperBinary.path, "--recover-v1"])
+        #expect(plist?["StandardOutPath"] as? String == "/var/log/com.camlid.power-helper.log")
+        #expect(recovery?["StandardErrorPath"] as? String == "/var/log/com.camlid.power-recovery.log")
         #expect(rig.runner.calls.filter { $0.hasPrefix("/bin/launchctl bootstrap system") }.count == 2)
     }
 
