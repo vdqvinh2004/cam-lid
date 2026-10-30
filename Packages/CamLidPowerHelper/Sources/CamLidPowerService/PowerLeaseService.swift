@@ -125,8 +125,8 @@ public final class PowerLeaseService {
                 if try mechanism.readApplied() == false {
                     try acknowledgeRestored()
                 } else if record.bootID == bootID || mechanism.restoresOwnedPolicyAfterReboot,
-                          record.intent == .enableLidOverride,
-                          record.disposition == .acknowledged {
+                          record.intent == .enableLidOverride && record.disposition == .acknowledged
+                            || finishesInterruptedRestore(record) {
                     // Re-observe before a restart cleanup. A foreign policy still permits the
                     // own one-shot lid clear, but the final state must stay recovery-required.
                     let foreign = (try? mechanism.readForeignPolicy()) ?? .unreadable
@@ -179,8 +179,9 @@ public final class PowerLeaseService {
         guard state == "starting", mechanism.restoresOwnedPolicyAfterReboot else { return .nothingToRecover }
         do {
             let current = try now()
-            guard let loaded = try store.load(), loaded.intent == .enableLidOverride,
-                  loaded.disposition == .acknowledged else { return .nothingToRecover }
+            guard let loaded = try store.load(),
+                  loaded.intent == .enableLidOverride && loaded.disposition == .acknowledged
+                    || finishesInterruptedRestore(loaded) else { return .nothingToRecover }
             record = loaded
             let deadline = Double(loaded.continuousDeadlineNanos) / 1_000_000_000
             let expired = loaded.bootID != bootID || current > deadline + graceSeconds
@@ -379,12 +380,20 @@ public final class PowerLeaseService {
         catch { state = "recoveryRequired"; reason = "restorationFailed" }
     }
 
+    /// A pending restore is journaled only after an acknowledged enable of our own, so for a policy that survives
+    /// reboot (global `SleepDisabled`) finishing it writes the default back. Without this, a restore cut off by
+    /// shutdown left the Mac unable to sleep after the next boot (G2 trial 7).
+    private func finishesInterruptedRestore(_ entry: JournalEntry) -> Bool {
+        mechanism.restoresOwnedPolicyAfterReboot && entry.intent == .restoreLidPolicy && entry.disposition == .pending
+    }
+
     private func restore(reason stopReason: String) throws {
         log("restore begin reason=\(stopReason)")
         defer { log("restore end state=\(state) reason=\(reason)") }
         guard let record else { throw PowerServiceFailure.journal }
         // Only completed enables or this process's retained success authorize a write.
-        guard record.disposition == .acknowledged && record.intent == .enableLidOverride || lease != nil else {
+        guard record.disposition == .acknowledged && record.intent == .enableLidOverride || lease != nil
+                || finishesInterruptedRestore(record) else {
             throw PowerServiceFailure.journal
         }
         guard !restoreAttempted else { throw PowerServiceFailure.backend }
@@ -410,6 +419,7 @@ public final class PowerLeaseService {
             }
             reason = stopReason
         } catch {
+            log("restore failed: \(error)")
             mechanism.releaseOwnedResourcesAfterFailedRestore()
             throw error
         }

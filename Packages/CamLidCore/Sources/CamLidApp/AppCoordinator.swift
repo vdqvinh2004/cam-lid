@@ -500,9 +500,17 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     }
 
     private func closedLidMessage() -> String? {
-        guard config.closedLidOptIn, session != nil else { return nil }
+        guard config.closedLidOptIn, let session else { return nil }
         if closedLidSupportRow() == nil { return "Closed lid is unavailable: this Mac and build haven’t been qualified." }
         if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Safety." }
+        // A stopped session keeps the helper's reason; the reconciler itself resets once the session stops.
+        if let stop = session.stopReasons.first(where: { $0.hasPrefix("helper") }) {
+            switch stop {
+            case "helperLeaseLost": return "Closed lid lost contact with the helper; sleep was restored automatically."
+            case "helperReleaseFailed": return "The sleep setting could not be restored yet. CamLid is retrying."
+            default: return Self.helperReasonText(String(stop.dropFirst("helper:".count)))
+            }
+        }
         switch holdReconciler.status {
         case .refused(let reason): return Self.helperReasonText(reason)
         case .lost: return "Closed lid lost contact with the helper; sleep will be restored automatically."

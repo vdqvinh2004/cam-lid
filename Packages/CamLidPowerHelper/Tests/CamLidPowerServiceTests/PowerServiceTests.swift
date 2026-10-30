@@ -507,3 +507,42 @@ private final class Fixture {
         #expect(f.backend.writes.isEmpty)
     }
 }
+
+/// G2 trial 7: shutdown interrupted the restore, the journal kept `restoreLidPolicy / pending`, and after boot
+/// `SleepDisabled` stayed 1 because the helper treated it as an uncertain mutation.
+@Suite struct InterruptedRestoreTests {
+    private func interrupted() -> Fixture {
+        let f = Fixture()
+        #expect(f.acquire().accepted)
+        f.backend.writeFails = true
+        f.service.shutdown()                       // restore journals `pending`, then the write fails
+        f.backend.writeFails = false
+        #expect(f.store.record?.intent == .restoreLidPolicy && f.store.record?.disposition == .pending)
+        #expect(f.backend.disabled)
+        return f
+    }
+
+    @Test func theNextBootFinishesTheRestore() {
+        let f = interrupted()
+        let next = f.makeService(bootID: "boot-b")
+        next.start()
+        #expect(next.state == "restored")
+        #expect(!f.backend.disabled)
+        #expect(f.store.record?.intent == .restoreLidPolicy && f.store.record?.disposition == .acknowledged)
+    }
+
+    @Test func theRecoveryJobFinishesItToo() {
+        let f = interrupted()
+        #expect(f.makeService(bootID: "boot-b").recoverOrphanedPolicy(graceSeconds: 10) == .restored)
+        #expect(!f.backend.disabled)
+    }
+
+    @Test func anAlreadyClearPolicyIsOnlyAcknowledged() {
+        let f = interrupted()
+        f.backend.disabled = false
+        let writes = f.backend.writes
+        let next = f.makeService(bootID: "boot-b")
+        next.start()
+        #expect(next.state == "restored" && f.backend.writes == writes)
+    }
+}

@@ -8,11 +8,14 @@ private final class FakeHoldTransport: PowerHoldTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var recorded: [HoldAction] = []
     private let token = UUID()
+    var refuseAcquireWith: String?
     var actions: [HoldAction] { lock.withLock { recorded } }
     func send(_ action: HoldAction) async -> HoldReply? {
         lock.withLock { recorded.append(action) }
         switch action {
-        case .acquire: return HoldReply(accepted: true, state: "active", reason: "leaseAcquired", token: token)
+        case .acquire:
+            if let reason = refuseAcquireWith { return HoldReply(accepted: false, state: "ready", reason: reason) }
+            return HoldReply(accepted: true, state: "active", reason: "leaseAcquired", token: token)
         case .renew: return HoldReply(accepted: true, state: "active", reason: "leaseRenewed", token: token)
         case .release: return HoldReply(accepted: true, state: "restored", reason: "restorationVerified")
         }
@@ -67,5 +70,16 @@ struct PowerHoldIntegrationTests {
         try? await Task.sleep(nanoseconds: 300_000_000)
         #expect(transport.actions.isEmpty)
         #expect(!app.dashboardData().leaseVerified && !app.dashboardData().powerActuationAvailable)
+    }
+
+    @Test @MainActor func aHelperRefusalStaysExplainedAfterTheSessionStops() async throws {
+        let (app, transport, support) = try await rig(row: "test-row")
+        defer { support.cleanup() }
+        transport.refuseAcquireWith = "preexistingOverride"
+        await app.startPreviewSession()
+        await settle { app.dashboardData().state == .safetyStopped }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        #expect(app.dashboardData().state == .safetyStopped)
+        #expect(app.dashboardData().bannerMessage?.contains("Another app already disables sleep") == true)
     }
 }

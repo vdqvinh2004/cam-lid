@@ -36,3 +36,19 @@ feels hot, the battery drops below 30%, or any trial behaves differently from th
 ## Result
 All nine rows pass on the exact model and OS build, evidence kept locally, owner approves in writing: add the row
 (`id`, `model`, `osBuild`) in a commit of its own. Any failure leaves the table empty.
+
+## Results on Mac17,3 / 26A434 (owner's Mac)
+Pre-trial finding (2026-10-31): the LidRun helper (`com.lidrun.app.helper`) resets `pmset disablesleep` 40–60 s after
+another process sets it (`scripts/g2-find-reverter.sh`: LidRun paused → held 81 s; LidWalk paused → reset after 47 s).
+Trials run with the LidRun helper booted out.
+
+| # | Date | Result | Evidence |
+|---|---|---|---|
+| 1 | 2026-10-31 | PASS | Lease acquired 01:23:17, renewed 56 times, released when the 10 min cap was reached at 01:33:20 with verified restore (`SleepDisabled` 0). Lid opened 01:33:12 (`powerd` lidopen assertion) after about 5 min closed. Progress log 01:22:26–01:39:50 has no gap over 15 s. |
+| 2 | 2026-10-31 | PASS | Lease acquired 01:41:26; Stop pressed 01:42:22; helper `release` → `restore end state=restored reason=userStop` at 01:42:23 (about 1 s); `SleepDisabled` 0. |
+| 3 | 2026-10-31 | PASS | Lease acquired 01:44:53; app killed with SIGKILL 01:45:27; helper `restore … reason=clientDisconnected` in the same second; `SleepDisabled` 0. |
+| 4 | 2026-10-31 | PASS (SIGTERM) | Lease acquired 01:47:57; helper sent SIGTERM 01:48:30; `restore … reason=helperStopping` 01:48:32; launchd restarted it (new pid, `start state=ready`); the app's next renewal got `invalidLease` and the session stopped; `SleepDisabled` 0. SIGKILL variant: see 4b. |
+| 4b | 2026-10-31 | PASS (SIGKILL) | Lease acquired 01:52:54; helper killed with SIGKILL 01:53:10; launchd restarted it in the same second; it read the journal and restored (`restore … reason=helperRestart`, `start state=restored`) by 01:53:11; next renewal `invalidLease`; `SleepDisabled` 0. |
+| 5 | 2026-10-31 | PASS, with finding | Lease acquired 01:55:41; helper stopped (SIGSTOP) 01:56:03; the independent recovery job restored at 01:56:55 (`independentRecovery`, 52 s) and the owner saw `SleepDisabled` 0 at 01:56:57. Finding: when the stale helper resumed (01:57:21) its in-memory journal revision was behind, so its own restore failed the revision check and it reported `recoveryRequired / restorationFailed` (no write was made; `SleepDisabled` stayed 0); a restart (01:57:24, new pid) returned it to `ready`. To fix: reload the journal on a revision conflict and adopt an acknowledged restore. |
+| 6 | 2026-10-31 | PASS | Lease acquired 01:59:49; charger unplugged 02:00:04; helper `poll stop reason=safetyStop` and verified restore at 02:00:10 (6 s); app session `safetyStopped` with `notCharging`; `SleepDisabled` 0. |
+| 9 | 2026-10-31 | PASS, with UI finding | `SleepDisabled` set to 1 by hand; Timed started; helper refused (`acquire` → `preexistingOverride`, 02:02:36) and wrote nothing; `SleepDisabled` stayed 1 until the owner reset it. The dashboard showed only "Stopped — safety" without the reason, because the banner read the reconciler, which resets once the session stops. Fixed after the trial: the banner now reads the session's helper stop reason (test added); not yet re-checked in the app. |
