@@ -71,37 +71,6 @@ struct AgentTests {
 
     // MARK: - Reconnect (epoch reset)
 
-    @Test("reconnect epoch reports reset and requires fresh numbering")
-    func reconnectEpochReset() throws {
-        var claude = ClaudeAdapter(optIn: true)
-        var normalizer = EvidenceNormalizer()
-        let first = claude.parse(json:
-            jsonData(#"{"hook":"UserPromptSubmit","session_id":"s-re"}"#), receivedMonotonic: 1000)
-        guard case let .event(event0) = first else {
-            Issue.record("expected event, got \(first)")
-            return
-        }
-        _ = normalizer.normalize(event0)
-        claude.noteReconnect(sessionID: "s-re")
-        let second = claude.parse(json:
-            jsonData(#"{"hook":"UserPromptSubmit","session_id":"s-re"}"#), receivedMonotonic: 1100)
-        guard case let .event(event1) = second else {
-            Issue.record("expected event, got \(second)")
-            return
-        }
-        #expect(event1.epoch == 1)
-        #expect(event1.sequence == 0)
-        guard case let .epochReset(generation) = normalizer.normalize(event1) else {
-            Issue.record("expected epochReset")
-            return
-        }
-        #expect(generation == 1)
-        // After reconcile, the fresh generation applies normally.
-        let task = try appliedTask(normalizer.normalize(event1))
-        #expect(task.state == .working)
-        #expect(PolicyEngine.holdsSession(task, now: 1101))
-    }
-
     // MARK: - Approval wait (waiting inside deadline)
 
     @Test("permission wait holds inside the wait deadline only")
@@ -208,55 +177,6 @@ struct AgentTests {
 
     // MARK: - Child tasks
 
-    @Test("parent stop does not clear a tracked working child")
-    func childTasks() throws {
-        var claude = ClaudeAdapter(optIn: true)
-        var normalizer = EvidenceNormalizer()
-        let prompt = claude.parse(json:
-            jsonData(#"{"hook":"UserPromptSubmit","session_id":"s-child"}"#),
-            receivedMonotonic: 5000)
-        guard case let .event(parentBegin) = prompt else {
-            Issue.record("expected event, got \(prompt)")
-            return
-        }
-        _ = normalizer.normalize(parentBegin)
-        let spawn = claude.parse(json:
-            jsonData(#"{"hook":"SubagentStart","session_id":"s-child","subagent_id":"kid-1"}"#),
-            receivedMonotonic: 5001)
-        guard case let .event(childBegin) = spawn else {
-            Issue.record("expected event, got \(spawn)")
-            return
-        }
-        #expect(childBegin.parentRunID == "main")
-        let childTask = try appliedTask(normalizer.normalize(childBegin))
-        #expect(childTask.state == .working)
-        #expect(normalizer.childRunIDs(
-            provider: "claude", sessionID: "s-child", parentRunID: "main") == ["kid-1"])
-        // Root Stop ends the parent turn while the child still works.
-        let stop = claude.parse(json:
-            jsonData(#"{"hook":"Stop","session_id":"s-child"}"#), receivedMonotonic: 5002)
-        guard case let .event(parentEnd) = stop else {
-            Issue.record("expected event, got \(stop)")
-            return
-        }
-        let parentTask = try appliedTask(normalizer.normalize(parentEnd))
-        #expect(parentTask.state == .idle)
-        #expect(!PolicyEngine.holdsSession(parentTask, now: 5003))
-        #expect(PolicyEngine.holdsSession(childTask, now: 5003))
-        // Child completion is tracked by its own explicit run ID.
-        let childStop = claude.parse(json:
-            jsonData(
-                #"{"hook":"SubagentStop","session_id":"s-child","subagent_id":"kid-1"}"#),
-            receivedMonotonic: 5004)
-        guard case let .event(childEnd) = childStop else {
-            Issue.record("expected event, got \(childStop)")
-            return
-        }
-        let finished = try appliedTask(normalizer.normalize(childEnd))
-        #expect(finished.state == .completed)
-        #expect(!PolicyEngine.holdsSession(finished, now: 5005))
-    }
-
     // MARK: - Parallel sessions
 
     @Test("parallel sessions track independently")
@@ -344,10 +264,6 @@ struct AgentTests {
 
     @Test("adapters stay disabled without explicit opt-in")
     func optInGating() throws {
-        var claude = ClaudeAdapter()
-        #expect(claude.parse(json:
-            jsonData(#"{"hook":"UserPromptSubmit","session_id":"s"}"#),
-            receivedMonotonic: 1) == .ignored(reason: "optInDisabled"))
         var codex = CodexAdapter()
         #expect(codex.parseJSONLine(
             #"{"type":"turn.started","session_id":"s","turn_id":"t"}"#,
@@ -356,12 +272,6 @@ struct AgentTests {
         #expect(opencode.parse(json:
             jsonData(#"{"type":"status.busy","session_id":"s"}"#),
             receivedMonotonic: 1) == .ignored(reason: "noConfiguredEndpoint"))
-        // Idle-prompt notifications are never completion evidence.
-        var opted = ClaudeAdapter(optIn: true)
-        #expect(opted.parse(json:
-            jsonData(
-                #"{"hook":"Notification","session_id":"s","notification_type":"idle_prompt"}"#),
-            receivedMonotonic: 1) == .ignored(reason: "idlePromptNotCompletion"))
     }
 
     @Test("codex desktop scope is explicitly unsupported")

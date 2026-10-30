@@ -66,7 +66,7 @@ struct AgentBadgeTests {
     }
     @Test func dashboardShowsOnlyWorkingEnabledAgents() throws {        let working = AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("a", .working)])
         let idle = AgentBadgeState(provider: "codex", enabled: true, tasks: [try row("b", .idle)])
-        let disabled = AgentBadgeState(provider: "claude", enabled: false, tasks: [try row("c", .working)])
+        let disabled = AgentBadgeState(provider: "cursor", enabled: false, tasks: [try row("c", .working)])
         let unknown = AgentBadgeState(provider: "opencode", enabled: true, tasks: [try row("d", .unknown)])
         let data = DashboardData(mode: .auto, state: .ready, reasonText: "",
             agents: [working, idle, disabled, unknown])
@@ -76,11 +76,11 @@ struct AgentBadgeTests {
     @Test func settingsAvailabilityReflectsDetectionSupport() {
         let soon = AgentBadgeState(provider: "vscode-copilot", enabled: false, tasks: [])
         #expect(!soon.supportsDetection && soon.settingsUnavailableReason == "Support soon")
-        let absent = AgentBadgeState(provider: "claude", enabled: false, tasks: [])
+        let absent = AgentBadgeState(provider: "cursor", enabled: false, tasks: [])
         #expect(absent.supportsDetection && absent.settingsUnavailableReason == "Not detected")
         let cli = AgentBadgeState(provider: "freebuff", enabled: false, tasks: [], cliDetected: true)
         #expect(cli.settingsUnavailableReason == nil && cli.isDetected)
-        let app = AgentBadgeState(provider: "claude-app", enabled: false, tasks: [], appDetected: true)
+        let app = AgentBadgeState(provider: "antigravity", enabled: false, tasks: [], appDetected: true)
         #expect(app.settingsUnavailableReason == nil && app.installationText == "App detected")
     }
 
@@ -131,13 +131,13 @@ struct AgentBadgeTests {
         let windsurf = AgentBadgeState(provider: "windsurf", enabled: true, tasks: [])
         let codex = AgentBadgeState(provider: "codex", enabled: true, tasks: [], cliDetected: true)
         let aider = AgentBadgeState(provider: "aider", enabled: true, tasks: [])
-        let claudeApp = AgentBadgeState(provider: "claude-app", enabled: true, tasks: [], appDetected: true)
-        let agents = [windsurf, codex, aider, claudeApp]
+        let antigravity = AgentBadgeState(provider: "antigravity", enabled: true, tasks: [], appDetected: true)
+        let agents = [windsurf, codex, aider, antigravity]
 
         #expect(agents.sortedForAgentDisplay().map(\.title)
-            == ["Aider", "Claude app", "Codex", "Windsurf / Devin"])
+            == ["Aider", "Antigravity", "Codex", "Windsurf / Devin"])
         #expect(agents.sortedForAgentDisplay(detectedFirst: true).map(\.provider)
-            == ["claude-app", "codex", "aider", "windsurf"])
+            == ["antigravity", "codex", "aider", "windsurf"])
     }
     @Test func mixedWorkingAndWaitingShowsBothCountsWaitingFirst() throws {
         let mixed = AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("w", .working), try row("q", .waiting)])

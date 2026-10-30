@@ -39,15 +39,6 @@ enum AgentProviderCatalog {
             cliNames: ["opencode"], processNames: ["opencode"],
             applicationBundleIDs: [], assetName: nil, symbolName: nil, monogram: nil),
         AgentProviderInfo(
-            id: "claude", title: "Claude Code",
-            cliNames: ["claude"], processNames: [],
-            applicationBundleIDs: [], assetName: "agent-claude", symbolName: nil, monogram: nil),
-        AgentProviderInfo(
-            id: "claude-app", title: "Claude app",
-            cliNames: [], processNames: [],
-            applicationBundleIDs: ["com.anthropic.claudefordesktop"],
-            assetName: "agent-claude", symbolName: nil, monogram: nil),
-        AgentProviderInfo(
             id: "freebuff", title: "Freebuff",
             cliNames: ["freebuff"], processNames: ["freebuff"],
             applicationBundleIDs: [], assetName: "agent-freebuff", symbolName: "bolt.fill", monogram: nil),
