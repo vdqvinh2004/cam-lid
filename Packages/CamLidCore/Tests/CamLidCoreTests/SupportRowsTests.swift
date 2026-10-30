@@ -13,10 +13,9 @@ import Testing
     }
 
     /// Tripwire: adding a row is a safety decision that needs the owner's approval after the attended trial.
-    @Test func noRowIsQualifiedInShippedCode() {
-        #expect(QualifiedSupportRows.rows.isEmpty)
-        let system = QualifiedSupportRows.currentSystem()
-        #expect(QualifiedSupportRows.matching(model: system.model, osBuild: system.osBuild) == nil)
+    /// Tripwire: every row is a safety decision. Change this list only together with an owner-approved G2 result.
+    @Test func onlyOwnerApprovedRowsAreQualified() {
+        #expect(QualifiedSupportRows.rows == [SupportRow(id: "mac17-3-26a434", model: "Mac17,3", osBuild: "26A434")])
     }
 
     @Test func theCurrentSystemIsReadable() {

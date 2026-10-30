@@ -12,9 +12,12 @@ public struct SupportRow: Equatable, Sendable {
 }
 
 public enum QualifiedSupportRows {
-    /// Empty on purpose: a row is added only with the owner's approval after the attended trial in
-    /// specs/014-persistent-helper/g2-trial.md passes. While it is empty no build asks the helper to hold power.
-    public static let rows: [SupportRow] = []
+    /// A row is added only with the owner's approval after the attended trial in
+    /// specs/014-persistent-helper/g2-trial.md. Other Macs need the user's "untested configuration" acceptance.
+    public static let rows: [SupportRow] = [
+        // G2 passed 2026-10-31 (trials 1–7 and 9; trial 8 deferred); owner approved the row the same day.
+        SupportRow(id: "mac17-3-26a434", model: "Mac17,3", osBuild: "26A434"),
+    ]
 
     public static func matching(model: String?, osBuild: String?, in table: [SupportRow] = rows) -> String? {
         guard let model, let osBuild else { return nil }

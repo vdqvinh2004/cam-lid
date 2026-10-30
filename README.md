@@ -3,8 +3,8 @@
 Native macOS menu bar app for AI-aware closed-lid work.
 
 **Status (2026-10-31): preview.** Telemetry is read-only. Closed lid may hold the Mac awake only when the user opted in,
-the helper is installed, and either the Mac matches a support row qualified by an attended trial (`QualifiedSupportRows`,
-empty in the repository) or the user accepted "untested configuration" for this exact model and macOS build in Settings ›
+the helper is installed, and either the Mac matches a support row qualified by an attended trial (`QualifiedSupportRows`;
+today one row: Mac17,3 with macOS 26A434) or the user accepted "untested configuration" for this exact model and macOS build in Settings ›
 Safety › Closed lid. The attended G2 trial passed on one Mac (Mac17,3, macOS 26A434; see
 [g2-trial.md](specs/014-persistent-helper/g2-trial.md)). Known conflict: the LidRun helper resets the sleep setting and
 interrupts closed lid. M6 has not passed and M7 is blocked.

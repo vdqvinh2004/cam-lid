@@ -13,7 +13,10 @@ struct QARefinementSupport {
         return AppCoordinator(historyDirectory: root.appendingPathComponent("history"),
             controlDirectory: root.appendingPathComponent("control"),
             preferences: UserDefaults(suiteName: suite)!,
-            settingsWriter: writer, outcomeNotifications: outcomeNotifications, permissions: permissions, healthReader: healthReader)
+            settingsWriter: writer, outcomeNotifications: outcomeNotifications, permissions: permissions, healthReader: healthReader,
+            // Never the real Mac identity or the real installed helper: a qualified row now matches the owner's Mac.
+            helperController: HelperController(status: { .notInstalled }, keepAwakeApps: { [] }),
+            holdTransportFactory: { NeverTransport() }, closedLidSupportRow: { nil }, systemIdentity: { (nil, nil) })
     }
     func cleanup() { UserDefaults().removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
 }
@@ -55,4 +58,10 @@ extension QARefinementSupport {
             recoveryJournalReady: false, ownershipEvidence: .unknown, matchingGlobalOverrideObserved: false,
             backendVerified: false, leaseVerified: false, safetyQualifying: false, requestedClosedLidIntent: true))
     }
+}
+
+/// Fails every call, so a test coordinator can never reach the real helper.
+struct NeverTransport: PowerHoldTransport {
+    func send(_ action: HoldAction) async -> HoldReply? { nil }
+    func close() {}
 }

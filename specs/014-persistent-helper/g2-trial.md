@@ -62,3 +62,5 @@ Trials run with the LidRun helper booted out.
 Owner decision (2026-10-31): the trial set above is sufficient; no re-runs. Trials 1–6 and 9 ran on builds before the
 restore-path fixes made during trial 7 (`7606e1c`, `d2d9170`, `53730cc`); those fixes are covered by unit tests only.
 Trial 8 (Auto with a real agent) remains deferred.
+
+Owner approval (2026-10-31): row `mac17-3-26a434` (Mac17,3, macOS 26A434) added to `QualifiedSupportRows.rows`.
