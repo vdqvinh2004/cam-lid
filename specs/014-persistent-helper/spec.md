@@ -45,6 +45,25 @@ Settings shows Standard (default) and, under an advanced section marked experime
 1. Switching is refused while either mode holds a lease or has an unresolved journal entry.
 2. Strict being unavailable (no admitted helper) is shown as a state, not an error.
 
+### User Story 6 — Use closed lid on a Mac that was not trialled (Priority: P1)
+A user on a Mac model or macOS build without a qualified support row can still use closed lid, but only after
+explicitly accepting that the configuration is untested. A Mac with a qualified row works without that step.
+
+**Acceptance**
+1. On a qualified row (exact model and macOS build), closed lid needs only the existing opt-in and an installed helper.
+2. On any other Mac, closed lid stays off and Settings explains why; turning on "Allow on this untested Mac" shows a
+   warning that names the model and macOS build and must be confirmed.
+3. The acceptance is tied to that model and build: after a macOS update or on another Mac it is cleared and asked again.
+4. While running on an acknowledged untested Mac, the Dashboard and `camlid status` say "Untested configuration".
+5. All other gates are unchanged: AC power, battery, thermal, external display, helper refusals, lease, recovery.
+
+### User Story 7 — Learn when another app fights over the sleep setting (Priority: P2)
+**Acceptance**
+1. If a known helper that resets `pmset disablesleep` is loaded (today: LidRun, `com.lidrun.app.helper`), Settings and
+   the Dashboard warn before a session that closed lid will be interrupted, and name the app.
+2. If a session ends because the setting was changed under it (`overrideChanged`), the Dashboard says another app
+   changed the sleep setting, instead of a generic stop.
+
 ### Edge Cases
 - Two CamLid clients start at once: the second is refused with a busy reason.
 - Clock change or sleep during a session: deadlines use a monotonic source; wall-clock changes cannot extend a session.
@@ -70,6 +89,14 @@ Settings shows Standard (default) and, under an advanced section marked experime
 - **FR-013** Auto, Timed and Manual drive the helper through one reconciler after the shared policy evaluation; no mode talks to the helper directly.
 - **FR-014** The UI shows Protected only while the helper lease is held and read back; otherwise it shows why closed lid is unavailable.
 - **FR-015** A helper refusal or stop ends the session as a safety stop or recovery conflict; the app never retries around it. Closed-lid sessions never exceed the helper's 4 h maximum and are not extended by fresh work.
+- **FR-016** Closed-lid permission is one of: qualified row (exact model and build), acknowledged untested
+  configuration, or not permitted. Only the first two may ask the helper to hold power.
+- **FR-017** The untested acknowledgement is an explicit user action, stored with the model and build it was given for,
+  and void when either differs. It is never set by default, by migration or by the CLI without the same confirmation.
+- **FR-018** The configuration kind (qualified row id, untested, not permitted) is visible in the Dashboard, Settings
+  and `camlid status`; "Protected" on an untested Mac is labelled as untested.
+- **FR-019** Known conflicting helpers are detected read-only (launchd label present) and reported; CamLid never stops,
+  removes or modifies them.
 
 ### Key Entities
 Helper installation (version, pin, status) · Lease (owner, expiry, renewals) · Ownership record (owned flag, enabled-at, deadline) · Journal entry · Mode (Standard | Strict) · Guard settings.
