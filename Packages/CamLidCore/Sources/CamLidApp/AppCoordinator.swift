@@ -498,7 +498,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let permit = closedLidPermit()
         if !permit.allowsActuation { return "Can’t keep your Mac awake · this Mac isn’t tested" }
         if helper.state != "installed" { return "Can’t keep your Mac awake · helper not installed" }
-        if !config.closedLidOptIn { return "Closed lid is off" }
+        if !config.closedLidOptIn { return "Closed lid is off · turn it on in Settings › Safety" }
         if case .qualified = permit { return "Closed lid ready · tested Mac" }
         return "Closed lid ready · untested Mac"
     }

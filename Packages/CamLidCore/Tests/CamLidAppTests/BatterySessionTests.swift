@@ -172,4 +172,20 @@ struct BatterySessionTests {
         #expect(NumericChoice.label(50, field: .batteryEntry) == "50%")
         editor.discard()
     }
+
+    @Test func theClosedLidSwitchSavesTheOptInAndRestoresItWhenSavingFails() throws {
+        var current = try Configuration()
+        let editor = SettingsEditor(configuration: current, revision: 1, section: .safety)
+        editor.configureAutosave { patch, revision in
+            do { current = try current.applying(patch); return .saved(revision: revision + 1) }
+            catch { return .failed("Invalid setting") }
+        }
+        editor.setClosedLidOptIn(true)
+        #expect(current.closedLidOptIn && editor.draft.closedLidOptIn && !editor.isDirty)
+        editor.configureAutosave { _, _ in .failed("Storage refused") }
+        editor.setClosedLidOptIn(false)
+        #expect(current.closedLidOptIn && editor.isDirty)
+        editor.discard()
+        #expect(editor.draft.closedLidOptIn)
+    }
 }

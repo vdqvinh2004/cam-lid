@@ -562,6 +562,10 @@ private struct SettingsClosedLidSection: View {
 
     var body: some View {
         Section {
+            Toggle("Keep awake with the lid closed", isOn: Binding(get: { editor.draft.closedLidOptIn }, set: editor.setClosedLidOptIn))
+                .help("Lets sessions keep this Mac awake with the lid closed, within the safety limits")
+                .accessibilityIdentifier("camlid.settings.closedLid.enabled")
+            SettingsFieldOutcome(editor: editor, key: "closedLidOptIn")
             LabeledContent("Mode") {
                 Text(PowerMode.standard.title)
             }
@@ -627,7 +631,7 @@ private struct SettingsClosedLidSection: View {
         } header: {
             Text("Closed lid")
         } footer: {
-            Text("Installing the helper doesn’t start a session or change sleep settings by itself.")
+            Text("Installing the helper doesn’t start a session or change sleep settings by itself. Keep awake with the lid closed turns off whenever CamLid restarts, so a restart never resumes it silently.")
         }
         .alert("Allow closed lid on an untested Mac?", isPresented: $confirmingUntested) {
             Button("Allow") { editor.onSetUntestedAcknowledgement?(true) }

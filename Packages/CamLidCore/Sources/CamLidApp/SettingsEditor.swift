@@ -225,6 +225,7 @@ public final class SettingsEditor: ObservableObject {
         apply(key: "batteryModeAllowed") { _ in var patch = ConfigPatch(); patch.batteryModeAllowed = enabled; return patch }
     }
     public func setChargingOnly(_ enabled: Bool) { draft.chargingOnly = enabled; apply(key: "chargingOnly") { _ in var p = ConfigPatch(); p.chargingOnly = enabled; return p } }
+    public func setClosedLidOptIn(_ enabled: Bool) { draft.closedLidOptIn = enabled; apply(key: "closedLidOptIn") { _ in var p = ConfigPatch(); p.closedLidOptIn = enabled; return p } }
     public func setLaunchAtLogin(_ enabled: Bool) { draft.launchAtLogin = enabled; apply(key: "launchAtLogin") { _ in var p = ConfigPatch(); p.launchAtLogin = enabled; return p } }
     public func setNotification(_ category: NotificationCategory, enabled: Bool) {
         var values = draft.notificationCategories ?? []
@@ -443,6 +444,7 @@ public final class SettingsEditor: ObservableObject {
         if pending.contains("batteryModeAllowed") { draft.batteryModeAllowed = oldDraft.batteryModeAllowed }
         if pending.contains("allowDisplaySleep") { draft.allowDisplaySleep = oldDraft.allowDisplaySleep }
         if pending.contains("launchAtLogin") { draft.launchAtLogin = oldDraft.launchAtLogin }
+        if pending.contains("closedLidOptIn") { draft.closedLidOptIn = oldDraft.closedLidOptIn }
         if pending.contains("notificationCategories") { draft.notificationCategories = oldDraft.notificationCategories }
         if pending.contains("cpuStopEnabled") { draft.cpuStopEnabled = oldDraft.cpuStopEnabled }
         for provider in AgentBadgeState.providers where pending.contains("provider:" + provider) {
