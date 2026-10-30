@@ -161,8 +161,13 @@ public final class PowerLeaseService {
                 reason = "noPendingIntent"
             }
         } catch {
-            state = "recoveryRequired"
-            reason = "startupInspectionFailed"
+            if case JournalFailure.revisionConflict = error, adoptRestoreWrittenElsewhere() {
+                // The recovery job (started together with us at load) finished the same restore first.
+            } else {
+                log("start failed: \(error)")
+                state = "recoveryRequired"
+                reason = "startupInspectionFailed"
+            }
         }
         log("start state=\(state) reason=\(reason)")
     }
@@ -380,6 +385,19 @@ public final class PowerLeaseService {
         catch { state = "recoveryRequired"; reason = "restorationFailed" }
     }
 
+    /// Another process (the recovery job) committed to the journal first. If it already finished a restore and the
+    /// policy reads back as cleared, take that result; otherwise the caller reports the failure as before.
+    private func adoptRestoreWrittenElsewhere() -> Bool {
+        guard let latest = try? store.load(), latest.intent == .restoreLidPolicy, latest.disposition == .acknowledged,
+              (try? mechanism.readApplied()) == false else { return false }
+        record = latest
+        lease = nil
+        state = "restored"
+        reason = "restorationVerified"
+        log("adopted a restore written by another process")
+        return true
+    }
+
     /// A pending restore is journaled only after an acknowledged enable of our own, so for a policy that survives
     /// reboot (global `SleepDisabled`) finishing it writes the default back. Without this, a restore cut off by
     /// shutdown left the Mac unable to sleep after the next boot (G2 trial 7).
@@ -419,6 +437,7 @@ public final class PowerLeaseService {
             }
             reason = stopReason
         } catch {
+            if case JournalFailure.revisionConflict = error, adoptRestoreWrittenElsewhere() { return }
             log("restore failed: \(error)")
             mechanism.releaseOwnedResourcesAfterFailedRestore()
             throw error

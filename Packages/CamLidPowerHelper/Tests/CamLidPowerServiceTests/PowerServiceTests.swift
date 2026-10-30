@@ -31,10 +31,12 @@ private final class FakeStore: PowerIntentStore {
         if loadFails { throw PowerServiceFailure.journal }
         return record
     }
+    var beforeCommit: (() -> Void)?
     func commit(_ entry: JournalEntry, replacing revision: UInt64?) throws {
+        if let hook = beforeCommit { beforeCommit = nil; hook() }
         commits += 1
         if failAt == commits { throw PowerServiceFailure.journal }
-        guard record?.revision == revision else { throw PowerServiceFailure.journal }
+        guard record?.revision == revision else { throw JournalFailure.revisionConflict }
         record = entry
         afterCommit?()
     }
@@ -544,5 +546,45 @@ private final class Fixture {
         let next = f.makeService(bootID: "boot-b")
         next.start()
         #expect(next.state == "restored" && f.backend.writes == writes)
+    }
+}
+
+/// A helper and the recovery job can both try to finish the same restore; the one that commits second must take the
+/// first one's result instead of reporting a failure (G2 trial 5 resume, and the reinstall after trial 7).
+@Suite struct ConcurrentRestoreTests {
+    @Test func startAdoptsARestoreTheRecoveryJobFinishedFirst() {
+        let f = Fixture()
+        #expect(f.acquire().accepted)
+        f.backend.writeFails = true
+        f.service.shutdown()                                   // interrupted restore: journal `restoreLidPolicy / pending`
+        f.backend.writeFails = false
+        let helper = f.makeService(bootID: "boot-b")
+        f.store.beforeCommit = { _ = f.makeService(bootID: "boot-b").recoverOrphanedPolicy(graceSeconds: 10) }
+        helper.start()
+        #expect(helper.state == "restored")
+        #expect(!f.backend.disabled)
+    }
+
+    @Test func aHelperResumingFromAHangAdoptsTheRecoveryJobsRestore() {
+        let f = Fixture()
+        #expect(f.acquire().accepted)                          // lease deadline 130
+        f.time = 141
+        #expect(f.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .restored)
+        f.time = 150
+        f.service.poll()                                       // the hung helper wakes with a stale journal revision
+        #expect(f.service.state == "restored")
+        #expect(!f.backend.disabled)
+    }
+
+    @Test func aConflictWithoutAFinishedRestoreStillFails() {
+        let f = Fixture()
+        #expect(f.acquire().accepted)
+        f.store.beforeCommit = { f.store.record = f.store.record.map {
+            JournalEntry(revision: $0.revision + 1, sessionID: $0.sessionID, ownerIdentity: $0.ownerIdentity, bootID: $0.bootID,
+                         generation: $0.generation, operationID: "other", intent: .enableLidOverride, disposition: .acknowledged,
+                         continuousDeadlineNanos: $0.continuousDeadlineNanos)
+        } }
+        f.service.shutdown()
+        #expect(f.service.state == "recoveryRequired")
     }
 }
