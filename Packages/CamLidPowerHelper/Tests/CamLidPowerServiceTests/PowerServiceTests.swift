@@ -352,7 +352,8 @@ private final class Fixture {
         f.service.poll()
         #expect(f.service.state == "restored")
         #expect(f.service.reason == "overrideChanged")
-        #expect(f.backend.writes == [true])
+        // The restore writes the default (0) once and never reasserts 1.
+        #expect(f.backend.writes == [true, false])
     }
 
     @Test func sameValueForeignWriteRemainsIndistinguishable() {
@@ -586,5 +587,38 @@ private final class Fixture {
         } }
         f.service.shutdown()
         #expect(f.service.state == "recoveryRequired")
+    }
+}
+
+/// G2 trial 7 rerun: `pmset -g` failed during shutdown (`invalidOutput`) and blocked the write, and the next boot's
+/// pending restore kept a deadline from the previous boot's clock, so the recovery job waited instead of acting.
+@Suite struct ShutdownAndBootRestoreTests {
+    @Test func aFailingReadDoesNotStopTheRestoreWrite() {
+        let f = Fixture()
+        #expect(f.acquire().accepted)
+        f.backend.readFails = true
+        f.service.shutdown()
+        #expect(f.backend.writes == [true, false])
+        #expect(!f.backend.disabled)
+    }
+
+    @Test func theRecoveryJobFinishesAPendingRestoreWhateverItsCopiedDeadline() {
+        let f = Fixture()
+        #expect(f.acquire(seconds: 3_600).accepted)            // lease deadline 130
+        f.backend.writeFails = true
+        f.service.shutdown()                                   // journal: restoreLidPolicy / pending, deadline 130
+        f.backend.writeFails = false
+        f.time = 101                                           // well before the copied deadline, same boot id
+        #expect(f.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .restored)
+        #expect(!f.backend.disabled)
+    }
+
+    @Test func aFailedStartAsksTheHostToRestart() {
+        let f = Fixture()
+        f.store.loadFails = true
+        let called = DispatchSemaphore(value: 0)
+        let runtime = PowerHelperRuntime(service: f.service, onStartupFailure: { called.signal() })
+        runtime.start()
+        #expect(called.wait(timeout: .now() + 15) == .success)
     }
 }

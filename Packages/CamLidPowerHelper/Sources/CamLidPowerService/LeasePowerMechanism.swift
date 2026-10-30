@@ -58,7 +58,9 @@ final class GlobalSleepMechanism: LeasePowerMechanism {
     func readApplied() throws -> Bool? { try backend.readDisabled() }
     func readForeignPolicy() throws -> ForeignPolicyObservation { .clear }
     func clear() throws -> CleanupEvidence {
-        if try backend.readDisabled() { try backend.setDisabled(false) }
+        // Write the default before reading: `pmset -g` can fail while powerd is busy (it did during shutdown in
+        // G2 trial 7) and must not stop the restore. Writing 0 when it is already 0 is harmless.
+        try backend.setDisabled(false)
         guard try !backend.readDisabled() else { throw PowerServiceFailure.backend }
         applyAcknowledged = false
         return .verifiedReadback

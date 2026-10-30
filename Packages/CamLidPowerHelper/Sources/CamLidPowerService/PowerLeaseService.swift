@@ -189,7 +189,8 @@ public final class PowerLeaseService {
                     || finishesInterruptedRestore(loaded) else { return .nothingToRecover }
             record = loaded
             let deadline = Double(loaded.continuousDeadlineNanos) / 1_000_000_000
-            let expired = loaded.bootID != bootID || current > deadline + graceSeconds
+            // A pending restore has no lease to wait for, and its copied deadline may come from another boot's clock.
+            let expired = finishesInterruptedRestore(loaded) || loaded.bootID != bootID || current > deadline + graceSeconds
             log("recover record=\(loaded.intent) boot=\(loaded.bootID == bootID ? "same" : "other") now=\(current) deadline=\(deadline) grace=\(graceSeconds) expired=\(expired)")
             guard expired else { return .leaseStillValid }
             if try mechanism.readApplied() == false {

@@ -60,7 +60,10 @@ do {
             safety: NativeHelperEnvironment.safety)
     }
     controller.log = logLine
-    let runtime = PowerHelperRuntime(service: controller)
+    let runtime = PowerHelperRuntime(service: controller, onStartupFailure: {
+        logLine("exiting after a failed start so launchd restarts the helper with a fresh pmset runner")
+        exit(75)
+    })
     let sleepObserver = bestEffortLidMode ? try RootDomainGeneralInterestObserver { reason in
         runtime.observeSystemEvent(reason: reason)
     } : nil

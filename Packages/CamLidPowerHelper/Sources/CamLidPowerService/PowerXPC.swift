@@ -7,11 +7,21 @@ public final class PowerHelperRuntime: @unchecked Sendable {
     private let service: PowerLeaseService
     private var timer: DispatchSourceTimer?
 
-    public init(service: PowerLeaseService) { self.service = service }
+    private let onStartupFailure: @Sendable () -> Void
+
+    /// `onStartupFailure` runs when start-up inspection fails. The helper passes an exit so launchd restarts it:
+    /// a pmset timeout poisons the runner for the rest of the process (seen at boot in G2 trial 7).
+    public init(service: PowerLeaseService, onStartupFailure: @escaping @Sendable () -> Void = {}) {
+        self.service = service
+        self.onStartupFailure = onStartupFailure
+    }
 
     public func start() {
         queue.async { [self] in
             service.start()
+            if service.state == "recoveryRequired", service.reason == "startupInspectionFailed" {
+                queue.asyncAfter(deadline: .now() + 10) { [onStartupFailure] in onStartupFailure() }
+            }
             let source = DispatchSource.makeTimerSource(queue: queue)
             source.schedule(deadline: .now() + 1, repeating: 1)
             source.setEventHandler { [weak self] in self?.service.poll() }
