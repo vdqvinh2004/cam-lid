@@ -91,7 +91,7 @@ public enum Commands {
         guard !argv.isEmpty else { return ("", CLIOptions()) }
         var args = argv
         var name = args.removeFirst()
-        if ["agents", "config", "logs", "watch"].contains(name),
+        if ["agents", "config", "logs", "watch", "helper"].contains(name),
            let next = args.first, !next.hasPrefix("-") {
             name += " " + args.removeFirst()
         }
@@ -219,6 +219,9 @@ public enum Commands {
         case "logs", "logs export": return logsExport(options: options, context: &context)
         case "recover": return recover(options: options, context: &context)
         case "doctor": return doctor(context: context)
+        case "helper install", "helper uninstall", "helper trust", "helper status":
+            return helperCommand(name: name, options: options)
+        case "helper": return fail(2, command: name, reason: "missingSubcommand")
         case "simulate": return simulate(options: options, context: context)
         case "event", "bridge", "run":
             return fail(3, command: name, reason: "externalObservationOnly")
@@ -652,6 +655,36 @@ public enum Commands {
             "healthIssues": context.health == nil ? ["healthUnknown"] : [String](),
             "revision": context.revision,
         ])
+    }
+
+    /// Standard-mode helper lifecycle. Mutating subcommands need administrator rights (`sudo camlid helper ...`);
+    /// the installer refuses otherwise. `status` is read-only and works without them.
+    static func helperCommand(name: String, options: CLIOptions, installer: HelperInstaller = HelperInstaller()) -> CLIResult {
+        let app = options.flags["app"].map { URL(fileURLWithPath: $0) } ?? HelperInstaller.defaultAppBundle
+        if name == "helper status" {
+            let status = installer.status(appBundle: app)
+            let label: String
+            switch status {
+            case .notInstalled: label = "notInstalled"
+            case .installed(let loaded): label = loaded ? "installed" : "installedNotLoaded"
+            case .needsReauthorization: label = "needsReauthorization"
+            case .helperIdentityMismatch: label = "helperIdentityMismatch"
+            case .partial: label = "partial"
+            }
+            var dict: [String: Any] = ["command": "helperStatus", "status": label]
+            if case .partial(let missing) = status { dict["missing"] = missing }
+            return cliJSON(0, dict)
+        }
+        let result: HelperOperationResult
+        switch name {
+        case "helper install":
+            result = installer.install(appBundle: app, helperSource: options.flags["helper"].map { URL(fileURLWithPath: $0) })
+        case "helper trust": result = installer.trust(appBundle: app)
+        default: result = installer.uninstall(force: options.flags["force"] != nil)
+        }
+        var dict: [String: Any] = ["command": name.replacingOccurrences(of: " ", with: "-"), "accepted": result.accepted, "reason": result.reason]
+        if let detail = result.detail { dict["detail"] = detail }
+        return cliJSON(result.accepted ? 0 : (result.reason == "administratorRequired" ? 77 : 1), dict)
     }
 
     /// Isolated simulation. Pure: uses `Simulator` (fake clock/sensors only),

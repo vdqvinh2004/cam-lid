@@ -49,9 +49,13 @@ Use `--configuration release` for Release. Executable `--version` is inert. No-a
 
 The staged QA bundle has its own `com.camlid.PowerCandidate` identity and must be addressed by exact path. Only root-installed exact pins admit that QA identity; the production Team-ID policy still accepts only the real CamLid app. Staging never registers it with Launch Services or replaces the running/installed CamLid. Root identity/helper/plist installation, daemon bootstrap consent and exact action approval are still required before native QA. The QA client has no `--register` command; `--registration-status` only reads legacy service status. Do not use the superseded first SMAppService-oriented staged bundle. Use only the latest frozen manifest. There is no installer or registration side effect in the package build.
 
+## Recovery and release modes (spec 014)
+
+`--recover-v1` is run every 15 s by the separate `com.camlid.power-recovery` LaunchDaemon (`Support/com.camlid.power-recovery.plist`). It takes no helper lock, so a hung helper cannot block it, and restores an acknowledged enable only after its lease deadline plus 10 s grace (or from another boot). `--release-v1` restores an owned acknowledged enable immediately and is used by `camlid helper uninstall`. Both only touch the `pmset-global-v1` journal.
+
 ## Lid-specific modes and the frozen best-effort candidate
 
-The daemon accepts exactly three argv forms: none (`pmset-global-v1`), `--lid-specific-v1`
+The daemon accepts exactly three argv forms: `--standard-v1` (`pmset-global-v1`; no argument is refused), `--lid-specific-v1`
 (24 s cap) and `--lid-specific-best-effort-v1` (900 s cap, 24 s leases, 10 s heartbeats).
 Only the best-effort form constructs `RootDomainGeneralInterestObserver`, so a qualified
 `kIOMessageSystemWillSleep` terminates the current session and latches no-resume through

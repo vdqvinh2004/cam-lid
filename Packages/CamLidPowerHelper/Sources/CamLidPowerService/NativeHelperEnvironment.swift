@@ -171,7 +171,10 @@ public final class HelperStorage {
     public let journal: DurableRecoveryJournal
     private let lockFD: Int32
 
-    public init(name: String = "CamLidPowerHelper") throws {
+    /// `holdsHelperLock: false` is for the independent recovery job: it must read and restore while a
+    /// hung helper still owns the helper lock. Journal commits stay revision-checked, so a racing
+    /// writer is refused rather than overwritten.
+    public init(name: String = "CamLidPowerHelper", holdsHelperLock: Bool = true) throws {
         guard ["CamLidPowerHelper", "CamLidPowerHelperLidSpecific"].contains(name) else {
             throw JournalFailure.unsafeStorage
         }
@@ -190,6 +193,11 @@ public final class HelperStorage {
         guard fstat(directory, &information) == 0, information.st_uid == 0,
               information.st_mode & 0o777 == 0o700 else { throw JournalFailure.unsafeStorage }
         try requireNoExtendedACL(fd: directory)
+        if !holdsHelperLock {
+            journal = try DurableRecoveryJournal(directory: URL(fileURLWithPath: "/private/var/db/\(name)"))
+            lockFD = -1
+            return
+        }
         let fd = openat(directory, ".helper.lock", O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK, 0o600)
         guard fd >= 0 else { throw JournalFailure.unsafeStorage }
         var lockInfo = stat()
@@ -209,5 +217,5 @@ public final class HelperStorage {
         }
     }
 
-    deinit { close(lockFD) }
+    deinit { if lockFD >= 0 { close(lockFD) } }
 }

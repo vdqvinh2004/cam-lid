@@ -16,6 +16,9 @@ public protocol LeasePowerMechanism: AnyObject {
     var maximumSessionSeconds: Int { get }
     var leaseSeconds: Double { get }
     var applyAcknowledged: Bool { get }
+    /// True when the policy this mechanism sets survives a reboot (global `SleepDisabled`), so an
+    /// acknowledged enable from a previous boot may be restored from the journal.
+    var restoresOwnedPolicyAfterReboot: Bool { get }
     func admissionAllowed() throws -> Bool
     func apply(remainingNanos: UInt64, episodeID: UUID) throws
     func prepareRenewal(remainingNanos: UInt64, episodeID: UUID) throws
@@ -32,6 +35,7 @@ public protocol LeasePowerMechanism: AnyObject {
 
 public extension LeasePowerMechanism {
     var leaseSeconds: Double { PowerLeaseService.leaseSeconds }
+    var restoresOwnedPolicyAfterReboot: Bool { false }
     func prepareRenewal(remainingNanos: UInt64, episodeID: UUID) throws {}
     func completeRenewal() throws {}
     func discardOwnedResourcesAfterFailedApply() throws {}
@@ -43,6 +47,7 @@ final class GlobalSleepMechanism: LeasePowerMechanism {
     let maximumSessionSeconds = PowerLeaseService.maximumSessionSeconds
     private let backend: any SleepOverrideBackend
     private(set) var applyAcknowledged = false
+    let restoresOwnedPolicyAfterReboot = true
     init(_ backend: any SleepOverrideBackend) { self.backend = backend }
     func admissionAllowed() throws -> Bool { try !backend.readDisabled() }
     func apply(remainingNanos: UInt64, episodeID: UUID) throws {

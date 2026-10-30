@@ -64,6 +64,12 @@ The result is that the helper cannot be installed, and no closed-lid run has bee
 - Whether the historical 012/013 specs, which link to QA files that are no longer on GitHub, stay in the public repository.
 - Whether Strict keeps its dedicated helper binary arguments (`--lid-specific-v1`, `--lid-specific-best-effort-v1`) or is removed from the shipped helper.
 
+## Resolved defaults (2026-10-30, owner may override)
+
+- **Identity without a Developer ID:** ad-hoc signing with the exact cdhash pinned at install time; `camlid helper trust` re-pins after a rebuild.
+- **Historical 012/013 specs:** stay in the repository with a superseded notice; their links to local-only QA files are expected to be dead on GitHub.
+- **Strict arguments:** stay in the shipped helper (`--lid-specific-*`), selected only by an explicit argument. Because both modes share one label and Mach service, only one mode's daemon is installed at a time.
+
 ## Not decided here
 
 This ADR grants no authority to install anything, run root code, change power state or perform a physical lid episode. Each native action still needs the owner's explicit go-ahead at the time. Passing unit tests or a successful install does not pass any gate.

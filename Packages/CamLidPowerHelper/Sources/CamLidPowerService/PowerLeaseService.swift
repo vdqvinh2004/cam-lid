@@ -159,10 +159,12 @@ public final class PowerLeaseService {
             }
             if let record, !(record.intent == .restoreLidPolicy && record.disposition == .acknowledged) {
                 state = "recoveryRequired"
-                // Never clear an uncertain enable, interrupted restore, or another boot's override.
+                // Never clear an uncertain enable or interrupted restore. Another boot's override is
+                // cleared only when its policy persists across reboot and our enable was acknowledged.
                 if try mechanism.readApplied() == false {
                     try acknowledgeRestored()
-                } else if record.bootID == bootID, record.intent == .enableLidOverride,
+                } else if record.bootID == bootID || mechanism.restoresOwnedPolicyAfterReboot,
+                          record.intent == .enableLidOverride,
                           record.disposition == .acknowledged {
                     // Re-observe before a restart cleanup. A foreign policy still permits the
                     // own one-shot lid clear, but the final state must stay recovery-required.
@@ -200,6 +202,35 @@ public final class PowerLeaseService {
         } catch {
             state = "recoveryRequired"
             reason = "startupInspectionFailed"
+        }
+    }
+
+    public enum OrphanRecovery: Equatable, Sendable {
+        case nothingToRecover, leaseStillValid, restored, failed(String)
+    }
+
+    /// One-shot recovery for a process other than the running helper (hung, killed or never restarted).
+    /// Acts only on an acknowledged enable whose lease deadline plus grace has passed, or one from
+    /// another boot, and only for a policy that survives reboot. Uncertain journal entries are left
+    /// for inspection. A racing journal writer makes the restore fail and the caller retries.
+    public func recoverOrphanedPolicy(graceSeconds: Double) -> OrphanRecovery {
+        guard state == "starting", mechanism.restoresOwnedPolicyAfterReboot else { return .nothingToRecover }
+        do {
+            let current = try now()
+            guard let loaded = try store.load(), loaded.intent == .enableLidOverride,
+                  loaded.disposition == .acknowledged else { return .nothingToRecover }
+            record = loaded
+            let expired = loaded.bootID != bootID
+                || current > Double(loaded.continuousDeadlineNanos) / 1_000_000_000 + graceSeconds
+            guard expired else { return .leaseStillValid }
+            if try mechanism.readApplied() == false {
+                try acknowledgeRestored()
+                return .restored
+            }
+            try restore(reason: "independentRecovery")
+            return state == "restored" ? .restored : .failed(reason)
+        } catch {
+            return .failed("recoveryFailed")
         }
     }
 

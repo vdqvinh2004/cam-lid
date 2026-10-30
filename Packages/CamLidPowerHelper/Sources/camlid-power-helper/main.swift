@@ -8,18 +8,35 @@ if arguments == ["--version"] {
     exit(0)
 }
 
-let lidSpecificMode = arguments == ["--lid-specific-v1"]
-let bestEffortLidMode = arguments == ["--lid-specific-best-effort-v1"]
-guard (arguments.isEmpty || lidSpecificMode || bestEffortLidMode), geteuid() == 0 else {
-    fputs("Refused: root launchd service required; no power action performed.\n", stderr)
+guard let launchMode = HelperLaunchMode(arguments: arguments), geteuid() == 0 else {
+    fputs("Refused: root launchd service with an explicit mode argument required; no power action performed.\n", stderr)
     exit(77)
+}
+let bestEffortLidMode = launchMode == .bestEffortLid
+
+if launchMode == .recovery || launchMode == .release {
+    // Separate short-lived process (own launchd job): works even when the main helper is hung.
+    do {
+        let storage = try HelperStorage(name: "CamLidPowerHelper", holdsHelperLock: false)
+        let runner = NativePMSetRunner()
+        let service = PowerLeaseService(backend: PMSetBackend(execute: runner.execute), store: storage.journal,
+            bootID: try NativeHelperEnvironment.bootID(), clock: { NativeHelperEnvironment.now },
+            safety: NativeHelperEnvironment.safety)
+        let outcome = service.recoverOrphanedPolicy(graceSeconds: launchMode == .release ? -.infinity : 10)
+        print("recovery: \(outcome)")
+        if case .failed = outcome { exit(1) }
+        exit(0)
+    } catch {
+        fputs("Refused: protected journal unavailable; no power action performed.\n", stderr)
+        exit(78)
+    }
 }
 
 do {
     // Team-validated production identity or explicit root-installed exact local CDHash pins.
     // Never unsigned, debugger-entitled, UID-only or client-configured trust.
     let requirement = try PowerHelperIdentity.peerRequirement(forHelper: false)
-    let usesLidSpecific = lidSpecificMode || bestEffortLidMode
+    let usesLidSpecific = launchMode != .standard
     let storage = try HelperStorage(name: usesLidSpecific ? "CamLidPowerHelperLidSpecific" : "CamLidPowerHelper")
     let controller: PowerLeaseService
     if usesLidSpecific {

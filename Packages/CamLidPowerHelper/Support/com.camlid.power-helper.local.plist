@@ -4,7 +4,7 @@
 <dict>
     <key>Label</key><string>com.camlid.power-helper</string>
     <key>Program</key><string>/Library/PrivilegedHelperTools/com.camlid.power-helper</string>
-    <key>ProgramArguments</key><array><string>/Library/PrivilegedHelperTools/com.camlid.power-helper</string></array>
+    <key>ProgramArguments</key><array><string>/Library/PrivilegedHelperTools/com.camlid.power-helper</string><string>--standard-v1</string></array>
     <key>MachServices</key><dict><key>com.camlid.power-helper</key><true/></dict>
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>

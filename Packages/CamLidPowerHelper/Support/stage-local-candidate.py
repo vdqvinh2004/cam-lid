@@ -56,7 +56,8 @@ def stage(helper, client, output, lid_specific=False, best_effort=False):
     shutil.copy2(client, app_binary)
     shutil.copy2(helper, helper_binary)
     daemon = plistlib.loads((Path(__file__).parent / f"{HELPER_ID}.local.plist").read_bytes())
-    helper_mode = None
+    helper_mode = "--standard-v1"
+    daemon["ProgramArguments"] = [daemon["Program"], helper_mode]
     if best_effort:
         helper_mode = "--lid-specific-best-effort-v1"
         daemon["ProgramArguments"] = [daemon["Program"], helper_mode]
@@ -111,10 +112,9 @@ def self_test():
     daemon = plistlib.loads((Path(__file__).parent / f"{HELPER_ID}.local.plist").read_bytes())
     assert daemon["Label"] == HELPER_ID
     assert daemon["Program"] == f"/Library/PrivilegedHelperTools/{HELPER_ID}"
-    assert daemon["ProgramArguments"] == [daemon["Program"]]
+    assert daemon["ProgramArguments"] == [daemon["Program"], "--standard-v1"]
     assert daemon["MachServices"] == {HELPER_ID: True}
     assert "BundleProgram" not in daemon
-    assert daemon["ProgramArguments"] == [daemon["Program"]]
     for mode in ("--lid-specific-v1", "--lid-specific-best-effort-v1"):
         variant = plistlib.loads((Path(__file__).parent / f"{HELPER_ID}.local.plist").read_bytes())
         variant["ProgramArguments"] = [variant["Program"], mode]

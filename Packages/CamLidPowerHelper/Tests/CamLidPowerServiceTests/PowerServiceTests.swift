@@ -25,8 +25,12 @@ private final class FakeStore: PowerIntentStore {
     var record: JournalEntry?
     var commits = 0
     var failAt: Int?
+    var loadFails = false
     var afterCommit: (() -> Void)?
-    func load() throws -> JournalEntry? { record }
+    func load() throws -> JournalEntry? {
+        if loadFails { throw PowerServiceFailure.journal }
+        return record
+    }
     func commit(_ entry: JournalEntry, replacing revision: UInt64?) throws {
         commits += 1
         if failAt == commits { throw PowerServiceFailure.journal }
@@ -198,13 +202,46 @@ private final class Fixture {
         #expect(f.backend.writes == [true, false])
     }
 
-    @Test func otherBootNeverBlindlyClearsPersistedOverride() {
+    @Test func otherBootRestoresAcknowledgedOverrideForPersistentGlobalPolicy() {
         let f = Fixture()
         #expect(f.acquire().accepted)
         let replacement = f.makeService(bootID: "boot-b")
         replacement.start()
+        #expect(replacement.state == "restored")
+        #expect(f.backend.disabled == false)
+        #expect(f.backend.writes == [true, false])
+    }
+
+    @Test func otherBootNeverClearsAnUncertainEnable() {
+        let f = Fixture()
+        f.backend.writeFails = true
+        #expect(!f.acquire().accepted)
+        f.backend.writeFails = false
+        f.backend.disabled = true
+        let replacement = f.makeService(bootID: "boot-b")
+        replacement.start()
         #expect(replacement.state == "recoveryRequired")
         #expect(f.backend.writes == [true])
+    }
+
+    @Test func otherBootWithPolicyAlreadyClearAcknowledgesWithoutWriting() {
+        let f = Fixture()
+        #expect(f.acquire().accepted)
+        f.backend.disabled = false
+        let replacement = f.makeService(bootID: "boot-b")
+        replacement.start()
+        #expect(replacement.state == "restored")
+        #expect(f.backend.writes == [true])
+    }
+
+    @Test func restartAfterLeaseExpiryRestoresBeforeAcceptingNewWork() {
+        let f = Fixture()
+        #expect(f.acquire().accepted)
+        f.time += 3600
+        let replacement = f.makeService()
+        replacement.start()
+        #expect(replacement.state == "restored")
+        #expect(f.backend.disabled == false)
     }
 
     @Test func restoreFailurePreventsNewProtection() {
@@ -363,5 +400,110 @@ private final class Fixture {
         #expect(PMSetCommand.disable.arguments == ["-a", "disablesleep", "0"])
         let failed = PMSetBackend { _ in PMSetResult(status: 1, output: Data()) }
         #expect(throws: PMSetFailure.exit(1)) { try failed.setDisabled(true) }
+    }
+}
+
+@Suite struct HelperLaunchModeTests {
+    @Test func acceptsOnlyOneExplicitKnownArgument() {
+        #expect(HelperLaunchMode(arguments: ["--standard-v1"]) == .standard)
+        #expect(HelperLaunchMode(arguments: ["--lid-specific-v1"]) == .lidSpecific)
+        #expect(HelperLaunchMode(arguments: ["--lid-specific-best-effort-v1"]) == .bestEffortLid)
+        #expect(HelperLaunchMode(arguments: ["--recover-v1"]) == .recovery)
+    }
+
+    @Test func refusesMissingUnknownOrExtraArguments() {
+        #expect(HelperLaunchMode(arguments: []) == nil)
+        #expect(HelperLaunchMode(arguments: ["--standard"]) == nil)
+        #expect(HelperLaunchMode(arguments: ["--standard-v1", "--lid-specific-v1"]) == nil)
+        #expect(HelperLaunchMode(arguments: ["--version"]) == nil)
+    }
+}
+
+@Suite struct IndependentRecoveryTests {
+    private func acquired() -> Fixture {
+        let f = Fixture()
+        #expect(f.acquire().accepted)   // lease deadline = 100 + 30
+        return f
+    }
+
+    @Test func doesNothingWhileTheLeaseIsValidOrWithinGrace() {
+        let f = acquired()
+        f.time = 120
+        #expect(f.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .leaseStillValid)
+        f.time = 139
+        #expect(f.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .leaseStillValid)
+        #expect(f.backend.disabled && f.backend.writes == [true])
+    }
+
+    @Test func restoresAfterDeadlinePlusGraceWhileTheHelperIsHung() {
+        let f = acquired()
+        f.time = 141   // the hung helper never polls; another process recovers
+        #expect(f.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .restored)
+        #expect(!f.backend.disabled)
+        #expect(f.backend.writes == [true, false])
+        #expect(f.store.record?.intent == .restoreLidPolicy && f.store.record?.disposition == .acknowledged)
+    }
+
+    @Test func restoresARecordFromAnotherBoot() {
+        let f = acquired()
+        #expect(f.makeService(bootID: "boot-b").recoverOrphanedPolicy(graceSeconds: 10) == .restored)
+        #expect(!f.backend.disabled)
+    }
+
+    @Test func acknowledgesWithoutWritingWhenThePolicyIsAlreadyClear() {
+        let f = acquired()
+        f.backend.disabled = false
+        f.time = 200
+        #expect(f.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .restored)
+        #expect(f.backend.writes == [true])
+    }
+
+    @Test func leavesUncertainOrAbsentRecordsAlone() {
+        let empty = Fixture()
+        #expect(empty.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .nothingToRecover)
+        let f = Fixture()
+        f.backend.writeFails = true
+        #expect(!f.acquire().accepted)
+        f.backend.writeFails = false
+        f.backend.disabled = true
+        f.time = 500
+        #expect(f.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .nothingToRecover)
+        #expect(f.backend.writes == [true])
+    }
+
+    @Test func aRacingJournalWriterMakesRecoveryFailInsteadOfOverwriting() {
+        let f = acquired()
+        f.time = 200
+        f.store.failAt = f.store.commits + 1
+        let outcome = f.makeService().recoverOrphanedPolicy(graceSeconds: 10)
+        guard case .failed = outcome else { Issue.record("expected failure, got \(outcome)"); return }
+        #expect(f.store.record?.intent == .enableLidOverride)
+    }
+
+    @Test func aSecondRecoveryAfterSuccessIsANoOp() {
+        let f = acquired()
+        f.time = 200
+        #expect(f.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .restored)
+        #expect(f.makeService().recoverOrphanedPolicy(graceSeconds: 10) == .nothingToRecover)
+        #expect(f.backend.writes == [true, false])
+    }
+}
+
+@Suite struct SessionIsolationTests {
+    @Test func aSecondClientIsRefusedWhileALeaseIsActive() {
+        let f = Fixture()
+        #expect(f.acquire().accepted)
+        let second = f.service.handle(PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 60),
+                                      owner: UUID(), uid: 501)
+        #expect(!second.accepted)
+        #expect(f.backend.writes == [true])
+    }
+
+    @Test func anUnreadableJournalBlocksNewSessionsWithoutWriting() {
+        let f = Fixture()
+        f.store.loadFails = true
+        #expect(!f.acquire().accepted)
+        #expect(f.service.state == "recoveryRequired")
+        #expect(f.backend.writes.isEmpty)
     }
 }
