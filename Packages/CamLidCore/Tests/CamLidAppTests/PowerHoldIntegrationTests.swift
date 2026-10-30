@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Testing
 import CamLidCore
+import CamLidCLI
 @testable import CamLidApp
 
 private final class FakeHoldTransport: PowerHoldTransport, @unchecked Sendable {
@@ -9,6 +10,8 @@ private final class FakeHoldTransport: PowerHoldTransport, @unchecked Sendable {
     private var recorded: [HoldAction] = []
     private let token = UUID()
     var refuseAcquireWith: String?
+    private var closes = 0
+    var closed: Bool { lock.withLock { closes > 0 } }
     var actions: [HoldAction] { lock.withLock { recorded } }
     func send(_ action: HoldAction) async -> HoldReply? {
         lock.withLock { recorded.append(action) }
@@ -20,7 +23,7 @@ private final class FakeHoldTransport: PowerHoldTransport, @unchecked Sendable {
         case .release: return HoldReply(accepted: true, state: "restored", reason: "restorationVerified")
         }
     }
-    func close() {}
+    func close() { lock.withLock { closes += 1 } }
 }
 
 @MainActor private func settle(_ done: () -> Bool) async {
@@ -179,5 +182,41 @@ struct PowerHoldIntegrationTests {
         #expect(second.closedLidCapabilityText == "Closed lid ready · untested Mac")
         #expect(second.dashboardData().mode == .timed)
         #expect(second.dashboardData().state != .protected)     // a session is never resumed by a restart
+    }
+
+    @Test @MainActor func cliStartUsesTheDashboardPathAndReportsHonestly() async throws {
+        let (app, transport, support) = try await rig(row: "test-row")
+        defer { support.cleanup() }
+        func object(_ r: CLIResult) -> [String: Any] { (try? JSONSerialization.jsonObject(with: Data(r.json.utf8))) as? [String: Any] ?? [:] }
+        func options(_ flags: [String: String]) -> Data { try! JSONEncoder().encode(CLIOptions(flags: flags)) }
+        #expect(await app.startFromControl(options(["mode": "off"])).exitCode == 2)
+        #expect(await app.startFromControl(options(["mode": "timed", "duration": "0m"])).exitCode == 2)
+        let started = await app.startFromControl(options(["mode": "timed", "duration": "30m"]))
+        #expect(started.exitCode == 0)
+        #expect(object(started)["mode"] as? String == "timed" && object(started)["closedLidPermit"] as? String == "qualified:test-row")
+        #expect(app.dashboardData().timerMinutes == 30)
+        await settle { transport.actions.contains { if case .acquire = $0 { true } else { false } } }
+        let again = await app.startFromControl(Data())
+        #expect(again.exitCode == 3 && object(again)["reason"] as? String == "sessionAlreadyActive")
+    }
+
+    @Test @MainActor func cliStartRefusesAnUntestedMacWithAReason() async throws {
+        let (app, transport, support) = try await rig(row: nil)
+        defer { support.cleanup() }
+        let refused = await app.startFromControl(Data())
+        let object = (try? JSONSerialization.jsonObject(with: Data(refused.json.utf8))) as? [String: Any] ?? [:]
+        #expect(refused.exitCode == 3 && object["reason"] as? String == "closedLidNotPermitted")
+        #expect(transport.actions.isEmpty)
+    }
+
+    /// 003 T022: quitting while the helper holds the Mac awake closes the connection, which makes the helper restore.
+    @Test @MainActor func quittingWithAHeldLeaseClosesTheHelperConnection() async throws {
+        let (app, transport, support) = try await rig(row: "test-row")
+        defer { support.cleanup() }
+        #expect(app.releaseHoldForQuit() == "noPowerResourcesOwned")
+        await app.startPreviewSession()
+        await settle { app.dashboardData().leaseVerified }
+        #expect(app.releaseHoldForQuit() == "helperRestoresOnDisconnect")
+        #expect(transport.closed)
     }
 }

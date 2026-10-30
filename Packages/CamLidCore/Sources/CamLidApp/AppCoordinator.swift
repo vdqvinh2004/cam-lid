@@ -378,9 +378,17 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     public func menuBarQuit() {
         // Without a qualified row no power state is owned. With one, closing the helper connection below makes
         // the helper restore at once, so an immediate terminate is still safe.
-        record(category: .configuration, newState: .off, reasons: ["appQuitNoOwnedPower"])
-        holdTransport?.close()
+        record(category: .configuration, newState: .off, reasons: ["appQuit", releaseHoldForQuit()])
         NSApp.terminate(nil)
+    }
+
+    /// Drops the helper connection before quitting. The helper restores the sleep setting as soon as its client
+    /// disconnects (G2 trial 3), so quitting with a held lease is safe; the outcome names what happened.
+    @discardableResult
+    func releaseHoldForQuit() -> String {
+        let held = holdReconciler.status == .held || holdReconciler.status == .acquiring
+        holdTransport?.close()
+        return held ? "helperRestoresOnDisconnect" : "noPowerResourcesOwned"
     }
 
     public var menuBarCanStart: Bool { !authorityUnavailable && !terminationFlowActive && !hasPendingSettingsWork }
@@ -1241,6 +1249,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 timeout: max(0, min(0.7, deadline - uptime()))) else { throw IPCError.unavailable }
             return data
         }
+        if command == .start { return try JSONEncoder().encode(await startFromControl(payload)) }
         guard command == .configSet else { return try handleControl(command, payload: payload) }
         _ = try BoundedPayload(payload)
         let options = try JSONDecoder().decode(CLIOptions.self, from: payload)
@@ -1420,22 +1429,71 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 refresh()
             }
         case .start:
-            result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"backendPendingM1\",\"preview\":true,\"powerActuation\":false}", exitCode: 3)
+            throw IPCError.invalidInput("startIsAsync")   // handled by `handleControlAsync` → `startFromControl`
         case .quit:
             // Preview owns no power resources. A future actuating backend must
             // replace this with restoration-confirmed shutdown before shipping.
-            record(category: .configuration, newState: .off, reasons: ["cliQuitNoOwnedPower"])
+            let cleanup = releaseHoldForQuit()
+            record(category: .configuration, newState: .off, reasons: ["cliQuit", cleanup])
             // AppKit's terminateLater loop must not nest inside a main-dispatch
             // callback: that blocks the main-actor cleanup task from replying.
             NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0.2)
-            result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":true,\"powerActuation\":false,\"cleanupOutcome\":\"noPowerResourcesOwned\"}", exitCode: 0)
+            result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":true,\"powerActuation\":false,\"cleanupOutcome\":\"\(cleanup)\"}", exitCode: 0)
         case .stop:
             let hadSession = session != nil
+            let held = holdReconciler.status == .held
             menuBarStopProtection()
-            result = CLIResult(json: "{\"schemaVersion\":1,\"released\":\(hadSession),\"cleanupOutcome\":\"noPowerResourcesOwned\",\"preview\":true}", exitCode: 0)
+            // With a held lease the release is sent on the next tick; `status` shows `restoration` when it lands.
+            let cleanup = held ? "releaseRequested" : "noPowerResourcesOwned"
+            result = CLIResult(json: "{\"schemaVersion\":1,\"released\":\(hadSession),\"cleanupOutcome\":\"\(cleanup)\",\"preview\":true}", exitCode: 0)
         default: throw IPCError.policyDenied("commandNotAvailableInPreview")
         }
         return try JSONEncoder().encode(result)
+    }
+
+    /// `camlid start [--mode auto|timed|manual] [--duration 30m]`: the same path as the Dashboard buttons, so every
+    /// refusal (mode, battery entry, closed-lid permit) applies. Power is held only later, once the helper confirms.
+    func startFromControl(_ payload: Data) async -> CLIResult {
+        func reply(_ code: Int, _ object: [String: Any]) -> CLIResult {
+            var merged = object; merged["schemaVersion"] = 1; merged["command"] = "start"
+            let data = (try? JSONSerialization.data(withJSONObject: merged, options: [.sortedKeys])) ?? Data()
+            return CLIResult(json: String(decoding: data, as: UTF8.self), exitCode: code)
+        }
+        let options = payload.isEmpty ? CLIOptions() : ((try? JSONDecoder().decode(CLIOptions.self, from: payload)) ?? CLIOptions())
+        var mode: RequestedMode?
+        if let raw = options.flags["mode"] {
+            guard let parsed = RequestedMode(rawValue: raw), parsed != .off else {
+                return reply(2, ["accepted": false, "reason": "invalidMode"])
+            }
+            mode = parsed
+        }
+        var minutes: Int?
+        if let raw = options.flags["duration"] {
+            let value = raw.hasSuffix("h") ? Double(raw.dropLast()).map { $0 * 60 }
+                : raw.hasSuffix("m") ? Double(raw.dropLast()) : Double(raw)
+            guard let value, value.isFinite, value >= 1, value <= 24 * 60 else { return reply(2, ["accepted": false, "reason": "invalidDuration"]) }
+            minutes = Int(value)
+        }
+        guard session == nil else { return reply(3, ["accepted": false, "reason": "sessionAlreadyActive"]) }
+        if let mode, mode != config.mode {
+            await activateDashboardMode(mode, expectedRevision: revision)
+        } else {
+            await startPreviewSession()
+        }
+        guard let active = session else {
+            let reason: String = if authorityUnavailable { "appUnavailable" }
+                else if terminationFlowActive { "applicationTerminating" }
+                else if config.mode == .off { "modeOff" }
+                else if config.closedLidOptIn && !closedLidPermit().allowsActuation { "closedLidNotPermitted" }
+                else { config.batteryEntryRefusal(health: currentHealth()) ?? "notStarted" }
+            return reply(3, ["accepted": false, "reason": reason, "detail": refusalNotice ?? NSNull()])
+        }
+        if let minutes, active.requestedMode == .timed { _ = changeTimerDuration(minutes, expectedRevision: revision) }
+        return reply(0, ["accepted": true, "mode": active.requestedMode.rawValue,
+            "effectiveState": (session ?? active).effectiveState.rawValue,
+            "closedLid": config.closedLidOptIn, "closedLidPermit": closedLidPermit().statusCode,
+            "powerActuation": holdReconciler.leaseVerified(now: uptime()),
+            "note": "Power is held once the helper confirms; check `camlid status` for leaseVerified."])
     }
 
     // MARK: - Config persistence (validated; never silently arms)

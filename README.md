@@ -80,7 +80,7 @@ Current owner-directed source changes: Settings → Permissions keeps optional N
 Defaults → Notifications stores opt-in categories; explicit GUI enablement requests native permission. CLI config edits never request notification permission. Returning to Settings refreshes actual OS permission/login state. Utility windows provide standard native editing commands and shortcuts. Login and notifications start off; saved intent does not arm a session. Isolated native QA verified failure delivery in Notification Center and permission grant/readback/revoke; complete native alert acceptance and signed login/update/uninstall remain open.
 
 Config mutations, status, agents, Stop, and export use the app's state; unreachable app
-returns exit 4. `start` returns exit 3 / `backendPendingM1`, never fictitious protection.
+returns exit 4. `start [--mode auto|timed|manual] [--duration 30m]` starts a session through the same path as the Dashboard (exit 0), or refuses with a reason code (exit 3: `modeOff`, `closedLidNotPermitted`, battery entry, `sessionAlreadyActive`); power is held only once the helper confirms, shown as `leaseVerified` in `status`.
 Legacy `event`, `bridge` and `run` now refuse with exit3/`externalObservationOnly` before
 reading stdin, forwarding events or launching a child. App IPC also rejects provider events,
 tool diagnostics and command admissions; internal CamLid status/config/history remain available. `quit` requests preview-app exit,

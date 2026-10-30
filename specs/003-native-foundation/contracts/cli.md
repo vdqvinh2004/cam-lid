@@ -42,7 +42,7 @@ keys never enable battery mode; absent entry defaults to max(40, floor+1).
 
 The inert library start path checks battery entry and bounds even Infinite to
 min(runCapMinutes, batteryCapMinutes). The actual Preview app still refuses CLI start
-with `backendPendingM1`; this amendment enables no host power action. App status adds
+with `backendPendingM1`; this amendment enables no host power action. **Superseded 2026-10-31 (spec 014):** `start` now starts a session through the Dashboard path; it returns exit 0 with `mode`, `closedLidPermit` and `powerActuation` (true only once the helper lease is verified), or exit 3 with `reason` (`modeOff`, `closedLidNotPermitted`, a battery entry code, `sessionAlreadyActive`, `appUnavailable`, `applicationTerminating`) and exit 2 for an invalid `--mode` or `--duration`. `stop` reports `cleanupOutcome: releaseRequested` when a lease was held; `quit` reports `helperRestoresOnDisconnect`. App status adds
 `batteryModeActive` as a display-only fact, never a qualified protection claim.
 
 ## Preview transport capacity and shutdown

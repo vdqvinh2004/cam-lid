@@ -6,7 +6,7 @@ import CamLidCLI
 
 @Suite("Preview protection readiness", .serialized)
 struct ProtectionReadinessTests {
-    @Test @MainActor func intentAndModesNeverClaimOrActuateProtection() throws {
+    @Test @MainActor func intentAndModesNeverClaimOrActuateProtection() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
         var revision = 1
@@ -24,9 +24,11 @@ struct ProtectionReadinessTests {
             #expect(protection["effectiveState"] as? String == "Preview")
             #expect(protection["requestedClosedLidIntent"] as? Bool == true)
             #expect(protection["supportRowID"] is NSNull)
-            app.menuBarStartProtection()
-            let start = try JSONDecoder().decode(CLIResult.self, from: app.handleControl(.start, payload: Data()))
-            #expect(start.exitCode == 3 && start.json.contains("backendPendingM1"))
+            // This Mac is neither qualified nor accepted, so a closed-lid start is refused with a reason.
+            let start = await app.startFromControl(Data())
+            let refusal = try JSONSerialization.jsonObject(with: Data(start.json.utf8)) as! [String: Any]
+            #expect(start.exitCode == 3)
+            #expect(["modeOff", "closedLidNotPermitted"].contains(refusal["reason"] as? String ?? ""))
         }
     }
     @Test @MainActor func realStatusHasTypedNullTemperatureAndIndependentPressure() throws {

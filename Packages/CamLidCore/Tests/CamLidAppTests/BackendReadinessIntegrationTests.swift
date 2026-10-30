@@ -22,7 +22,9 @@ struct BackendReadinessIntegrationTests {
         let control = root.appendingPathComponent("control")
         let app = AppCoordinator(historyDirectory: root.appendingPathComponent("history"),
             controlDirectory: control, preferences: preferences,
-            healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) })
+            healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) },
+            helperController: HelperController(status: { .notInstalled }, keepAwakeApps: { [] }),
+            holdTransportFactory: { NeverTransport() }, closedLidSupportRow: { nil }, systemIdentity: { (nil, nil) })
         app.startControlService()
         defer { app.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification)) }
         let channel = LocalControlChannel(directory: control)
@@ -66,13 +68,11 @@ struct BackendReadinessIntegrationTests {
                 #expect(reply.exitCode == 3)
                 let denied = try object(reply)
                 #expect(denied["accepted"] as? Bool == false)
-                #expect(denied["reason"] as? String == "backendPendingM1")
-                #expect(denied["preview"] as? Bool == true)
-                #expect(denied["powerActuation"] as? Bool == false)
+                #expect(denied["reason"] as? String == "sessionAlreadyActive")
             }
             let start = await cli(["start", "--mode", mode.rawValue])
             #expect(start.exitCode == 3)
-            #expect(try object(start)["reason"] as? String == "backendPendingM1")
+            #expect(try object(start)["reason"] as? String == "sessionAlreadyActive")
 
             let marker = root.appendingPathComponent("must-not-launch-" + mode.rawValue)
             let protectedRun = await cli(["run", "--keep-awake", "--", "/usr/bin/touch", marker.path])
