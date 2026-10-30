@@ -84,6 +84,8 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         settingsEditor?.badges = state.dashboard.agents
         settingsEditor?.protection = state.protection
         settingsEditor?.loginState = state.loginState; settingsEditor?.loginMessage = state.loginMessage
+        settingsEditor?.helperState = state.helperState; settingsEditor?.helperMessage = state.helperMessage
+        settingsEditor?.helperBusy = state.helperBusy
         settingsEditor?.notificationPermission = state.notificationPermission
         settingsEditor?.accessibilityPermission = state.accessibilityPermission
         settingsEditor?.permissionSettingsError = state.permissionSettingsError
@@ -185,6 +187,9 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         }
         editor.badges = state.dashboard.agents; editor.protection = state.protection
         editor.loginState = state.loginState; editor.loginMessage = state.loginMessage
+        editor.helperState = state.helperState; editor.helperMessage = state.helperMessage; editor.helperBusy = state.helperBusy
+        editor.onInstallHelper = { [weak self] in self?.send(.installHelper) }
+        editor.onUninstallHelper = { [weak self] in self?.send(.uninstallHelper) }
         editor.notificationPermission = state.notificationPermission
         editor.accessibilityPermission = state.accessibilityPermission
         editor.permissionSettingsError = state.permissionSettingsError

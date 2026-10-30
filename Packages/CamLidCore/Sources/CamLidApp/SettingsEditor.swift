@@ -49,6 +49,11 @@ public final class SettingsEditor: ObservableObject {
     @Published public var protection: ProtectionReadiness?
     @Published public var loginState = "notRegistered"
     @Published public var loginMessage = "Login registration has not been checked."
+    @Published public var helperState = "unknown"
+    @Published public var helperMessage = "Helper status has not been checked."
+    @Published public var helperBusy = false
+    public var onInstallHelper: (() -> Void)?
+    public var onUninstallHelper: (() -> Void)?
     @Published public var notificationPermission = "notDetermined"
     @Published public var accessibilityPermission = "unavailable"
     @Published public var permissionSettingsError: String?

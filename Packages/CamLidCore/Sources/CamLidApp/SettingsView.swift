@@ -548,6 +548,62 @@ private struct SettingsLifetimePane: View {
     }
 }
 
+private struct SettingsClosedLidSection: View {
+    @ObservedObject var editor: SettingsEditor
+
+    private var installed: Bool { ["installed", "installedNotLoaded", "needsReauthorization", "helperIdentityMismatch", "partial"].contains(editor.helperState) }
+
+    var body: some View {
+        Section {
+            LabeledContent("Mode") {
+                Text(PowerMode.standard.title)
+            }
+            .accessibilityElement(children: .combine)
+            Text(PowerMode.standard.disclosure)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            LabeledContent("Strict (experimental)") {
+                Text("Unavailable")
+            }
+            .accessibilityElement(children: .combine)
+            Text(PowerMode.strict.disclosure)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            LabeledContent("Helper") {
+                Text(editor.helperBusy ? "Working…" : helperLabel)
+            }
+            .accessibilityElement(children: .combine)
+            Text(editor.helperMessage)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button(installed ? "Reinstall helper…" : "Install helper…") { editor.onInstallHelper?() }
+                    .disabled(editor.helperBusy)
+                    .help("Asks for an administrator password once")
+                    .accessibilityIdentifier("camlid.settings.helper.install")
+                if installed {
+                    Button("Remove helper…") { editor.onUninstallHelper?() }
+                        .disabled(editor.helperBusy)
+                        .accessibilityIdentifier("camlid.settings.helper.remove")
+                }
+            }
+        } header: {
+            Text("Closed lid")
+        } footer: {
+            Text("Installing the helper doesn’t start a session or change sleep settings by itself.")
+        }
+    }
+
+    private var helperLabel: String {
+        switch editor.helperState {
+        case "installed": "Installed"
+        case "notInstalled": "Not installed"
+        case "unknown": "Not checked"
+        default: "Needs attention"
+        }
+    }
+}
+
 private struct SettingsSafetyPane: View {
     @ObservedObject var editor: SettingsEditor
     let onOpenSleepDiagnostics: (() -> Void)?
@@ -568,6 +624,7 @@ private struct SettingsSafetyPane: View {
         Section {
             PreviewBuildNotice()
         }
+        SettingsClosedLidSection(editor: editor)
         Section {
             Toggle("Require charger", isOn: Binding(get: { editor.draft.chargingOnly }, set: editor.setChargingOnly))
                 .accessibilityLabel(Text("Require charger", bundle: .module))

@@ -4,6 +4,8 @@ public enum PowerMode: String, Codable, Sendable, CaseIterable {
     case standard
     case strict
 
+    public var title: String { self == .standard ? "Standard" : "Strict (experimental)" }
+
     /// Strict keeps the frozen lid-only mechanism and its one-use admission; it is opt-in and unqualified.
     public var isExperimental: Bool { self == .strict }
 

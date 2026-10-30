@@ -67,6 +67,9 @@ Settings shows Standard (default) and, under an advanced section marked experime
 - **FR-010** Mutual exclusion between Standard and Strict across helpers, journals and storage directories (kept separate).
 - **FR-011** Uninstall restores the default policy when owned and removes installed files.
 - **FR-012** User-facing text states that Standard changes the global sleep policy and is less strict than Strict.
+- **FR-013** Auto, Timed and Manual drive the helper through one reconciler after the shared policy evaluation; no mode talks to the helper directly.
+- **FR-014** The UI shows Protected only while the helper lease is held and read back; otherwise it shows why closed lid is unavailable.
+- **FR-015** A helper refusal or stop ends the session as a safety stop or recovery conflict; the app never retries around it. Closed-lid sessions never exceed the helper's 4 h maximum and are not extended by fresh work.
 
 ### Key Entities
 Helper installation (version, pin, status) · Lease (owner, expiry, renewals) · Ownership record (owned flag, enabled-at, deadline) · Journal entry · Mode (Standard | Strict) · Guard settings.

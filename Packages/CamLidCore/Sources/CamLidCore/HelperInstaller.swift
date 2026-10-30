@@ -52,6 +52,9 @@ public struct HelperOperationResult: Equatable, Sendable {
     public let accepted: Bool
     public let reason: String
     public let detail: String?
+    public init(accepted: Bool, reason: String, detail: String?) {
+        self.accepted = accepted; self.reason = reason; self.detail = detail
+    }
     static func ok(_ reason: String, _ detail: String? = nil) -> Self { .init(accepted: true, reason: reason, detail: detail) }
     static func refused(_ reason: String, _ detail: String? = nil) -> Self { .init(accepted: false, reason: reason, detail: detail) }
 }

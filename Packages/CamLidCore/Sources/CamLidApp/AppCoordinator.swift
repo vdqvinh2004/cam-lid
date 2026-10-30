@@ -40,6 +40,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private let sensors = LiveSensorProvider()
     private let healthReader: (() -> HealthSnapshot)?
     private let loginItem = LoginItemController()
+    private let helper = HelperController()
     private let outcomeNotifications: OutcomeNotifications
     private let permissions: AppPermissions
     private var latestHealth: HealthSnapshot?
@@ -246,6 +247,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     func start() {
         startControlService()
         loginItem.refresh()
+        helper.observe { [weak self] in
+            guard let self else { return }
+            self.utilityUI?.send(.update(self.utilityUIState()))
+            self.refresh()
+        }
+        helper.refresh()
         outcomeNotifications.configure(categories: config.notificationCategories ?? [])
         outcomeNotifications.onPermissionChanged = { [weak self] in
             guard let self, self.utilityUI?.isRunning == true else { return }
@@ -437,6 +444,15 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     private func sessionStateForRecord() -> EffectiveState {
         session?.effectiveState ?? (config.mode == .off ? .off : .ready)
+    }
+
+    private var helperSummary: String {
+        switch helper.state {
+        case "installed": "helper installed"
+        case "notInstalled": "helper not installed"
+        case "unknown": "helper not checked"
+        default: "helper needs attention"
+        }
     }
 
     private func refresh() {
@@ -636,7 +652,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             updates: updates.snapshot, canCheckUpdates: updates.canCheck,
             loginState: loginItem.state, loginMessage: loginItem.message,
             notificationPermission: outcomeNotifications.permissionState,
-            accessibilityPermission: permissions.accessibility, permissionSettingsError: permissions.settingsError)
+            accessibilityPermission: permissions.accessibility, permissionSettingsError: permissions.settingsError,
+            helperState: helper.state, helperMessage: helper.message, helperBusy: helper.busy)
     }
     private func showUtility(_ surface: UtilitySurface) {
         if surface == .settings { loginItem.refresh(); Task { await outcomeNotifications.refresh() } }
@@ -680,10 +697,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             if settings {
                 permissions.refresh()
                 loginItem.refresh()
+                helper.refresh()
                 utilityUI?.send(.update(utilityUIState()))
                 Task { await outcomeNotifications.refresh() }
             }
         case .applyLoginPreference: loginItem.apply(config.launchAtLogin); refresh()
+        case .installHelper: helper.install()
+        case .uninstallHelper: helper.uninstall()
         case .readDiagnostics(let id):
             let recipient = utilityUI
             Task { @MainActor in recipient?.send(.diagnostics(id, await self.diagnosticSnapshot())) }
@@ -749,7 +769,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             temperatureText: health?.temperature.displayText,
             sensorDetailsText: health.map { sensorDetails($0, now: now) },
             cpuText: health?.cpuPercent.map { String(format: "%.1f%%", $0) },
-            freshnessText: "Read-only telemetry · backend unverified",
+            freshnessText: "Read-only telemetry · backend unverified · Closed lid: \(PowerMode.standard.title), \(helperSummary)",
             isStale: health == nil,
             graceRemainingSeconds: graceRemaining,
             capRemainingSeconds: capRemaining,
