@@ -70,6 +70,12 @@ The result is that the helper cannot be installed, and no closed-lid run has bee
 - **Historical 012/013 specs:** stay in the repository with a superseded notice; their links to local-only QA files are expected to be dead on GitHub.
 - **Strict arguments:** stay in the shipped helper (`--lid-specific-*`), selected only by an explicit argument. Because both modes share one label and Mach service, only one mode's daemon is installed at a time.
 
+## Amendment (2026-10-31): untested Macs
+Owner decision (spec 014 plan D8, option D): a Mac without a qualified support row may run Standard mode after the user
+explicitly accepts "untested configuration" for its exact model and macOS build; a qualified row needs no such step. The
+acceptance is a user preference, never a default, and is voided by a macOS update or another Mac. All other invariants
+above are unchanged. Known conflicting helpers (LidRun) are detected read-only and reported, never modified.
+
 ## Not decided here
 
 This ADR grants no authority to install anything, run root code, change power state or perform a physical lid episode. Each native action still needs the owner's explicit go-ahead at the time. Passing unit tests or a successful install does not pass any gate.

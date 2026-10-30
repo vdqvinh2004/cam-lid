@@ -2,15 +2,17 @@
 
 Native macOS menu bar app for AI-aware closed-lid work.
 
-**Status (2026-10-30): preview.** Telemetry is read-only, and a shipped build never asks the helper to hold the
-Mac awake: closed-lid actuation needs a support row qualified by an owner-approved physical trial, and none is
-qualified yet. M6 has not passed and M7 is blocked.
+**Status (2026-10-31): preview.** Telemetry is read-only. Closed lid may hold the Mac awake only when the user opted in,
+the helper is installed, and either the Mac matches a support row qualified by an attended trial (`QualifiedSupportRows`,
+empty in the repository) or the user accepted "untested configuration" for this exact model and macOS build in Settings ›
+Safety › Closed lid. The attended G2 trial passed on one Mac (Mac17,3, macOS 26A434; see
+[g2-trial.md](specs/014-persistent-helper/g2-trial.md)). Known conflict: the LidRun helper resets the sleep setting and
+interrupts closed lid. M6 has not passed and M7 is blocked.
 
 **Deployment model.** The closed-lid helper is a root LaunchDaemon installed once with administrator
 authentication (Standard mode), replacing the earlier exclusive-create / one-use admission. The earlier
 mechanism remains as a frozen, experimental Strict mode. Decision: [ADR 0001](docs/adr/0001-persistent-helper-and-strict-experimental-mode.md);
-work: [spec 014](specs/014-persistent-helper/spec.md) (22 of 25 tasks done; the rest need attended hardware
-trials). Install and status commands: `camlid helper install|uninstall|trust|status` (administrator rights needed
+work: [spec 014](specs/014-persistent-helper/spec.md) (see its tasks file for status). Install and status commands: `camlid helper install|uninstall|trust|status` (administrator rights needed
 for all but `status`), or Settings › Safety › Closed lid.
 
 Dashboard, Settings, Welcome, Activity and Updates run in an owned UI subprocess that exits when its last surface

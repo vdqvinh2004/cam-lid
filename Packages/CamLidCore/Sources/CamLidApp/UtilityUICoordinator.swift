@@ -86,6 +86,9 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         settingsEditor?.loginState = state.loginState; settingsEditor?.loginMessage = state.loginMessage
         settingsEditor?.helperState = state.helperState; settingsEditor?.helperMessage = state.helperMessage
         settingsEditor?.helperBusy = state.helperBusy
+        settingsEditor?.closedLidPermit = state.closedLidPermit
+        settingsEditor?.systemModel = state.systemModel; settingsEditor?.systemBuild = state.systemBuild
+        settingsEditor?.conflictingHelpers = state.conflictingHelpers
         settingsEditor?.notificationPermission = state.notificationPermission
         settingsEditor?.accessibilityPermission = state.accessibilityPermission
         settingsEditor?.permissionSettingsError = state.permissionSettingsError
@@ -190,6 +193,10 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         editor.helperState = state.helperState; editor.helperMessage = state.helperMessage; editor.helperBusy = state.helperBusy
         editor.onInstallHelper = { [weak self] in self?.send(.installHelper) }
         editor.onUninstallHelper = { [weak self] in self?.send(.uninstallHelper) }
+        editor.closedLidPermit = state.closedLidPermit
+        editor.systemModel = state.systemModel; editor.systemBuild = state.systemBuild
+        editor.conflictingHelpers = state.conflictingHelpers
+        editor.onSetUntestedAcknowledgement = { [weak self] in self?.send(.setUntestedAcknowledgement($0)) }
         editor.notificationPermission = state.notificationPermission
         editor.accessibilityPermission = state.accessibilityPermission
         editor.permissionSettingsError = state.permissionSettingsError

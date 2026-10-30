@@ -52,6 +52,11 @@ public final class SettingsEditor: ObservableObject {
     @Published public var helperState = "unknown"
     @Published public var helperMessage = "Helper status has not been checked."
     @Published public var helperBusy = false
+    @Published public var closedLidPermit = "notPermitted"
+    @Published public var systemModel = ""
+    @Published public var systemBuild = ""
+    @Published public var conflictingHelpers: [String] = []
+    public var onSetUntestedAcknowledgement: ((Bool) -> Void)?
     public var onInstallHelper: (() -> Void)?
     public var onUninstallHelper: (() -> Void)?
     @Published public var notificationPermission = "notDetermined"

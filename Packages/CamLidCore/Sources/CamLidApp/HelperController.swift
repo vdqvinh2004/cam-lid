@@ -8,13 +8,18 @@ import CamLidCore
     public private(set) var state = "unknown"
     public private(set) var message = "Helper status has not been checked."
     public private(set) var busy = false
+    /// Names of loaded apps known to reset the sleep setting (spec 014 FR-019).
+    public private(set) var conflicts: [String] = []
     private let readStatus: @Sendable () -> HelperInstallStatus
+    private let readConflicts: @Sendable () -> [String]
     private let runAdmin: @Sendable (String) -> HelperOperationResult
     private var onChange: () -> Void = {}
 
     public init(status: (@Sendable () -> HelperInstallStatus)? = nil,
-                runAdmin: (@Sendable (String) -> HelperOperationResult)? = nil) {
+                runAdmin: (@Sendable (String) -> HelperOperationResult)? = nil,
+                conflicts: (@Sendable () -> [String])? = nil) {
         readStatus = status ?? { HelperInstaller().status(appBundle: Bundle.main.bundleURL) }
+        readConflicts = conflicts ?? { ConflictingSleepHelpers.detect(isLoaded: HelperInstaller().isServiceLoaded) }
         self.runAdmin = runAdmin ?? { HelperController.runWithAdministratorPrompt(operation: $0) }
     }
 
@@ -23,9 +28,14 @@ import CamLidCore
     public func refresh() {
         guard !busy else { return }
         let read = readStatus
+        let readConflicts = readConflicts
         Task { [weak self] in
             let status = await Task.detached { read() }.value
-            await MainActor.run { self?.apply(status) }
+            let conflicts = await Task.detached { readConflicts() }.value
+            await MainActor.run {
+                self?.conflicts = conflicts
+                self?.apply(status)
+            }
         }
     }
 

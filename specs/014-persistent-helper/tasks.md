@@ -1,6 +1,6 @@
 # Tasks: Persistent Helper (Standard Mode)
 
-**Feature context:** `014-persistent-helper` · **Status:** 23/31 checked. Sources: [spec.md](spec.md), [plan.md](plan.md), [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md).
+**Feature context:** `014-persistent-helper` · **Status:** 29/31 checked. Sources: [spec.md](spec.md), [plan.md](plan.md), [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md).
 
 ## Phase 0 — Alignment
 - [x] T001 Mark admission / one-use sections of specs 012 and 013 as superseded by 014 (keep evidence). — done 2026-10-30 (notice added to 012/013 spec, plan, tasks).
@@ -41,12 +41,12 @@ Open owner decisions, recommended defaults used until changed: (1) closed lid st
 - [x] T705 Truthful UI: Protected only when the lease is held and read back (`leaseVerified`, `powerActuationAvailable`); show the specific reason when closed lid is unavailable (no opt-in, helper missing, battery, external display, helper refused). — Dashboard/menu bar `leaseVerified` and `powerActuationAvailable` come from the reconciler; banner explains why closed lid is unavailable (unqualified build, helper missing, refusal, lost contact, retrying); CLI status reports lease state instead of constants. Not checked visually.
 - [ ] T706 Attended physical qualification of Auto with a real agent: start, hold, completion grace, release, Sleep after verified restore; app kill and helper kill mid-session. Owner-approved, not started. Runbook: [g2-trial.md](g2-trial.md) trial 8.
 
-## Phase 8 — Untested Macs and conflicting apps (design in plan D8; owner chose option D on 2026-10-31)
-- [ ] T801 `ClosedLidPermit` pure decision (qualified row / acknowledged untested / not permitted) with table tests, including a model or build change voiding the acknowledgement.
-- [ ] T802 Store the acknowledgement as a preference with model, build and date; never set by default, migration or config patch.
-- [ ] T803 Coordinator uses the permit instead of `closedLidSupportRow`; readiness projects `untestedConfiguration`; `camlid status` reports the permit kind.
-- [ ] T804 Settings › Safety › Closed lid: "Allow on this untested Mac" with a confirmation naming model and build; keyboard and VoiceOver labels; Dashboard shows "Untested configuration".
-- [ ] T805 Read-only detection of known conflicting helpers (`com.lidrun.app.helper`) with a warning in Settings and Dashboard; `overrideChanged` stop explained as another app changing the sleep setting.
-- [ ] T806 Update README, ADR 0001 and `g2-trial.md` result rules for the two permission kinds.
+## Phase 8 — Untested Macs and conflicting apps (design in plan D8; owner chose option D on 2026-10-31; done)
+- [x] T801 `ClosedLidPermit` pure decision (qualified row / acknowledged untested / not permitted) with table tests, including a model or build change voiding the acknowledgement. — `ClosedLidPermit.decide` in `SupportRows.swift`; 6 table tests (qualified, acknowledged, voided by model/build change, update on a qualified Mac).
+- [x] T802 Store the acknowledgement as a preference with model, build and date; never set by default, migration or config patch. — Preference `CamLidUntestedClosedLidAcknowledgement` (model, build, date) written only by `setUntestedAcknowledgement`; not part of `Configuration`, so config patches and migration cannot set it.
+- [x] T803 Coordinator uses the permit instead of `closedLidSupportRow`; readiness projects `untestedConfiguration`; `camlid status` reports the permit kind. — Coordinator uses `closedLidPermit()`; readiness gets the row id only when qualified (otherwise `untestedConfiguration`); `camlid status` adds `closedLidPermit` and `conflictingHelpers`; withdrawing the acceptance mid-session releases the hold. 3 integration tests.
+- [x] T804 Settings › Safety › Closed lid: "Allow on this untested Mac" with a confirmation naming model and build; keyboard and VoiceOver labels; Dashboard shows "Untested configuration". — Settings: This Mac, Testing (Tested / Untested — allowed / Not tested), "Allow on this untested Mac" with a confirmation alert naming model and build; Dashboard banner "Untested configuration: …". Checked by offscreen render only; keyboard and VoiceOver not checked in the running app.
+- [x] T805 Read-only detection of known conflicting helpers (`com.lidrun.app.helper`) with a warning in Settings and Dashboard; `overrideChanged` stop explained as another app changing the sleep setting. — `ConflictingSleepHelpers` (LidRun label) via `launchctl print`, refreshed with helper status and at session start; Settings warning and Dashboard banner; `overrideChanged` explained. A registered but idle LidRun helper also warns.
+- [x] T806 Update README, ADR 0001 and `g2-trial.md` result rules for the two permission kinds. — README status, ADR 0001 amendment, g2-trial result rules.
 
 - [ ] T601 App/CLI integration sign-off after T501 and T706; replaces the blocked 013 T502 path.

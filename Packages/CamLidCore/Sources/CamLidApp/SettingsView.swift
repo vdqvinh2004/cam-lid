@@ -550,6 +550,13 @@ private struct SettingsLifetimePane: View {
 
 private struct SettingsClosedLidSection: View {
     @ObservedObject var editor: SettingsEditor
+    @State private var confirmingUntested = false
+
+    private var systemText: String { "\(editor.systemModel), macOS \(editor.systemBuild)" }
+    private var testedText: String {
+        if editor.closedLidPermit.hasPrefix("qualified:") { return "Tested" }
+        return editor.closedLidPermit == "untestedAcknowledged" ? "Untested — allowed" : "Not tested"
+    }
 
     private var installed: Bool { ["installed", "installedNotLoaded", "needsReauthorization", "helperIdentityMismatch", "partial"].contains(editor.helperState) }
 
@@ -569,6 +576,29 @@ private struct SettingsClosedLidSection: View {
             Text(PowerMode.strict.disclosure)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            LabeledContent("This Mac") {
+                Text(systemText)
+            }
+            .accessibilityElement(children: .combine)
+            LabeledContent("Testing") {
+                Text(testedText)
+            }
+            .accessibilityElement(children: .combine)
+            if !editor.closedLidPermit.hasPrefix("qualified:") {
+                Toggle("Allow on this untested Mac", isOn: Binding(
+                    get: { editor.closedLidPermit == "untestedAcknowledged" },
+                    set: { allow in
+                        if allow { confirmingUntested = true } else { editor.onSetUntestedAcknowledgement?(false) }
+                    }))
+                    .help("Closed lid has not been tested on this model and macOS build")
+                    .accessibilityIdentifier("camlid.settings.closedLid.allowUntested")
+            }
+            ForEach(editor.conflictingHelpers, id: \.self) { app in
+                Label("\(app) resets the sleep setting and will interrupt closed lid. Quit \(app) or remove its helper.",
+                      systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             LabeledContent("Helper") {
                 Text(editor.helperBusy ? "Working…" : helperLabel)
             }
@@ -591,6 +621,12 @@ private struct SettingsClosedLidSection: View {
             Text("Closed lid")
         } footer: {
             Text("Installing the helper doesn’t start a session or change sleep settings by itself.")
+        }
+        .alert("Allow closed lid on an untested Mac?", isPresented: $confirmingUntested) {
+            Button("Allow") { editor.onSetUntestedAcknowledgement?(true) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("CamLid hasn’t been tested on \(systemText). If something fails, this Mac may stay awake with the lid closed until the helper or its recovery job restores the sleep setting. This applies to this Mac and macOS build only; you can turn it off at any time.")
         }
     }
 

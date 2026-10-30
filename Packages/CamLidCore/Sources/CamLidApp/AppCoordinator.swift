@@ -9,7 +9,7 @@ import Darwin
 /// PolicyEngine/SafetyPolicy evaluation on a 1s tick.
 ///
 /// HONESTY BOUNDARY: host power is actuated only through the closed-lid helper, and only when a qualified
-/// support row is supplied (`closedLidSupportRow`, nil in every shipped build today), the user opted in and
+/// support row matches (`QualifiedSupportRows`, empty in shipped code) or the user accepted this untested Mac, the user opted in and
 /// the helper is installed. Otherwise there is no backend, telemetry is read-only, every surface carries the
 /// preview banner and closed-lid arming is refused.
 /// Start creates a *preview* session so grace/safety/cap transitions are
@@ -48,6 +48,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     /// Support row that qualifies closed-lid actuation on this Mac and OS build, or nil. `QualifiedSupportRows`
     /// is empty today, so the helper is never asked to hold power in a shipped build.
     private let closedLidSupportRow: () -> String?
+    private let systemIdentity: () -> (model: String?, osBuild: String?)
+    private static let untestedAcknowledgementKey = "CamLidUntestedClosedLidAcknowledgement"
     private let outcomeNotifications: OutcomeNotifications
     private let permissions: AppPermissions
     private var latestHealth: HealthSnapshot?
@@ -139,10 +141,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
          healthReader: (() -> HealthSnapshot)? = nil,
          helperController: HelperController? = nil,
          holdTransportFactory: (() -> any PowerHoldTransport)? = nil,
-         closedLidSupportRow: (() -> String?)? = nil) {
+         closedLidSupportRow: (() -> String?)? = nil,
+         systemIdentity: (() -> (model: String?, osBuild: String?))? = nil) {
         self.healthReader = healthReader
         self.helper = helperController ?? HelperController()
         self.makeHoldTransport = holdTransportFactory ?? { XPCPowerHoldTransport() }
+        self.systemIdentity = systemIdentity ?? { QualifiedSupportRows.currentSystem() }
         self.closedLidSupportRow = closedLidSupportRow ?? {
             let system = QualifiedSupportRows.currentSystem()
             return QualifiedSupportRows.matching(model: system.model, osBuild: system.osBuild)
@@ -322,7 +326,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             refusalNotice = "Choose a mode before starting."
             refresh(); toggleDashboard(show: true); return
         }
-        if config.closedLidOptIn, closedLidSupportRow() == nil {
+        if config.closedLidOptIn, !closedLidPermit().allowsActuation {
             refusalNotice = "Closed-lid preview refused: power control is unavailable."
             record(category: .configuration, newState: sessionStateForRecord(), reasons: ["backendUnverified"])
             refresh()
@@ -341,6 +345,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             record(category: .configuration, newState: sessionStateForRecord(), reasons: [reason])
             refresh(); toggleDashboard(show: true); return
         }
+        helper.refresh()
         let mode = config.mode
         let now = uptime()
         sessionBatteryDeadline = health.powerSource == .battery
@@ -465,8 +470,31 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         session?.effectiveState ?? (config.mode == .off ? .off : .ready)
     }
 
+    func closedLidPermit() -> ClosedLidPermit {
+        if let row = closedLidSupportRow() { return .qualified(rowID: row) }
+        let system = systemIdentity()
+        let stored = preferences.data(forKey: Self.untestedAcknowledgementKey)
+            .flatMap { try? JSONDecoder().decode(UntestedAcknowledgement.self, from: $0) }
+        return ClosedLidPermit.decide(model: system.model, osBuild: system.osBuild, rows: [], acknowledgement: stored)
+    }
+
+    /// Records or withdraws the user's acceptance of closed lid on this untested model and macOS build (FR-017).
+    /// Only reachable from the confirmed Settings action.
+    func setUntestedAcknowledgement(_ accepted: Bool) {
+        let system = systemIdentity()
+        if accepted, let model = system.model, let osBuild = system.osBuild,
+           let data = try? JSONEncoder().encode(UntestedAcknowledgement(model: model, osBuild: osBuild, acceptedAt: Date())) {
+            preferences.set(data, forKey: Self.untestedAcknowledgementKey)
+        } else {
+            preferences.removeObject(forKey: Self.untestedAcknowledgementKey)
+        }
+        record(category: .configuration, newState: sessionStateForRecord(),
+               reasons: [accepted ? "untestedConfigurationAccepted" : "untestedConfigurationWithdrawn"])
+        refresh()
+    }
+
     private var holdDesired: Bool {
-        guard closedLidSupportRow() != nil, config.closedLidOptIn, helper.state == "installed",
+        guard closedLidPermit().allowsActuation, config.closedLidOptIn, helper.state == "installed",
               let state = session?.effectiveState else { return false }
         return state == .protected || state == .completionGrace
     }
@@ -501,8 +529,16 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     private func closedLidMessage() -> String? {
         guard config.closedLidOptIn, let session else { return nil }
-        if closedLidSupportRow() == nil { return "Closed lid is unavailable: this Mac and build haven’t been qualified." }
+        let permit = closedLidPermit()
+        let system = systemIdentity()
+        let identity = "\(system.model ?? "unknown Mac"), macOS \(system.osBuild ?? "unknown build")"
+        if !permit.allowsActuation {
+            return "Closed lid is off on this untested Mac (\(identity)). To allow it, see Settings › Safety › Closed lid."
+        }
         if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Safety." }
+        if let app = helper.conflicts.first {
+            return "\(app) resets the sleep setting, so closed lid will be interrupted. Quit \(app) or remove its helper."
+        }
         // A stopped session keeps the helper's reason; the reconciler itself resets once the session stops.
         if let stop = session.stopReasons.first(where: { $0.hasPrefix("helper") }) {
             switch stop {
@@ -511,6 +547,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             default: return Self.helperReasonText(String(stop.dropFirst("helper:".count)))
             }
         }
+        if permit == .untestedAcknowledged { return "Untested configuration: \(identity)." }
         switch holdReconciler.status {
         case .refused(let reason): return Self.helperReasonText(reason)
         case .lost: return "Closed lid lost contact with the helper; sleep will be restored automatically."
@@ -523,6 +560,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         switch reason {
         case "safetyRefused": "Closed lid declined for safety: it needs AC power, at least 20% battery, normal temperature and no external display."
         case "preexistingOverride", "foreignGlobalSleepDisabled": "Another app already disables sleep, so CamLid left it alone."
+        case "overrideChanged": "Another app changed the sleep setting (for example LidRun), so closed lid stopped."
         case "recoveryRequired": "The helper needs recovery before it can hold the Mac awake."
         default: "The helper ended closed lid (\(reason))."
         }
@@ -635,7 +673,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     private func protectionReadiness() -> ProtectionReadiness {
         let now = uptime()
-        let row = closedLidSupportRow()
+        let permit = closedLidPermit()
+        let row: String? = if case .qualified(let id) = permit { id } else { nil }
         let installed = helper.state == "installed"
         let leaseVerified = holdReconciler.leaseVerified(now: now)
         let ownership: ProtectionOwnershipEvidence = switch (holdReconciler.restoration, leaseVerified, installed) {
@@ -749,7 +788,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             loginState: loginItem.state, loginMessage: loginItem.message,
             notificationPermission: outcomeNotifications.permissionState,
             accessibilityPermission: permissions.accessibility, permissionSettingsError: permissions.settingsError,
-            helperState: helper.state, helperMessage: helper.message, helperBusy: helper.busy)
+            helperState: helper.state, helperMessage: helper.message, helperBusy: helper.busy,
+            closedLidPermit: closedLidPermit().statusCode,
+            systemModel: systemIdentity().model ?? "unknown", systemBuild: systemIdentity().osBuild ?? "unknown",
+            conflictingHelpers: helper.conflicts)
     }
     private func showUtility(_ surface: UtilitySurface) {
         if surface == .settings { loginItem.refresh(); Task { await outcomeNotifications.refresh() } }
@@ -799,6 +841,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             }
         case .applyLoginPreference: loginItem.apply(config.launchAtLogin); refresh()
         case .installHelper: helper.install()
+        case .setUntestedAcknowledgement(let accepted): setUntestedAcknowledgement(accepted)
         case .uninstallHelper: helper.uninstall()
         case .readDiagnostics(let id):
             let recipient = utilityUI
@@ -1246,6 +1289,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 "leaseVerified": holdReconciler.leaseVerified(now: uptime()),
                 "backendVerified": holdReconciler.leaseVerified(now: uptime()),
                 "configuredMode": config.mode.rawValue, "activeSessionMode": session?.requestedMode.rawValue as Any? ?? NSNull(),
+                "closedLidPermit": closedLidPermit().statusCode,
+                "conflictingHelpers": helper.conflicts,
                 "restoration": holdReconciler.status == .inactive && holdReconciler.restoration == .verified
                     ? "noPowerResourcesOwned" : "\(holdReconciler.restoration)",
                 "mode": config.mode.rawValue, "effectiveState": "unavailable", "policyState": sessionStateForRecord().rawValue,

@@ -90,7 +90,7 @@ public struct HelperInstaller: Sendable {
         guard let pins = readPins() else { return .partial(missing: ["validPins"]) }
         guard let helperHash = cdHash(of: paths.helperBinary), helperHash == pins.helperCDHash else { return .helperIdentityMismatch }
         guard let appHash = cdHash(of: appBundle), appHash == pins.appCDHash else { return .needsReauthorization }
-        return .installed(loaded: isLoaded(HelperInstallPaths.helperLabel))
+        return .installed(loaded: isServiceLoaded(HelperInstallPaths.helperLabel))
     }
 
     // MARK: Install
@@ -131,7 +131,7 @@ public struct HelperInstaller: Sendable {
 
         // A service already loaded under one of our labels is not ours (this install has no files yet):
         // never replace it, and never boot it out.
-        for label in [HelperInstallPaths.helperLabel, HelperInstallPaths.recoveryLabel] where isLoaded(label) {
+        for label in [HelperInstallPaths.helperLabel, HelperInstallPaths.recoveryLabel] where isServiceLoaded(label) {
             return .refused("labelInUse", "launchd already runs \(label) from an earlier install. Inspect it with `launchctl print system/\(label)` and remove it yourself if you intend to.")
         }
 
@@ -229,9 +229,9 @@ public struct HelperInstaller: Sendable {
     // MARK: Helpers
 
     /// Whether launchd currently has a service under the helper label, whoever installed it.
-    public func serviceLoaded() -> Bool { isLoaded(HelperInstallPaths.helperLabel) }
+    public func serviceLoaded() -> Bool { isServiceLoaded(HelperInstallPaths.helperLabel) }
 
-    private func isLoaded(_ label: String) -> Bool {
+    public func isServiceLoaded(_ label: String) -> Bool {
         runner.run("/bin/launchctl", ["print", "system/\(label)"]).status == 0
     }
 

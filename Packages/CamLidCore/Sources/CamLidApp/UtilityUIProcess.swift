@@ -24,6 +24,10 @@ struct UtilityUIState: Codable, Sendable {
     var helperState = "unknown"
     var helperMessage = "Helper status has not been checked."
     var helperBusy = false
+    var closedLidPermit = "notPermitted"
+    var systemModel = ""
+    var systemBuild = ""
+    var conflictingHelpers: [String] = []
 }
 enum UtilityUICommand: Codable, Sendable {
     case show(UtilitySurface, UtilityUIState)
@@ -59,6 +63,7 @@ case settings(SettingsSection)
     case checkUpdates
     case authorizeNotifications, applyLoginPreference
     case installHelper, uninstallHelper
+    case setUntestedAcknowledgement(Bool)
     case authorizeAccessibility, refreshPermissions
     case openPermissionSettings(AppPermission)
 }

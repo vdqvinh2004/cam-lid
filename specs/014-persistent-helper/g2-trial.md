@@ -34,7 +34,9 @@ Stop and restore (`sudo pmset -a disablesleep 0`) if `SleepDisabled` stays 1 for
 feels hot, the battery drops below 30%, or any trial behaves differently from the table. Report the exact output.
 
 ## Result
-All nine rows pass on the exact model and OS build, evidence kept locally, owner approves in writing: add the row
+A row marks a Mac as *tested*. Without one, users can still allow closed lid after accepting "untested configuration"
+for their exact model and build (spec 014 FR-016/FR-017), so adding a row changes the label and removes that step; it is
+not the only way to run. All nine rows pass on the exact model and OS build, evidence kept locally, owner approves in writing: add the row
 (`id`, `model`, `osBuild`) in a commit of its own. Any failure leaves the table empty.
 
 ## Results on Mac17,3 / 26A434 (owner's Mac)
