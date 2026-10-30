@@ -48,6 +48,7 @@ xcuserdata/
 docs/qa/
 docs/planning/
 docs/research/
+docs/design/
 /Tests/
 
 # Python packaging QA
