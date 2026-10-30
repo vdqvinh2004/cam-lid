@@ -11,9 +11,8 @@ these CLIs directly.
 ## Decision
 1. CamLid stays a pure outside observer. It never installs hooks, plugins or wrappers, never changes an agent's
    configuration or environment, and never takes part in an agent's process.
-2. For directly run agents, working or idle is inferred from what the agent already produces: process lifetime, CPU
-   activity of the agent and its descendants, and modification times in the agent's own session directory. Contents of
-   those files are never read. This evidence is a new kind, `activity`, capped at `inferred` confidence and labelled
+2. For directly run agents, working or idle is inferred from what the agent already produces: process lifetime and CPU
+   activity of the agent and its descendants (session-file times were dropped after calibration). This evidence is a new kind, `activity`, capped at `inferred` confidence and labelled
    as an estimate; it may arm Auto.
 3. Claude Code is supported again (observation only).
 

@@ -1,17 +1,15 @@
 import Foundation
 
-/// One outside observation of a directly run agent process (spec 015). Nothing here reads file contents.
+/// One outside observation of a directly run agent process (spec 015). Process metadata only.
 public struct AgentActivitySample: Sendable, Equatable {
     /// Continuous monotonic seconds.
     public let at: Double
     public let alive: Bool
     /// Cumulative CPU seconds of the agent process and its descendants; nil when unreadable.
     public let cpuSeconds: Double?
-    /// Seconds since the newest write in the agent's own session directory; nil when unavailable.
-    public let sessionFileAgeSeconds: Double?
 
-    public init(at: Double, alive: Bool, cpuSeconds: Double?, sessionFileAgeSeconds: Double?) {
-        self.at = at; self.alive = alive; self.cpuSeconds = cpuSeconds; self.sessionFileAgeSeconds = sessionFileAgeSeconds
+    public init(at: Double, alive: Bool, cpuSeconds: Double?) {
+        self.at = at; self.alive = alive; self.cpuSeconds = cpuSeconds
     }
 }
 
@@ -24,9 +22,9 @@ public struct AgentActivityMemory: Sendable, Equatable {
 }
 
 /// Working / idle / unknown from outside signals. A signal that cannot be read never counts as quiet.
+/// Constants come from the spec 015 calibration (see specs/015-agent-activity-observer/calibration.md): on Claude
+/// Code, 5 s averages were 0.006–0.015 of a core while waiting for input and 0.05–0.13 while answering.
 public enum AgentActivityClassifier {
-    // shortcut: provisional constants until spec 015 T401 calibrates them on real sessions; replace with measured values.
-    public static let activityWindowSeconds = 10.0
     public static let quietSeconds = 45.0
     /// CPU-time growth per wall second (fraction of one core) that counts as activity.
     public static let busyCPUFraction = 0.03
@@ -37,31 +35,22 @@ public enum AgentActivityClassifier {
         guard sample.at.isFinite else { return (.unknown, "unreadable") }
         guard sample.alive else { return (.completed, "exited") }
         if let lastAt = memory.lastAt, sample.at < lastAt { memory = AgentActivityMemory() }   // clock went back
-
-        var cpuActive: Bool?
-        if let cpu = sample.cpuSeconds, cpu.isFinite, cpu >= 0 {
-            if let lastCPU = memory.lastCPU, let lastAt = memory.lastAt, sample.at > lastAt {
-                // CPU time can only grow for one process; a drop means pid reuse, so start over.
-                cpuActive = cpu >= lastCPU ? (cpu - lastCPU) / (sample.at - lastAt) >= busyCPUFraction : nil
-            }
-            memory.lastCPU = cpu
-        } else {
-            memory.lastCPU = nil
+        guard let cpu = sample.cpuSeconds, cpu.isFinite, cpu >= 0 else {
+            memory.lastCPU = nil; memory.lastAt = sample.at
+            return (.unknown, "unreadable")
         }
+        var busy: Bool?
+        if let lastCPU = memory.lastCPU, let lastAt = memory.lastAt, sample.at > lastAt, cpu >= lastCPU {
+            busy = (cpu - lastCPU) / (sample.at - lastAt) >= busyCPUFraction
+        }
+        // A drop (a child exited, or pid reuse) has no usable delta; it only restarts the baseline.
+        memory.lastCPU = cpu
         memory.lastAt = sample.at
-        let fileActive = sample.sessionFileAgeSeconds.map { $0 >= 0 && $0 <= activityWindowSeconds }
-
-        if cpuActive == true || fileActive == true {
+        if busy == true {
             memory.lastActiveAt = sample.at
-            return (.working, cpuActive == true ? "cpu" : "sessionFile")
+            return (.working, "cpu")
         }
-        if let lastActive = memory.lastActiveAt, sample.at - lastActive < quietSeconds {
-            return (.working, "recent")
-        }
-        // A readable CPU signal without a baseline yet is not evidence of quiet.
-        if sample.cpuSeconds != nil && cpuActive == nil { return (.unknown, "warmingUp") }
-        // Quiet needs at least one signal that was actually read as quiet.
-        guard cpuActive == false || fileActive == false else { return (.unknown, "unreadable") }
-        return (.idle, "quiet")
+        if let lastActive = memory.lastActiveAt, sample.at - lastActive < quietSeconds { return (.working, "recent") }
+        return busy == nil ? (.unknown, "warmingUp") : (.idle, "quiet")
     }
 }

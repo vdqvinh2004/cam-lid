@@ -17,9 +17,8 @@ Infer working or idle from signals the agent produces anyway, observed read-only
    lives; exit ends the work.
 2. **CPU activity of the agent process and its descendants.** Interactive agents redraw a progress spinner and run
    tools while working, and sit near 0% CPU while waiting for the user. Measured as CPU-time growth per window.
-3. **Session-file activity.** Each agent writes its own session files while working (Claude Code
-   `~/.claude/projects`, Codex `~/.codex/sessions`, OpenCode `~/.local/share/opencode`). CamLid reads only the newest
-   modification time in that directory, never file contents or names into logs.
+3. ~~Session-file activity~~ — **dropped after calibration** ([calibration.md](calibration.md)): the directories are
+   shared by every session of an agent, and the calibration sessions wrote nothing there.
 4. **Tool subprocesses.** Shells, compilers and git started by the agent count through the CPU of the agent's
    process subtree. A plain count of children is not used: agents keep long-lived children (MCP servers) that would
    make them look busy forever.
@@ -58,8 +57,8 @@ neutral mark (the earlier bundled artwork was removed).
 
 ## Requirements
 - **FR-001** No hooks, plugins, wrappers, environment changes or configuration edits for any agent.
-- **FR-002** Read only: process table (pid, parent, start time, executable name, CPU time) and modification times
-  under each agent's own session directory. Never file contents; never prompts, transcripts or paths in history.
+- **FR-002** Read only: process table (pid, parent, start time, executable name, executable path for version-named
+  binaries, CPU time). Never file contents; never prompts, transcripts or paths in history.
 - **FR-003** New evidence kind `activity`, confidence at most `inferred`, ranked below `lifecycle` and above `process`;
   it may arm Auto.
 - **FR-004** Thresholds (activity window, quiet period, CPU threshold) are constants calibrated on real sessions per

@@ -15,14 +15,15 @@ struct AgentActivityIntegrationTests {
         var patch = ConfigPatch(); patch.mode = .auto; patch.adapterEnrollment = ["codex"]
         guard case .saved = app.applySettingsPatch(patch, expectedRevision: 1) else { Issue.record("not saved"); return }
         let t = ContinuousTime.now
-        app.receiveActivity([codex(cpu: 10)], sessionAges: ["codex": 2], at: t)          // writing its session file
+        app.receiveActivity([codex(cpu: 10)], at: t - 5)
+        app.receiveActivity([codex(cpu: 10.5)], at: t)                                   // 0.1 core: answering
         await app.startPreviewSession()
         app.changeMode(.auto)
         #expect(app.dashboardData().state == .protected)
         #expect(app.dashboardData().agents.first { $0.provider == "codex" }?.compactDetail.hasSuffix("(estimated)") == true)
 
-        app.receiveActivity([codex(cpu: 10)], sessionAges: ["codex": 999], at: t + 5)     // establishes the CPU baseline
-        app.receiveActivity([codex(cpu: 10)], sessionAges: ["codex": 999], at: t + 5 + AgentActivityClassifier.quietSeconds)
+        app.receiveActivity([codex(cpu: 10.5)], at: t + 5)
+        app.receiveActivity([codex(cpu: 10.5)], at: t + AgentActivityClassifier.quietSeconds)
         app.receiveProcessSnapshot([], complete: true, observedAt: ContinuousTime.now)   // a fresh, complete process scan
         app.changeMode(.auto)
         #expect(app.dashboardData().state == .completionGrace)                          // idle → "Sleep when done", not "uncertain"
@@ -32,11 +33,11 @@ struct AgentActivityIntegrationTests {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
         let t = ContinuousTime.now
-        app.receiveActivity([codex(cpu: nil)], sessionAges: [:], at: t)
+        app.receiveActivity([codex(cpu: nil)], at: t)
         let unknown = try #require(app.sleepRelevantTasksForTesting(provider: "codex").first)
         #expect(unknown.state == .unknown && unknown.evidenceKind == .activity && unknown.confidence == .inferred)
         #expect(unknown.unknownUntilMonotonic == t + AgentActivityClassifier.unknownHoldSeconds)
-        app.receiveActivity([], sessionAges: [:], at: t + 5)
+        app.receiveActivity([], at: t + 5)
         #expect(app.sleepRelevantTasksForTesting(provider: "codex").isEmpty)
     }
 

@@ -100,7 +100,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     /// Spec 015: outside-observed working/idle tasks for directly run agents, by provider.
     private var activityTasks: [String: [AgentTask]] = [:]
     private var activityMemory: [String: AgentActivityMemory] = [:]
-    private let sessionProbe = SessionActivityProbe()
+    private let sampleActivityNow: @Sendable () -> (processes: [AgentActivityProcess], at: Double)
     private var installationSnapshot: AgentInstallationSnapshot?
     private var lifetimeTracker = LifetimeRuleTracker()
     private var lifetimeProcessSnapshot: LifetimeProcessSnapshot?
@@ -146,7 +146,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
          helperController: HelperController? = nil,
          holdTransportFactory: (() -> any PowerHoldTransport)? = nil,
          closedLidSupportRow: (() -> String?)? = nil,
-         systemIdentity: (() -> (model: String?, osBuild: String?))? = nil) {
+         systemIdentity: (() -> (model: String?, osBuild: String?))? = nil,
+         activitySampler: (@Sendable () -> (processes: [AgentActivityProcess], at: Double))? = nil) {
+        self.sampleActivityNow = activitySampler ?? { AppCoordinator.sampleActivity(NativeProcessList()) }
         self.healthReader = healthReader
         self.helper = helperController ?? HelperController()
         self.makeHoldTransport = holdTransportFactory ?? { XPCPowerHoldTransport() }
@@ -1125,7 +1127,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let started = uptime()
         lastProcessPoll = started
         let scanLifetimeRules = hasLifetimeRules && session?.requestedMode == .auto
-        let probe = sessionProbe
+        let sampleActivity = sampleActivityNow
         Task { [weak self] in
             let (candidates, complete, installation, lifetime, activity) = await Task.detached(priority: .utility) {
                 let installation = AgentCLIInstallation.snapshot()
@@ -1134,14 +1136,14 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 let candidates = ProcessDiscovery(provider: InMemoryProcessList(records: snapshot.records),
                     patterns: AgentProviderCatalog.processPatterns, maxFallbackEntries: 20).discover()
                 let lifetime = scanLifetimeRules ? processList.lifetimeSnapshot() : nil
-                return (candidates, snapshot.complete, installation, lifetime, AppCoordinator.sampleActivity(processList, probe: probe))
+                return (candidates, snapshot.complete, installation, lifetime, sampleActivity())
             }.value
             guard let self else { return }
             self.processPolling = false
             self.installationSnapshot = installation
             self.lifetimeProcessSnapshot = lifetime
             self.receiveProcessSnapshot(candidates, complete: complete, observedAt: started)
-            self.receiveActivity(activity.processes, sessionAges: activity.ages, at: activity.at)
+            self.receiveActivity(activity.processes, at: activity.at)
             // Presence never fabricates working/idle/completion or an Auto hold.
         }
     }
@@ -1205,31 +1207,28 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
     }
 
-    /// Providers observed for activity: those with a known session directory (spec 015).
-    nonisolated static func sampleActivity(_ list: NativeProcessList, probe: SessionActivityProbe)
-        -> (processes: [AgentActivityProcess], ages: [String: Double], at: Double) {
-        let observed = Set(SessionActivityProbe.directories.keys)
+    /// Agents observed for activity: directly run terminal agents (spec 015).
+    nonisolated static let activityProviders: Set<String> = ["claude", "codex", "opencode"]
+
+    nonisolated static func sampleActivity(_ list: NativeProcessList) -> (processes: [AgentActivityProcess], at: Double) {
+        let observed = activityProviders
         var byName: [String: String] = [:]
         for info in AgentProviderCatalog.providers where observed.contains(info.id) {
             for name in info.processNames { byName[name] = info.id }
         }
         let orcaNames = Set(AgentProviderCatalog.info(for: "orca")?.processNames ?? [])
-        let processes = list.activityProcesses(providerByName: byName, orcaNames: orcaNames)
-        var ages: [String: Double] = [:]
-        for provider in Set(processes.map(\.provider)) { ages[provider] = probe.ageSeconds(provider: provider) }
-        return (processes, ages, ContinuousTime.now)
+        return (list.activityProcesses(providerByName: byName, orcaNames: orcaNames), ContinuousTime.now)
     }
 
     /// Classifies each observed agent process and keeps the result as `activity` tasks. A process that is gone has
     /// finished; its task is dropped, so the policy sees no holding work and runs its normal completion grace.
-    func receiveActivity(_ processes: [AgentActivityProcess], sessionAges: [String: Double], at: Double) {
+    func receiveActivity(_ processes: [AgentActivityProcess], at: Double) {
         var tasks: [String: [AgentTask]] = [:]
         var memory: [String: AgentActivityMemory] = [:]
         for process in processes {
             let key = "activity-\(process.provider)-\(process.pid)-\(String(process.startTime.bitPattern, radix: 16))"
             var state = activityMemory[key] ?? AgentActivityMemory()
-            let result = AgentActivityClassifier.step(&state, AgentActivitySample(at: at, alive: true,
-                cpuSeconds: process.cpuSeconds, sessionFileAgeSeconds: sessionAges[process.provider]))
+            let result = AgentActivityClassifier.step(&state, AgentActivitySample(at: at, alive: true, cpuSeconds: process.cpuSeconds))
             memory[key] = state
             guard let task = try? AgentTask(id: key, sessionID: "activity-\(process.provider)", runID: key,
                 state: result.state, evidenceKind: .activity, confidence: .inferred,

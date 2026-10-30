@@ -16,7 +16,9 @@ struct QARefinementSupport {
             settingsWriter: writer, outcomeNotifications: outcomeNotifications, permissions: permissions, healthReader: healthReader,
             // Never the real Mac identity or the real installed helper: a qualified row now matches the owner's Mac.
             helperController: HelperController(status: { .notInstalled }, keepAwakeApps: { [] }),
-            holdTransportFactory: { NeverTransport() }, closedLidSupportRow: { nil }, systemIdentity: { (nil, nil) })
+            holdTransportFactory: { NeverTransport() }, closedLidSupportRow: { nil }, systemIdentity: { (nil, nil) },
+            // Never the agents actually running on this Mac (this suite itself runs under one).
+            activitySampler: { ([], ContinuousTime.now) })
     }
     func cleanup() { UserDefaults().removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
 }
