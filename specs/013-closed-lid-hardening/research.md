@@ -13,7 +13,7 @@ helper command, no power action, no install and no app integration.
 - `LidSpecificMechanism.swift`, `LeasePowerMechanism.swift`, `PowerLeaseService.swift`,
   `NativeHelperEnvironment.swift`.
 - `BestEffortProductModel.swift` and its fake tests.
-- LidRun REA report in `cam-lid-v2` (external reference, not vendored
+- LidRun REA report in `<local>/cam-lid-v2` (external reference, not vendored
   and not copied into CamLid).
 - R0 attempts #1–#3 and the T001 clear-path audit.
 

@@ -73,6 +73,7 @@ import CamLidCore
         case "cancelled": return "Cancelled."
         case "helperSourceMissing": return "This build of CamLid does not include the helper."
         case "signatureUnreadable": return "CamLid and its helper must be signed before the helper can be installed."
+        case "foreignPinsPresent": return "An earlier CamLid identity file exists. In Terminal run: sudo camlid helper install --replace-pins"
         case "alreadyInstalledDifferently": return "A different helper is already installed. Remove it first."
         case "restoreUnresolved": return "The sleep setting could not be restored, so the helper was kept. Check `pmset -g`."
         default: return "Helper \(result.reason) failed."
@@ -132,5 +133,25 @@ public enum HelperAdminCommand {
         }
         print("helper-admin: \(result.reason)")
         return result.accepted ? 0 : 1
+    }
+}
+
+extension HelperAdminCommand {
+    /// Entry for `CamLid --helper-inspect`: one read-only XPC round trip proving the helper is reachable and
+    /// that its pinned identity accepts this app. Prints the helper's state; never starts a session.
+    public static func runInspectIfRequested(arguments: [String]) -> Int32? {
+        guard arguments.contains("--helper-inspect") else { return nil }
+        let transport = XPCPowerHoldTransport()
+        let semaphore = DispatchSemaphore(value: 0)
+        nonisolated(unsafe) var reply: HoldReply?
+        Task.detached {
+            reply = await transport.inspect()
+            semaphore.signal()
+        }
+        semaphore.wait()
+        transport.close()
+        guard let reply else { print("helper-inspect: unreachable"); return 1 }
+        print("helper-inspect: accepted=\(reply.accepted) state=\(reply.state) reason=\(reply.reason)")
+        return reply.accepted ? 0 : 1
     }
 }

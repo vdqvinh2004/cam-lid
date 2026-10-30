@@ -14,7 +14,7 @@ blocked. No app integration or shipping-gate change was performed. This is not a
 **Inputs:** [012 spec](../012-closed-lid-best-effort/spec.md),
 [012 plan](../012-closed-lid-best-effort/plan.md),
 [closed-lid product path](../../docs/planning/closed-lid-product-path-2026-10-19.md),
-LidRun REA report (external path `cam-lid-v2/reports/`; not copied into
+LidRun REA report (external path `<local>/cam-lid-v2/reports/`; not copied into
 CamLid).
 
 ## Reproducibility follow-up — 2026-10-21

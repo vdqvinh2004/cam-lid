@@ -96,7 +96,10 @@ public struct HelperInstaller: Sendable {
 
     // MARK: Install
 
-    public func install(appBundle: URL = defaultAppBundle, helperSource: URL? = nil) -> HelperOperationResult {
+    /// `replacePins` lets the install move an existing `identity.json` from another CamLid install aside
+    /// (kept as `identity.json.previous` and restored by `uninstall`); without it that file is never touched.
+    public func install(appBundle: URL = defaultAppBundle, helperSource: URL? = nil,
+                        replacePins: Bool = false) -> HelperOperationResult {
         guard isAdministrator else {
             return .refused("administratorRequired", "Run: sudo camlid helper install")
         }
@@ -108,9 +111,19 @@ public struct HelperInstaller: Sendable {
             return .refused("signatureUnreadable", "Sign the app and helper before installing.")
         }
         guard helperHash != appHash else { return .refused("identitiesNotDistinct") }
+        var movedPins = false
         switch status(appBundle: appBundle) {
         case .notInstalled:
             break
+        case .partial(let missing) where Set(missing) == ["helper", "daemonPlist", "recoveryPlist"]:
+            // Only an identity file exists: it belongs to an earlier install, not to this helper.
+            guard replacePins else {
+                return .refused("foreignPinsPresent", "An identity.json from another install exists. Re-run with --replace-pins to keep a backup and continue.")
+            }
+            guard !FileManager.default.fileExists(atPath: previousPinFile.path) else {
+                return .refused("previousPinsBackupExists", previousPinFile.path)
+            }
+            movedPins = true
         case .installed where readPins()?.helperCDHash == helperHash && readPins()?.appCDHash == appHash:
             return .ok("alreadyInstalled")
         default:
@@ -122,9 +135,13 @@ public struct HelperInstaller: Sendable {
             _ = runner.run("/bin/launchctl", ["bootout", "system/\(HelperInstallPaths.recoveryLabel)"])
             _ = runner.run("/bin/launchctl", ["bootout", "system/\(HelperInstallPaths.helperLabel)"])
             for url in written.reversed() { try? FileManager.default.removeItem(at: url) }
+            if movedPins { try? FileManager.default.moveItem(at: previousPinFile, to: paths.pinFile) }
         }
         do {
             try makeDirectory(paths.supportDirectory, mode: 0o755)
+            if movedPins {
+                try FileManager.default.moveItem(at: paths.pinFile, to: previousPinFile)
+            }
             try makeDirectory(paths.helperBinary.deletingLastPathComponent(), mode: 0o755)
             try makeDirectory(paths.helperPlist.deletingLastPathComponent(), mode: 0o755)
             try FileManager.default.copyItem(at: source, to: paths.helperBinary)
@@ -172,8 +189,10 @@ public struct HelperInstaller: Sendable {
     /// Restores an owned sleep policy first; refuses to remove the daemons while that is unresolved unless forced.
     public func uninstall(force: Bool = false) -> HelperOperationResult {
         guard isAdministrator else { return .refused("administratorRequired", "Run: sudo camlid helper uninstall") }
-        guard FileManager.default.fileExists(atPath: paths.helperBinary.path) || status() != .notInstalled else {
-            return .refused("notInstalled")
+        let fm = FileManager.default
+        guard [paths.helperBinary, paths.helperPlist, paths.recoveryPlist].contains(where: { fm.fileExists(atPath: $0.path) }) else {
+            return .refused("notInstalled", fm.fileExists(atPath: paths.pinFile.path)
+                ? "Only an identity.json from another install is present; nothing of this helper to remove." : nil)
         }
         if FileManager.default.fileExists(atPath: paths.helperBinary.path) {
             let release = runner.run(paths.helperBinary.path, ["--release-v1"])
@@ -188,12 +207,21 @@ public struct HelperInstaller: Sendable {
             do { if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) } }
             catch { failed.append(url.lastPathComponent) }
         }
-        try? FileManager.default.removeItem(at: paths.supportDirectory)
+        // Put back an identity file that install moved aside, and never delete the support directory
+        // itself: it may hold files from other installs. Remove it only when it is empty.
+        if fm.fileExists(atPath: previousPinFile.path) {
+            do { try fm.moveItem(at: previousPinFile, to: paths.pinFile) } catch { failed.append(previousPinFile.lastPathComponent) }
+        }
+        if (try? fm.contentsOfDirectory(atPath: paths.supportDirectory.path))?.isEmpty == true {
+            try? fm.removeItem(at: paths.supportDirectory)
+        }
         if !failed.isEmpty { return .refused("removeIncomplete", failed.joined(separator: ", ")) }
         return .ok("uninstalled", "Journal and logs under /private/var/db/CamLidPowerHelper were left in place.")
     }
 
     // MARK: Helpers
+
+    private var previousPinFile: URL { paths.supportDirectory.appendingPathComponent("identity.json.previous") }
 
     static func plist(label: String, program: String, argument: String, resident: Bool) -> Data {
         var dict: [String: Any] = ["Label": label, "Program": program, "ProgramArguments": [program, argument],

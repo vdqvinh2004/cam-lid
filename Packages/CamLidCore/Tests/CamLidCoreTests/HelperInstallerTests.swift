@@ -139,3 +139,63 @@ private struct Rig {
     }
 }
 
+
+@Suite struct HelperInstallerForeignFilesTests {
+    private func plantForeignFiles(_ rig: Rig) throws -> (pins: URL, evidence: URL) {
+        let support = rig.paths.supportDirectory
+        try FileManager.default.createDirectory(at: support.appendingPathComponent("once-scope"), withIntermediateDirectories: true)
+        let evidence = support.appendingPathComponent("once-scope/consumed.json")
+        try Data("evidence".utf8).write(to: evidence)
+        try Data(#"{"version":1,"appCDHash":"old"}"#.utf8).write(to: rig.paths.pinFile)
+        return (rig.paths.pinFile, evidence)
+    }
+
+    @Test func foreignPinsAreNeverOverwrittenWithoutExplicitConsent() throws {
+        let rig = try Rig()
+        let (pins, _) = try plantForeignFiles(rig)
+        #expect(rig.installer().status(appBundle: rig.app) == .partial(missing: ["helper", "daemonPlist", "recoveryPlist"]))
+        let result = rig.installer().install(appBundle: rig.app)
+        #expect(!result.accepted && result.reason == "foreignPinsPresent")
+        #expect(try String(contentsOf: pins, encoding: .utf8).contains("\"old\""))
+        #expect(!rig.runner.calls.contains { $0.hasPrefix("/bin/launchctl") })
+    }
+
+    @Test func replacingPinsKeepsABackupAndUninstallRestoresItAndLeavesOtherFiles() throws {
+        let rig = try Rig()
+        let (pins, evidence) = try plantForeignFiles(rig)
+        #expect(rig.installer().install(appBundle: rig.app, replacePins: true).accepted)
+        let backup = rig.paths.supportDirectory.appendingPathComponent("identity.json.previous")
+        #expect(try String(contentsOf: backup, encoding: .utf8).contains("\"old\""))
+        #expect(try String(contentsOf: pins, encoding: .utf8).contains("appCDHash") && !(try String(contentsOf: pins, encoding: .utf8).contains("\"old\"")))
+
+        #expect(rig.installer().uninstall().accepted)
+        #expect(try String(contentsOf: pins, encoding: .utf8).contains("\"old\""))          // original restored
+        #expect(!FileManager.default.fileExists(atPath: backup.path))
+        #expect(FileManager.default.fileExists(atPath: evidence.path))                      // untouched
+        #expect(FileManager.default.fileExists(atPath: rig.paths.supportDirectory.path))
+    }
+
+    @Test func uninstallWithOnlyForeignPinsRemovesNothing() throws {
+        let rig = try Rig()
+        let (pins, evidence) = try plantForeignFiles(rig)
+        let result = rig.installer().uninstall()
+        #expect(!result.accepted && result.reason == "notInstalled")
+        #expect(FileManager.default.fileExists(atPath: pins.path) && FileManager.default.fileExists(atPath: evidence.path))
+    }
+
+    @Test func aFailedInstallRestoresTheMovedPins() throws {
+        let rig = try Rig()
+        let (pins, _) = try plantForeignFiles(rig)
+        rig.runner.failing = ["/bin/launchctl bootstrap"]
+        let result = rig.installer().install(appBundle: rig.app, replacePins: true)
+        #expect(!result.accepted && result.reason == "bootstrapFailed")
+        #expect(try String(contentsOf: pins, encoding: .utf8).contains("\"old\""))
+    }
+
+    @Test func theSupportDirectoryIsRemovedOnlyWhenEmpty() throws {
+        let rig = try Rig()
+        #expect(rig.installer().install(appBundle: rig.app).accepted)
+        #expect(rig.installer().uninstall().accepted)
+        #expect(!FileManager.default.fileExists(atPath: rig.paths.supportDirectory.path))
+    }
+}

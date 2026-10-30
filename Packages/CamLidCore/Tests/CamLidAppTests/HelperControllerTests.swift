@@ -31,6 +31,7 @@ private final class Flag: @unchecked Sendable {
         #expect(HelperAdminCommand.runIfRequested(arguments: ["CamLid"]) == nil)
         #expect(HelperAdminCommand.runIfRequested(arguments: ["CamLid", "--helper-admin"]) == nil)
         #expect(HelperAdminCommand.runIfRequested(arguments: ["CamLid", "--helper-admin", "trust"]) == 2)
+        #expect(HelperAdminCommand.runInspectIfRequested(arguments: ["CamLid"]) == nil)
     }
 
     @Test @MainActor func statusMapsToPlainStatesAndInstallRefreshesAfterTheAdminRun() async {

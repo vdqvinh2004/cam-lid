@@ -17,7 +17,16 @@ public final class XPCPowerHoldTransport: PowerHoldTransport, @unchecked Sendabl
     }
 
     public func send(_ action: HoldAction) async -> HoldReply? {
-        guard let data = try? JSONEncoder().encode(Self.request(for: action)),
+        await exchange(Self.request(for: action))
+    }
+
+    /// Read-only state query; never changes the sleep setting.
+    public func inspect() async -> HoldReply? {
+        await exchange(PowerRequest(operation: .inspect))
+    }
+
+    private func exchange(_ request: PowerRequest) async -> HoldReply? {
+        guard let data = try? JSONEncoder().encode(request),
               let connection = currentConnection() else { return nil }
         return await withCheckedContinuation { continuation in
             let once = Once(continuation)

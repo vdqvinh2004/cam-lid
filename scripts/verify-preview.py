@@ -41,7 +41,10 @@ commands = [
     ("debug-build", ["xcodebuild", "-project", "CamLid.xcodeproj", "-scheme", "CamLid", "-configuration", "Debug", "-destination", "platform=macOS,arch=arm64", "-derivedDataPath", str(xcode), "CODE_SIGNING_ALLOWED=NO", "build"], root, "xcode"),
     ("release-build", ["xcodebuild", "-project", "CamLid.xcodeproj", "-scheme", "CamLid", "-configuration", "Release", "-destination", "platform=macOS,arch=arm64", "-derivedDataPath", str(xcode), "CODE_SIGNING_ALLOWED=NO", "build"], root, "xcode"),
     ("binary-integration", ["swift", "test", "--no-parallel", "--scratch-path", str(spm), "--filter", "ControlIntegrationTests"], root / "Packages/CamLidCore", "clt"),
-    ("packaging-tests", ["python3", "-m", "unittest", "discover", "-s", "Tests/Packaging"], root, "read-only"),
+    ("helper-swift-tests", ["swift", "test", "--no-parallel", "--scratch-path", str(spm) + "-helper"], root / "Packages/CamLidPowerHelper", "clt"),
+    ("wire-swift-tests", ["swift", "test", "--no-parallel", "--scratch-path", str(spm) + "-wire"], root / "Packages/CamLidPowerWire", "clt"),
+    # Tests/ is kept local only; the packaging tests run when that directory exists.
+    *([("packaging-tests", ["python3", "-m", "unittest", "discover", "-s", "Tests/Packaging"], root, "read-only")] if (root / "Tests/Packaging").is_dir() else []),
     ("preview-package-audit", ["python3", str(root / "scripts/package-beta.py"), "--app", str(xcode / "Build/Products/Debug/CamLid.app")], root, "read-only"),
     ("hardware-preflight", ["python3", str(root / "scripts/hardware-preflight.py")], root, "read-only"),
 ]

@@ -1,31 +1,23 @@
 # CamLid
 
-Native macOS menu bar app for AI-aware closed-lid work. **Current build is a preview:
-zero power actuation, no verified closed-lid backend, M6 not passed, M7 blocked.**
+Native macOS menu bar app for AI-aware closed-lid work.
 
-**Current handoff — 2026-10-21:** [reproducible Preview/M9 preparation and next gate](docs/qa/reproducible-m9-handoff-2026-10-21.md).
-M9's original offline hardening is complete; R0 was accepted historically. The [M9 G2 foreign-policy row](docs/qa/g2-m9-foreign-policy-result-2026-10-21.md) now has a
-PASS with operator attestation (T501 complete); overall G2 and G3 remain blocked. The owner approved and completed the
-[frozen QA helper installation and one IPC inspect](docs/qa/m9-lock-only-install-packet-2026-10-21.md):
-reported `ready/noPendingIntent`, no mutation or lease, original locks preserved/no journal
-deletion. The main app remains unconnected. Native activation still needs a separate exact
-one-use approval; do not rerun the consumed installer or reset the journal.
-[Next G2 packet](docs/qa/g2-m9-next-qualification-packet-2026-10-21.md): offline preparation
-complete; postboot audit matches the acknowledged G2 journal. A separate
-[archival/restart decision](docs/qa/m9-g2-journal-archival-packet-2026-10-21.md) is next,
-not another activation. Candidate is disarmed; no mutation or new IPC is approved.
-Fresh canonical Preview verification passes Swift Debug/Release (519 declarations per
-configuration, including four explicit skips), both Xcode builds, actual CLI integration and
-packaging/read-only preflight. Earlier dated counts below are historical. This is not M6 or
-native closed-lid acceptance.
+**Status (2026-10-30): preview.** Telemetry is read-only, and a shipped build never asks the helper to hold the
+Mac awake: closed-lid actuation needs a support row qualified by an owner-approved physical trial, and none is
+qualified yet. M6 has not passed and M7 is blocked.
 
-[Current continuity-first scope](docs/qa/continuity-first-qualification-2026-10-11.md): owner prioritizes AI workload progress with the physical lid closed; panel-sleep qualification is deferred, not passed. Brightness is optional, no screen-off claim or automatic dimming. Safety, Stop/deadline and physical restoration remain mandatory; historical lab permissions are not reused. Continuity-first experimental preparation has eight Debug/Release fake suites PASS (178 scenarios per configuration), six fresh inert identities and completed bounded code/evidence inspections; a separate disposable workload progressed only inside a simulated lid interval. This does not establish physical closed-lid AI work or restoration.
-[2026-10-11 lab reconciliation](docs/qa/lab-evidence-reconciliation-2026-10-11.md): isolated native lab actions occurred; revised open-lid Stop/API path succeeded, but C's sole closed-lid sample reports panel awake and a safety refusal. No sustained closed-lid/display-off or physical-restoration qualification; experimental source gate currently false. Lab results do not enable Preview or pass M1/M6.
-Dashboard, Settings, Welcome, Activity and Updates run in an owned UI subprocess that exits when its last surface closes. The persistent menu-bar process remains the sole policy, preferences, history, update-check and CLI authority; private anonymous pipes carry projections and actions. This releases UI framework resident memory after close; combined RSS while UI is open is higher. See [post-UI memory evidence](docs/qa/preview-evidence/memory-peak-fix-2026-10-05/README.md) and [current UI/UX implementation QA](docs/qa/uiux-implementation-2026-10-07.md). Battery/thermal/normalized
-CPU/built-in-display/lid telemetry is read-only; missing or stale sources remain Unknown. CLI reaches the running
-app's actual config/revision/tasks/history over an authenticated same-user local socket.
-See [current quality report](docs/qa/ai-quality-report.md) and [milestone folders](specs/README.md).
-[Updated LidRun gap table](specs/011-awake-automation/lidrun-comparison.md) and [M8 implementation](docs/qa/awake-automation-report.md): shared awake diagnosis, opt-in local alerts, native login intent/read-back, and fail-closed CLI guards are implemented. The [43-task backlog](specs/011-awake-automation/tasks.md) retains live power and signed/native acceptance gates.
+**Deployment model.** The closed-lid helper is a root LaunchDaemon installed once with administrator
+authentication (Standard mode), replacing the earlier exclusive-create / one-use admission. The earlier
+mechanism remains as a frozen, experimental Strict mode. Decision: [ADR 0001](docs/adr/0001-persistent-helper-and-strict-experimental-mode.md);
+work: [spec 014](specs/014-persistent-helper/spec.md) (22 of 25 tasks done; the rest need attended hardware
+trials). Install and status commands: `camlid helper install|uninstall|trust|status` (administrator rights needed
+for all but `status`), or Settings › Safety › Closed lid.
+
+Dashboard, Settings, Welcome, Activity and Updates run in an owned UI subprocess that exits when its last surface
+closes; the persistent menu-bar process is the sole policy, preferences, history, update-check and CLI authority.
+Battery, thermal, CPU, built-in-display and lid telemetry is read-only; missing or stale sources stay Unknown.
+The CLI reaches the running app over an authenticated same-user local socket.
+See the [milestone folders](specs/README.md) for scope and status.
 
 ## Build and verify
 
@@ -137,7 +129,7 @@ missing or incomplete scans must not claim absence. Legacy stream/wrapper entry 
 not optional product integrations. [Boundary correction and tests](docs/qa/third-person-boundary-2026-10-13.md).
 
 Numeric CPU temperature appears only when the bounded read-only reader has a current supported sample; missing/stale readings stay explicit. The public thermal API reports pressure, labeled separately. A numerical reading does not qualify a closed-lid backend or hardware safety row.
-Closed-lid protection remains unimplemented; this preview owns no power resources. See
+Closed-lid protection is implemented behind the qualified-row gate described above and is not active in shipped builds; without it this preview owns no power resources. See
 [current supervision QA](docs/qa/passive-supervision-report.md). VoiceOver acceptance is
 excluded by user request; keyboard and native accessibility semantics remain in scope.
 

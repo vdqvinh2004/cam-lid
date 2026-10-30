@@ -678,7 +678,8 @@ public enum Commands {
         let result: HelperOperationResult
         switch name {
         case "helper install":
-            result = installer.install(appBundle: app, helperSource: options.flags["helper"].map { URL(fileURLWithPath: $0) })
+            result = installer.install(appBundle: app, helperSource: options.flags["helper"].map { URL(fileURLWithPath: $0) },
+                                       replacePins: options.flags["replace-pins"] != nil)
         case "helper trust": result = installer.trust(appBundle: app)
         default: result = installer.uninstall(force: options.flags["force"] != nil)
         }

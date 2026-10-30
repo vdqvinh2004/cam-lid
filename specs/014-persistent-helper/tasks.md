@@ -1,6 +1,6 @@
 # Tasks: Persistent Helper (Standard Mode)
 
-**Feature context:** `014-persistent-helper` · **Status:** 21/25 checked. Sources: [spec.md](spec.md), [plan.md](plan.md), [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md).
+**Feature context:** `014-persistent-helper` · **Status:** 22/25 checked. Sources: [spec.md](spec.md), [plan.md](plan.md), [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md).
 
 ## Phase 0 — Alignment
 - [x] T001 Mark admission / one-use sections of specs 012 and 013 as superseded by 014 (keep evidence). — done 2026-10-30 (notice added to 012/013 spec, plan, tasks).
@@ -14,7 +14,7 @@
 - [x] T104 Implement independent recovery; test helper kill, helper hang, reboot with record. — `recoverOrphanedPolicy` + 7 `IndependentRecoveryTests` (helper hang, other boot, racing writer, idempotent). Fake-backed only; not run on hardware.
 
 ## Phase 2 — Installer
-- [x] T201 `camlid helper install|uninstall|trust|status` (fixed command, refuses non-admin). — `camlid helper install|uninstall|trust|status` (`HelperInstaller` in CamLidCore, 10 + 2 tests with a fake runner). Not run as root.
+- [x] T201 `camlid helper install|uninstall|trust|status` (fixed command, refuses non-admin). — `camlid helper install|uninstall|trust|status` (`HelperInstaller` in CamLidCore, 10 + 2 tests with a fake runner). Not run as root. Install refuses to overwrite a foreign `identity.json` without `--replace-pins` (kept as `identity.json.previous`, restored on uninstall) and uninstall never deletes the support directory: found on the owner\'s Mac, which still holds earlier QA material there.
 - [x] T202 cdhash pin write at install; `trust` re-pin; refuse commands on mismatch. — pin written at install from `codesign` CDHash; `trust` re-pins and kickstarts; status reports `needsReauthorization` / `helperIdentityMismatch`.
 - [x] T203 App install/uninstall action with the administrator prompt; status shown in Settings. — Settings › Safety › Closed lid: status, Install/Reinstall/Remove via the macOS administrator prompt running `CamLid --helper-admin install|uninstall`. `scripts/embed-helper.sh` (Xcode post-build) builds, embeds and ad-hoc signs the helper and app with distinct identities. Not exercised with a real admin prompt; install never run.
 - [x] T204 Uninstall restores owned policy and removes plist, binary, socket; reports leftovers. — `uninstall` runs `--release-v1` first, refuses while restore is unresolved unless `--force`, removes plists, binary, pins; journal left in place.
@@ -25,7 +25,7 @@
 - [x] T303 User-facing text for FR-012. — `PowerMode.disclosure` shown for both modes in Settings.
 
 ## Phase 4 — Fake-backed tests
-- [ ] T401 Peer rejection: invalid signature, wrong pin, replaced binary, other user. — PARTIAL: wrong pin, cross-user and replaced-binary cases covered; a peer with a genuinely invalid signature is not tested.
+- [x] T401 Peer rejection: invalid signature, wrong pin, replaced binary, other user. — `PeerSignatureTests` (CamLidPowerWire): the pinned requirement accepts the exact ad-hoc signed peer and rejects a validly signed peer with another CDHash, a tampered binary and an unsigned binary; replaced binary is covered by installer status.
 - [x] T402 Ownership and foreign `SleepDisabled`; Unknown vs Off; guard fail-closed cases. — covered by existing ownership/foreign/Unknown/guard tests plus the restart and recovery tests above.
 - [x] T403 Concurrent clients; clock change; corrupt journal. — added `SessionIsolationTests` (second client, unreadable journal); clock regression test already existed.
 

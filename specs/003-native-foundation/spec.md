@@ -1,5 +1,7 @@
 # Feature Specification: M2 Native Foundation and Safety
 
+> **Deployment note (2026-10-30):** helper deployment follows [spec 014](../014-persistent-helper/spec.md) and [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md) (root LaunchDaemon installed once with administrator authentication). Admission and one-use wording below describes the earlier, now experimental Strict model.
+
 **Feature Branch**: None; numbered folder is feature identity, not Git branch.
 **Created**: 2026-10-04
 **Status**: Planned; blocked on M1 PASS

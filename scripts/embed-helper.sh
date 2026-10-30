@@ -12,4 +12,5 @@ DEST="${APP}/Contents/Library/LaunchServices"
 mkdir -p "$DEST"
 cp "$SCRATCH/$CONFIG/camlid-power-helper" "$DEST/camlid-power-helper"
 codesign --force --sign - --options runtime --identifier com.camlid.power-helper "$DEST/camlid-power-helper"
-codesign --force --sign - --options runtime --identifier com.camlid.CamLid "$APP"
+codesign --force --sign - --options runtime --entitlements "${SRCROOT}/Config/CamLid.dev-signing.entitlements" \
+  --identifier com.camlid.CamLid "$APP"
