@@ -125,7 +125,7 @@ struct UIUXRefinementTests {
         let snapshot = UpdateSnapshot(phase: .unavailable, reason: "developerIDRequired")
         let view = UpdatesView(snapshot: snapshot, canCheck: false, onCheck: {})
         #expect(view.title == "Updates unavailable")
-        #expect(view.detail.contains("release version"))
+        #expect(view.detail.contains("rebuild") && !view.detail.contains("preview"))
         #expect(!view.detail.lowercased().contains("install"))
         #expect(view.preferredHeight < 185)
     }

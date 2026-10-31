@@ -298,7 +298,6 @@ struct DashboardAgentBadge: View {
     private var isWorking: Bool { agent.workingCount > 0 }
     private var status: String { isWorking ? "Working" : "Waiting" }
     private var count: Int { isWorking ? agent.workingCount : agent.waitingCount }
-    private var symbol: String { isWorking ? "terminal" : "hourglass" }
     private func countText(_ value: Int) -> String {
         "\(value) " + (value == 1 ? "task" : "tasks")
     }
@@ -313,11 +312,8 @@ struct DashboardAgentBadge: View {
 
     var body: some View {
         AgentBadge(provider: agent.provider, title: agent.title, tone: .activity) {
-            HStack(spacing: 3) {
-                Image(systemName: symbol).font(.caption2)
-                Text("\(count)").font(.caption).fontWeight(.semibold).monospacedDigit()
-            }
-            .foregroundStyle(.secondary)
+            Text("\(count) " + status.lowercased()).font(.caption).monospacedDigit()
+                .foregroundStyle(.secondary)
         }
         .help(hoverText)
         .accessibilityLabel("\(agent.title), \(status), \(countText(count))")
@@ -337,8 +333,11 @@ struct ModeBadges: View {
         HStack(spacing: 5) {
             ForEach([RequestedMode.auto, .timed], id: \.self) { mode in
                 Button { onSelect(mode) } label: {
-                    Text(buttonLabel(mode)).font(.callout)
-                        .padding(.horizontal, 9).padding(.vertical, 7)
+                    // Primary text and the menu bar's own marks: grey text on grey read as disabled.
+                    Label(buttonLabel(mode), systemImage: mode == .auto ? "arrow.triangle.2.circlepath" : "timer")
+                        .font(.callout.weight(isSelected(mode) ? .semibold : .regular))
+                        .foregroundStyle(isSelected(mode) ? Color.accentColor : Color.primary)
+                        .padding(.horizontal, 9).padding(.vertical, 6)
                         .frame(maxWidth: .infinity)
                         .camLidPill(isSelected(mode) ? .selected : .neutral)
                 }

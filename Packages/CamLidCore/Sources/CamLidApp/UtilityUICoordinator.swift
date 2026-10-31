@@ -217,8 +217,8 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         let host = NSHostingController(rootView: view)
         host.sizingOptions = []
         let window = NSWindow(contentViewController: host)
-        window.isReleasedWhenClosed = false; window.title = "CamLid Settings"
-        window.setContentSize(NSSize(width: 580, height: 540)); window.center()
+        window.isReleasedWhenClosed = false; window.title = "Settings"
+        window.setContentSize(NSSize(width: 580, height: editor.section.preferredHeight)); window.center()
         settingsWindow = window
         closeGuard = SettingsCloseGuard(editor: editor,
             installationPending: { [weak self] in self?.state?.installationPending ?? true },
@@ -250,7 +250,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
             onDeleteAll: { [weak self] in self?.send(.deleteHistory(nil)) }, onDeleteResult: { _ in })
         let height = ActivityLogView.preferredHeight(recordCount: activity.records.count, hasError: activity.error != nil)
         let needsInitialSize = activityWindow == nil || !historyInitiallySized
-        present(view, title: "CamLid Activity", window: &activityWindow, width: 640, height: height, show: show)
+        present(view, title: "Activity", window: &activityWindow, width: 640, height: height, show: show)
         if needsInitialSize, !activity.isLoading, let activityWindow {
             activityWindow.setContentSize(NSSize(width: 640, height: height))
             historyInitiallySized = true
@@ -308,13 +308,13 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         }
     }
     private func showSleepDiagnostics() {
-        present(SleepDiagnosticsView(read: { [weak self] in await self?.readDiagnostics() ?? DiagnosticSnapshot(errors: ["appUnavailable"]) }), title: "Why is my Mac awake? · CamLid", window: &sleepDiagnosticsWindow, width: 600, height: 480)
+        present(SleepDiagnosticsView(read: { [weak self] in await self?.readDiagnostics() ?? DiagnosticSnapshot(errors: ["appUnavailable"]) }), title: "Why Is My Mac Awake?", window: &sleepDiagnosticsWindow, width: 600, height: 420)
     }
     private func showUpdates(show: Bool = true) {
         guard let state else { return }
         let view = UpdatesView(snapshot: state.updates, canCheck: state.canCheckUpdates,
                               onCheck: { [weak self] in self?.send(.checkUpdates) })
-        present(view, title: "CamLid Updates", window: &updatesWindow, width: 460, height: view.preferredHeight, show: show)
+        present(view, title: "Updates", window: &updatesWindow, width: 460, height: view.preferredHeight, show: show)
     }
     private func present<Content: View>(_ view: Content, title: String, window: inout NSWindow?, width: CGFloat, height: CGFloat, show: Bool = true) {
         if let existing = window {

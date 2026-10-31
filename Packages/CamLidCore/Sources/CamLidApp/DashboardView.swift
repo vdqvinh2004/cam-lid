@@ -302,7 +302,7 @@ public struct DashboardView: View {
                         }
                     }.labelsHidden().accessibilityLabel("Auto sleep delay")
                         .frame(maxWidth: .infinity, alignment: .trailing)
-                        .help("Wait after selected agents finish; this preview does not actuate sleep")
+                        .help("Wait this long after selected agents finish, then let the Mac sleep")
                         .disabled(data.state == .safetyStopped || data.state == .expired)
                         .accessibilityIdentifier("camlid.dashboard.sleepDelay")
                 }

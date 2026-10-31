@@ -333,7 +333,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             refresh(); toggleDashboard(show: true); return
         }
         if config.closedLidOptIn, !closedLidAllowed {
-            refusalNotice = "Closed-lid preview refused: power control is unavailable."
+            refusalNotice = "Closed lid isn’t available yet. Settings › Closed Lid shows what is missing."
             record(category: .configuration, newState: sessionStateForRecord(), reasons: ["backendUnverified"])
             refresh()
             toggleDashboard(show: true)
@@ -736,7 +736,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private func sensorDetails(_ health: HealthSnapshot, now: Double) -> String {
         let lidAge = health.lid?.sampledAtMonotonic.map { String(format: "%.1f s old", max(0, now - $0)) } ?? "no fresh sample"
         let lidSource = health.lid?.source ?? "IOPMrootDomain.AppleClamshellState"
-        return "Lid source: \(lidSource) · \(lidAge).\nTemperature: \(health.temperature.displayText).\nPressure is a macOS thermal state, not degrees.\nThis preview owns no power lease."
+        return "Lid source: \(lidSource) · \(lidAge).\nTemperature: \(health.temperature.displayText).\nPressure is a macOS thermal state, not degrees."
     }
 
     private func recordSensorAvailability(_ health: HealthSnapshot) {
@@ -1345,8 +1345,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         } catch {
             authorityUnavailable = true
             if case IPCError.policyDenied(let reason) = error {
-                refusalNotice = "Preview control unavailable: " + reason
-            } else { refusalNotice = "Preview control unavailable; local service could not start." }
+                refusalNotice = "Local control unavailable: " + reason
+            } else { refusalNotice = "Local control couldn’t start; another copy of CamLid may be running." }
         }
     }
 
@@ -1395,6 +1395,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             throw IPCError.policyDenied("unsupportedObservedProvider")
         }
         let now = uptime()
+        func matching() -> AgentTask? {
+            agents.tasks(now: now).first {
+                $0.sessionID == event.sessionID && $0.runID == event.runID && agents.provider(for: $0.id) == event.provider
+            }
+        }
+        let stateBefore = matching()?.state
         let result = try agents.ingest(JSONEncoder().encode(event), now: now)
         if result == "applied", let task = agents.tasks(now: now).first(where: {
             $0.sessionID == event.sessionID && $0.runID == event.runID && agents.provider(for: $0.id) == event.provider
@@ -1409,11 +1415,15 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                task.state == .failed || (task.state == .completed && session?.requestedMode != .auto) {
                 outcomeNotifications.emit(category: task.state == .failed ? .failure : .completion,
                     session: session?.id ?? "app", event: identity,
-                    reason: "terminalEvidence", preview: true, now: now)
+                    reason: "terminalEvidence", preview: false, now: now)
             }
         }
         refresh()
-        record(category: .stateTransition, newState: sessionStateForRecord(), reasons: ["agentObservation"])
+        // Only a change is history: an unchanged state re-reported on every poll flooded Activity (20 521 of 21 489).
+        if let stateAfter = matching()?.state, stateAfter != stateBefore {
+            record(category: .stateTransition, newState: sessionStateForRecord(),
+                   reasons: ["agentStateChanged", "\(event.provider):\(stateAfter.rawValue)"])
+        }
         return result
     }
 
@@ -1706,7 +1716,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             guard let saved = try? JSONDecoder().decode(PersistedSettings.self, from: data),
                 saved.schemaVersion == 1, saved.revision >= 1,
                 (try? saved.configuration.validate()) != nil else {
-                refusalNotice = "Saved settings are invalid. Preview uses safe defaults."
+                refusalNotice = "Saved settings were invalid, so CamLid uses safe defaults."
                 return
             }
             config = saved.configuration; revision = saved.revision
@@ -1715,7 +1725,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         guard let data = preferences.data(forKey: Self.configKey) else { return }
         guard let decoded = try? JSONDecoder().decode(Configuration.self, from: data),
             (try? decoded.validate()) != nil else {
-            refusalNotice = "Saved settings are invalid. Preview uses safe defaults."
+            refusalNotice = "Saved settings were invalid, so CamLid uses safe defaults."
             return
         }
         config = decoded

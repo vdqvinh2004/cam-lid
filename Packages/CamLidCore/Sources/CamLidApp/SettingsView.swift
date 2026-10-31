@@ -239,8 +239,7 @@ private struct SettingsGeneralPane: View {
     @ObservedObject var editor: SettingsEditor
     let onOpenActivity: () -> Void
 
-    /// "Work failed" has no source any more; the stored value stays readable but is not offered.
-    private static let categories = NotificationCategory.allCases.filter { $0 != .failure }
+    private static let categories = NotificationCategory.allCases
     private var permissionNeedsAction: Bool { !["granted", "authorized", "provisional"].contains(editor.notificationPermission) }
 
     var body: some View {
@@ -358,16 +357,17 @@ private struct SettingsAgentsPane: View {
                 ForEach(orderedBadges) { state in
                     SettingsFieldOutcome(editor: editor, key: "provider:" + state.provider)
                 }
+                if !editor.selectableProviders.allSatisfy({ editor.draft.parsedAdapters().contains($0) }) {
+                    HStack {
+                        Spacer()
+                        Button("Enable All") { editor.enableAllProviders() }
+                            .help("Include all agents in sleep decisions")
+                            .accessibilityIdentifier("camlid.agents.enableAll")
+                    }
+                }
             }
         } header: {
-            HStack {
-                Text("Agents that may delay sleep")
-                Spacer()
-                Button("Enable all") { editor.enableAllProviders() }
-                    .disabled(editor.selectableProviders.allSatisfy { editor.draft.parsedAdapters().contains($0) })
-                    .help("Include all agents in sleep decisions")
-                    .accessibilityIdentifier("camlid.agents.enableAll")
-            }
+            Text("Agents that may delay sleep")
         }
         WatchedProgramsSection(editor: editor)
     }
@@ -570,19 +570,8 @@ private struct SettingsClosedLidSection: View {
         Section {
             // The one status line; details below on request.
             PreviewBuildNotice(text: editor.capabilityText.isEmpty ? nil : editor.capabilityText)
-            HStack {
-                Button(installed ? "Reinstall helper…" : "Install helper…") { editor.onInstallHelper?() }
-                    .disabled(editor.helperBusy)
-                    .help("Asks for an administrator password once. Installing doesn’t start a session or change sleep settings.")
-                    .accessibilityIdentifier("camlid.settings.helper.install")
-                if installed {
-                    Button("Remove helper…") { editor.onUninstallHelper?() }
-                        .disabled(editor.helperBusy)
-                        .help("Restores the sleep setting and removes the helper")
-                        .accessibilityIdentifier("camlid.settings.helper.remove")
-                }
-                if editor.helperBusy { ProgressView().controlSize(.small) }
-            }
+            // Helper actions sit up front only when something needs doing; otherwise they live under Details.
+            if !helperHealthy { helperButtons }
             ForEach(editor.keepAwakeApps.filter(\.resetsSleepSetting), id: \.self) { app in
                 Label("\(app.name) resets the sleep setting and will interrupt closed lid. Quit \(app.name) or remove its helper.",
                       systemImage: "exclamationmark.triangle")
@@ -629,16 +618,33 @@ private struct SettingsClosedLidSection: View {
                 Text(editor.helperMessage)
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if helperHealthy { helperButtons }
             }
             .disclosureGroupStyle(RowDisclosureStyle())
-        } header: {
-            Text("Closed lid")
         }
         .alert("Allow closed lid on an untested Mac?", isPresented: $confirmingUntested) {
             Button("Allow") { editor.onSetUntestedAcknowledgement?(true) }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("CamLid hasn’t been tested on \(systemText). If something fails, this Mac may stay awake with the lid closed until the helper or its recovery job restores the sleep setting. This applies to this Mac and macOS build only; you can turn it off at any time.")
+        }
+    }
+
+    private var helperHealthy: Bool { editor.helperState == "installed" && !editor.helperBusy }
+
+    private var helperButtons: some View {
+        HStack {
+            Button(installed ? "Reinstall helper…" : "Install helper…") { editor.onInstallHelper?() }
+                .disabled(editor.helperBusy)
+                .help("Asks for an administrator password once. Installing doesn’t start a session or change sleep settings.")
+                .accessibilityIdentifier("camlid.settings.helper.install")
+            if installed {
+                Button("Remove helper…") { editor.onUninstallHelper?() }
+                    .disabled(editor.helperBusy)
+                    .help("Restores the sleep setting and removes the helper")
+                    .accessibilityIdentifier("camlid.settings.helper.remove")
+            }
+            if editor.helperBusy { ProgressView().controlSize(.small) }
         }
     }
 

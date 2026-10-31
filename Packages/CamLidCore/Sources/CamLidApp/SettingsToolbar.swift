@@ -23,7 +23,13 @@ final class SettingsToolbar: NSObject, NSToolbarDelegate {
     func select(_ section: SettingsSection) {
         toolbar.selectedItemIdentifier = NSToolbarItem.Identifier(section.rawValue)
         guard let window else { return }
-        window.title = section.title + " · CamLid"
+        window.title = section.title   // macOS settings windows are titled with the pane name
+        let content = window.contentRect(forFrameRect: window.frame)
+        let delta = section.preferredHeight - content.height
+        guard abs(delta) > 1 else { return }
+        var frame = window.frame
+        frame.origin.y -= delta; frame.size.height += delta   // keep the top edge in place
+        window.setFrame(frame, display: true, animate: window.isVisible)
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {

@@ -18,8 +18,13 @@ public struct UpdatesView: View {
     }
     private var content: some View {
         VStack(alignment: .leading, spacing: 10) {
-            CamLidStatusLabel(title, systemImage: symbol, tone: updateTone,
-                              font: .headline, help: title)
+            // The title stays in the primary colour; the tone colours only the symbol (grey text read as disabled).
+            Label {
+                Text(title).font(.headline)
+            } icon: {
+                Image(systemName: symbol).foregroundStyle(updateTone.foreground)
+            }
+            .help(title)
             Text(detail).fixedSize(horizontal: false, vertical: true)
             if snapshot.phase == .available, let version = snapshot.version {
                 Text("Available version: \(version)")
@@ -73,7 +78,7 @@ public struct UpdatesView: View {
     }
     var detail: String {
         switch snapshot.reason {
-        case "developerIDRequired": "This preview build can’t check for updates. The release version of CamLid can."
+        case "developerIDRequired": "This build was made from source, so it can’t check for updates. Pull the latest source and rebuild to update."
         case "trustedFeedRequired": "This build has no update feed. Update checks work in the release app."
         case "updateSigningKeyRequired": "This build can’t verify updates. Use the release version of CamLid."
         case "noCompatibleUpdate": "No compatible update was found. This doesn’t confirm the latest version."

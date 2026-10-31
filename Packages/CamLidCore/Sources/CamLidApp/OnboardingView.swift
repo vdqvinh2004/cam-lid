@@ -143,7 +143,7 @@ private struct OnboardingContent: View {
                 Text("Choose Auto or Timed in the dashboard. Click the active mode again to stop. Auto’s Sleep when done sets the delay after selected work ends.")
                 Text("Infinite has no time limit. Battery and thermal safety stops still apply. Activity records what happened and why.")
                     .foregroundStyle(.secondary)
-                Text("Readings can be delayed or unavailable. This preview can’t keep the Mac awake or change lid-close sleep.")
+                Text("Readings can be delayed or unavailable.")
                     .font(.callout).foregroundStyle(.secondary)
             }
         }

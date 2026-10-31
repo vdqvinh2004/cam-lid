@@ -155,8 +155,8 @@ private struct DiagnosticContent: View {
                 detailRow("Global setting", coverageText(snapshot.coverage["global"]))
                 detailRow("Devices", coverageText(snapshot.coverage["kernel"]))
                 detailRow("Preventing sleep", preventingText)
-                detailRow("CamLid", snapshot.activeSessionMode.map { "\($0.rawValue.capitalized) · Preview only" }
-                    ?? "Stopped · Preview only")
+                detailRow("CamLid", snapshot.activeSessionMode.map { $0.rawValue.capitalized }
+                    ?? "Stopped")
                 if !snapshot.errors.isEmpty {
                     detailRow("Errors", snapshot.errors.joined(separator: ", "))
                 }

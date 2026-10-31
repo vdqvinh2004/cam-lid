@@ -181,7 +181,7 @@ public struct ActivityLogView: View {
             if hiddenSensorCount > 0 {
                 Button("Show \(hiddenSensorCount) routine updates") { showsSensorUpdates = true }
                     .buttonStyle(.link).font(.caption)
-                    .help("Lid and temperature availability changes are routine and hidden by default")
+                    .help("Sensor availability changes and repeated agent checks are routine and hidden by default")
             } else if showsSensorUpdates && sensorCount > 0 && !filter.isActive {
                 Button("Hide routine updates") { showsSensorUpdates = false }
                     .buttonStyle(.link).font(.caption)
@@ -342,9 +342,11 @@ public struct ActivityLogView: View {
                             .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                             .help(activityDateFormatter.string(from: record.timestamp))
                     }
-                    if ![ActivityCategory.configuration, .enrollment].contains(record.category) {
-                        Text(record.reasonCodes.map(ActivityPresentation.readableReason).joined(separator: ", "))
-                            .font(.caption).foregroundStyle(.secondary)
+                    // A second line only when it says something the title doesn't.
+                    let detail = record.reasonCodes.map(ActivityPresentation.readableReason).joined(separator: ", ")
+                    if ![ActivityCategory.configuration, .enrollment].contains(record.category),
+                       ActivityPresentation.agentState(record) == nil, detail != ActivityPresentation.title(record) {
+                        Text(detail).font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -370,10 +372,19 @@ enum ActivityPresentation {
         case .configuration: "Settings & sensors"
         }
     }
+    /// Hidden by default: sensor availability flips, and the per-poll agent checks older builds recorded.
     static func isRoutineSensorUpdate(_ record: StoredTransition) -> Bool {
-        record.category == .configuration && record.reasonCodes.contains {
+        record.reasonCodes == ["agentObservation"] || record.category == .configuration && record.reasonCodes.contains {
             $0 == "lidAvailabilityChanged" || $0 == "temperatureAvailabilityChanged"
         }
+    }
+    /// "orca:working" → "Orca: Working".
+    static func agentState(_ record: StoredTransition) -> String? {
+        guard record.reasonCodes.first == "agentStateChanged", record.reasonCodes.count > 1 else { return nil }
+        let parts = record.reasonCodes[1].split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return nil }
+        let name = AgentProviderCatalog.info(for: parts[0])?.title ?? parts[0].capitalized
+        return name + ": " + parts[1].capitalized
     }
     static func isAttention(_ record: StoredTransition) -> Bool {
         record.category == .safetyStop || record.category == .capExpiry || record.category == .recovery
@@ -392,6 +403,7 @@ enum ActivityPresentation {
         }
     }
     static func title(_ record: StoredTransition) -> String {
+        if let agent = agentState(record) { return agent }
         if ![ActivityCategory.configuration, .enrollment].contains(record.category),
             let previous = record.previousState, previous != record.newState {
             return CamLidAccessibility.StatusStyle.style(for: previous).text + " → "
@@ -411,8 +423,10 @@ enum ActivityPresentation {
         case "appLaunched": return "CamLid opened"
         case "appQuitNoOwnedPower": return "CamLid quit without a session"
         case "onboardingComplete": return "Welcome completed"
-        case "previewSessionStarted": return "Preview session started"
-        case "previewSessionStopped": return "Preview session stopped"
+        case "previewSessionStarted": return "Session started"
+        case "previewSessionStopped": return "Session stopped"
+        case "agentStateChanged": return "Agent state changed"
+        case "agentObservation": return "Agent checked"
         case "sessionTimerChanged": return "Timer changed"
         case "sessionSleepDelayChanged": return "Sleep when done changed"
         case "lidAvailabilityChanged": return "Lid reading availability changed"

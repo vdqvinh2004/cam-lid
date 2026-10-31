@@ -135,9 +135,9 @@ struct CamLidMetricChip: View {
             .font(.caption).monospacedDigit()
             .foregroundStyle(attention ? Color.orange : Color.primary)
             .fixedSize(horizontal: true, vertical: true)
-            .padding(.horizontal, 6).padding(.vertical, 4)
+            .padding(.horizontal, 6).padding(.vertical, 6)
             .frame(maxWidth: .infinity)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+            .background(.quaternary, in: Capsule())   // the same capsule as the mode buttons and agent badges
             .help(detail)
             .accessibilityLabel(detail)
     }
@@ -231,7 +231,7 @@ struct PreviewBuildNotice: View {
 
     var body: some View {
         CamLidStatusLabel(
-            text ?? "Preview build · can’t keep your Mac awake",
+            text ?? "Can’t keep your Mac awake",
             systemImage: ready ? "checkmark.circle" : "info.circle",
             tone: ready ? .success : .info,
             font: font,

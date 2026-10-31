@@ -44,7 +44,7 @@ import CamLidCore
         let applied = try app.receiveObservation(event(state: .working, sequence: 0))
         #expect(applied == "applied")
         for _ in 0..<20 { await Task.yield() }
-        #expect(titles == ["CamLid Preview: Work failed"])
+        #expect(titles == ["CamLid: Work failed"])
         #expect(throws: IPCError.self) { try app.receiveObservation(event(state: .failed, sequence: 1)) }
         for _ in 0..<20 { await Task.yield() }
         #expect(titles.count == 1)
@@ -90,6 +90,29 @@ import CamLidCore
         for _ in 0..<20 { await Task.yield() }
         #expect(deliveries == 0)
         _ = try await app.handleControlAsync(.logsExport, payload: Data(), deadline: ContinuousTime.now + 2)
+    }
+
+    /// Activity keeps agent changes only: the same state reported again (every Orca poll) is not history.
+    @Test @MainActor func onlyAgentStateChangesReachActivity() async throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let app = fixture.makeCoordinator()
+        _ = try app.receiveObservation(event(state: .working, sequence: 0))
+        _ = try app.receiveObservation(event(state: .working, sequence: 1))
+        _ = try app.receiveObservation(event(state: .idle, sequence: 2))
+        #expect(await app.flushHistory(timeout: 2))
+        let lines = try FileManager.default.contentsOfDirectory(at: fixture.root.appendingPathComponent("history"), includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "jsonl" }
+            .flatMap { try String(contentsOf: $0, encoding: .utf8).split(separator: "\n") }
+        let changes = lines.filter { $0.contains("agentStateChanged") }
+        #expect(changes.count == 2)
+        #expect(changes.contains { $0.contains("codex:working") } && changes.contains { $0.contains("codex:idle") })
+        #expect(!lines.contains { $0.contains("\"agentObservation\"") })
+        let record = try StoredTransition(stateRevision: 1, category: .stateTransition, previousState: .ready,
+            newState: .ready, reasonCodes: ["agentStateChanged", "orca:working"])
+        #expect(ActivityPresentation.title(record) == "Orca: Working")
+        let old = try StoredTransition(stateRevision: 1, category: .stateTransition, previousState: .ready,
+            newState: .ready, reasonCodes: ["agentObservation"])
+        #expect(ActivityPresentation.isRoutineSensorUpdate(old))
     }
 
     private func event(state: TaskState, sequence: Int, epoch: Int = 0,
