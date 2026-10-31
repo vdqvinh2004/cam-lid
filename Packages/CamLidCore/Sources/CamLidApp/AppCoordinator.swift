@@ -541,9 +541,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case "installed": break
         case "notInstalled": return "Can’t keep your Mac awake · helper not installed"
         case "needsReauthorization": return "Can’t keep your Mac awake · reinstall the helper after this update"
-        default: return "Can’t keep your Mac awake · the helper needs attention in Settings › Safety"
+        default: return "Can’t keep your Mac awake · the helper needs attention in Settings › Closed Lid"
         }
-        if !config.closedLidOptIn { return "Closed lid is off · turn it on in Settings › Safety" }
+        if !config.closedLidOptIn { return "Closed lid is off · turn it on in Settings › Closed Lid" }
         if config.powerMode == .strict { return "Closed lid ready · Strict (experimental)" }
         if case .qualified = permit { return "Closed lid ready · tested Mac" }
         return "Closed lid ready · untested Mac"
@@ -563,7 +563,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
         guard let action = holdReconciler.next(desired: holdDesired, remainingSessionSeconds: remaining, now: now,
                                                strict: config.powerMode == .strict,
-                                               // Battery sessions allowed in Settings › Safety: the helper may hold on
+                                               // Battery sessions allowed in Settings › Closed Lid: the helper may hold on
                                                // battery down to the stop level, and stops itself below it.
                                                batteryFloor: config.chargingOnly || !config.batteryModeAllowed
                                                    ? nil : config.batteryFloorPercent) else { return }
@@ -594,12 +594,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let system = systemIdentity()
         let identity = "\(system.model ?? "unknown Mac"), macOS \(system.osBuild ?? "unknown build")"
         if config.powerMode == .strict, strictRow == nil {
-            return "Strict isn’t tested on this Mac (\(identity)). Choose Standard in Settings › Safety › Closed lid."
+            return "Strict isn’t tested on this Mac (\(identity)). Choose Standard in Settings › Closed Lid."
         }
         if config.powerMode == .standard, !permit.allowsActuation {
-            return "Closed lid is off on this untested Mac (\(identity)). To allow it, see Settings › Safety › Closed lid."
+            return "Closed lid is off on this untested Mac (\(identity)). To allow it, see Settings › Closed Lid."
         }
-        if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Safety." }
+        if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Closed Lid." }
         // A stopped session keeps the helper's reason; the reconciler itself resets once the session stops.
         if let stop = session.stopReasons.first(where: { $0.hasPrefix("helper") }) {
             switch stop {
@@ -627,13 +627,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     static func helperReasonText(_ reason: String) -> String {
         switch reason {
         case "systemSleptWhileHeld": "The Mac slept during a Strict session (macOS can end Strict, for example when a display changes). Start a new session to continue."
-        case "mechanismUnavailable": "The installed helper doesn’t offer Strict yet. Reinstall it in Settings › Safety."
+        case "mechanismUnavailable": "The installed helper doesn’t offer Strict yet. Reinstall it in Settings › Closed Lid."
         case "safetyRefused": "Closed lid can only start with the lid open, normal temperature and no external display, on the charger (or on battery above the stop level when battery sessions are allowed)."
         case "preexistingOverride", "foreignGlobalSleepDisabled": "Another app already disables sleep, so CamLid left it alone."
         case "overrideChanged": "Another app changed the sleep setting (for example LidRun), so closed lid stopped."
         case "recoveryRequired", "restorationFailed", "startupInspectionFailed":
-            "The helper needs recovery before it can hold the Mac awake. Restart the Mac or reinstall the helper in Settings › Safety."
-        case "notReady": "The helper isn’t ready. Reinstall it in Settings › Safety or restart the Mac."
+            "The helper needs recovery before it can hold the Mac awake. Restart the Mac or reinstall the helper in Settings › Closed Lid."
+        case "notReady": "The helper isn’t ready. Reinstall it in Settings › Closed Lid or restart the Mac."
         case "safetyStop": "Stopped for safety: check power, battery, temperature and external displays."
         case "sessionExpired": "The closed-lid time limit was reached."
         case "invalidLease", "renewalRefused", "renewalExpiredDuringCommit", "heartbeatExpired", "clientDisconnected",
@@ -1748,7 +1748,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             : newState == .ready && reasons.contains("graceExpired") ? .completion : nil
         if let alertCategory {
             outcomeNotifications.emit(category: alertCategory, session: session?.id ?? "app", event: transition.id.uuidString,
-                reason: reasons.first ?? "stateChanged", preview: true, now: uptime())
+                reason: reasons.first ?? "stateChanged", preview: false, now: uptime())
         }
     }
 }

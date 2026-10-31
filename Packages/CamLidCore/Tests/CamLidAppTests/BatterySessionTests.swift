@@ -188,4 +188,22 @@ struct BatterySessionTests {
         editor.discard()
         #expect(editor.draft.closedLidOptIn)
     }
+
+    /// Settings shows one "Allow on battery" switch: it saves "Require charger" off and battery sessions on together.
+    @Test func oneBatterySwitchSavesBothSettings() throws {
+        var current = try Configuration()
+        let editor = SettingsEditor(configuration: current, revision: 1, section: .safety)
+        editor.configureAutosave { patch, revision in
+            do { current = try current.applying(patch); return .saved(revision: revision + 1) }
+            catch { return .failed("Invalid setting") }
+        }
+        #expect(!editor.batteryAllowed)
+        editor.setBatteryAllowed(true)
+        #expect(!current.chargingOnly && current.batteryModeAllowed && editor.batteryAllowed && !editor.isDirty)
+        editor.configureAutosave { _, _ in .failed("Storage refused") }
+        editor.setBatteryAllowed(false)
+        #expect(!current.chargingOnly && current.batteryModeAllowed && editor.isDirty)
+        editor.discard()
+        #expect(editor.batteryAllowed)
+    }
 }

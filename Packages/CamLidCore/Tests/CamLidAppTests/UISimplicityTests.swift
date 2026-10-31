@@ -68,7 +68,8 @@ struct UISimplicityTests {
         let shortened = try #require(status()["session"] as? [String: Any])
         #expect(shortened["id"] as? String == auto["id"] as? String)
         #expect((shortened["capDeadlineMonotonic"] as? Double ?? 0) == (auto["startedAtMonotonic"] as? Double ?? 0) + 300)
-        #expect(!SettingsSection.allCases.contains { $0.rawValue == "general" })
+        // Owner-approved cleanup (2026-11-01): three panes.
+        #expect(SettingsSection.allCases.map(\.title) == ["General", "Agents", "Closed Lid"])
     }
     @Test @MainActor func dashboardModesStartSwitchAndToggleWithoutResettingCap() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }

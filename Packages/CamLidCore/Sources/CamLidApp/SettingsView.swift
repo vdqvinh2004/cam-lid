@@ -184,19 +184,17 @@ public struct SettingsView: View {
     public let onClose: () -> Void
     public let onOpenActivityLog: () -> Void
     public let onSectionChange: (SettingsSection) -> Void
-    public let onOpenSleepDiagnostics: (() -> Void)?
     public let showsPanePicker: Bool
 
     public init(editor: SettingsEditor, statusSummary: String,
         onCommit: @escaping (ConfigPatch, Int) -> SettingsCommitResult,
         onClose: @escaping () -> Void, onOpenActivityLog: @escaping () -> Void,
         onSectionChange: @escaping (SettingsSection) -> Void = { _ in },
-        showsPanePicker: Bool = true, onOpenSleepDiagnostics: (() -> Void)? = nil) {
+        showsPanePicker: Bool = true) {
         self.editor = editor; self.statusSummary = statusSummary
         self.onCommit = onCommit; self.onClose = onClose
         self.onOpenActivityLog = onOpenActivityLog; self.onSectionChange = onSectionChange
         self.showsPanePicker = showsPanePicker
-        self.onOpenSleepDiagnostics = onOpenSleepDiagnostics
     }
 
     public var body: some View {
@@ -228,54 +226,86 @@ public struct SettingsView: View {
     private var settingsForm: some View {
         Form {
             switch editor.section {
-            case .defaults: SettingsDefaultsPane(editor: editor)
+            case .general: SettingsGeneralPane(editor: editor, onOpenActivity: onOpenActivityLog)
             case .agents: SettingsAgentsPane(editor: editor)
-            case .lifetime: SettingsLifetimePane(editor: editor)
-            case .safety: SettingsSafetyPane(editor: editor, onOpenSleepDiagnostics: onOpenSleepDiagnostics, isExpanded: $safetyExpanded)
-            case .permissions: SettingsPermissionsPane(editor: editor)
-            case .activity: SettingsActivityPane(onOpen: onOpenActivityLog)
+            case .safety: SettingsSafetyPane(editor: editor, isExpanded: $safetyExpanded)
             }
         }.formStyle(.grouped).padding(8)
     }
 }
 
-private struct SettingsPermissionsPane: View {
+/// Defaults for new sessions, the app, notifications (with their permission) and history.
+private struct SettingsGeneralPane: View {
     @ObservedObject var editor: SettingsEditor
+    let onOpenActivity: () -> Void
 
-    private var canRequest: Bool {
-        ["notDetermined", "unavailable"].contains(editor.notificationPermission)
-    }
+    /// "Work failed" has no source any more; the stored value stays readable but is not offered.
+    private static let categories = NotificationCategory.allCases.filter { $0 != .failure }
+    private var permissionNeedsAction: Bool { !["granted", "authorized", "provisional"].contains(editor.notificationPermission) }
 
     var body: some View {
         Section {
-            HStack(alignment: .firstTextBaseline) {
-                PermissionStatusLabel(status: editor.notificationPermission)
-                    .accessibilityIdentifier("camlid.permissions.notifications.status")
-                Spacer()
-                Button { editor.onRefreshPermissions?() } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+            SettingsNumberField(editor: editor, title: "Default Timed duration", field: .timer, unit: "minutes")
+            SettingsNumberField(editor: editor, title: "Default Sleep when done", field: .completionDelay, unit: "minutes")
+        } header: {
+            Text("New sessions")
+        } footer: {
+            Text("The Dashboard changes only the current session.")
+        }
+        Section("App") {
+            Toggle("Launch at login", isOn: Binding(get: { editor.draft.launchAtLogin }, set: editor.setLaunchAtLogin))
+                .help("Open CamLid at login without starting a session")
+                .accessibilityLabel("Launch at login")
+                .accessibilityIdentifier("camlid.settings.launchAtLogin")
+            if editor.loginState == "error" || editor.loginState == "requiresApproval" || (editor.draft.launchAtLogin != (editor.loginState == "enabled")) {
+                Text(editor.loginMessage).font(.caption).foregroundStyle(.secondary)
+                Button("Apply startup preference") { editor.onApplyLogin?() }
+            }
+            SettingsFieldOutcome(editor: editor, key: "launchAtLogin")
+        }
+        Section {
+            ForEach(Self.categories, id: \.self) { category in
+                Toggle(category.title, isOn: Binding(get: { editor.draft.notificationCategories?.contains(category) ?? false },
+                    set: { editor.setNotification(category, enabled: $0) }))
+                    .help("Send a local notification for " + category.title.lowercased())
+                    .accessibilityLabel(category.title)
+                    .accessibilityIdentifier("camlid.settings.notification." + category.rawValue)
+            }
+            if !(editor.draft.notificationCategories ?? []).isEmpty, permissionNeedsAction {
+                HStack(alignment: .firstTextBaseline) {
+                    PermissionStatusLabel(status: editor.notificationPermission)
+                        .accessibilityIdentifier("camlid.permissions.notifications.status")
+                    Spacer()
+                    if ["notDetermined", "unavailable"].contains(editor.notificationPermission) {
+                        Button("Allow Notifications…") { editor.onAuthorizeNotifications?() }
+                            .accessibilityIdentifier("camlid.permissions.notifications.request")
+                    } else {
+                        Button("Open System Settings…") { editor.onOpenNotificationSettings?() }
+                            .accessibilityLabel("Open Notifications in System Settings")
+                            .accessibilityIdentifier("camlid.permissions.notifications.settings")
+                    }
                 }
-                .buttonStyle(.borderless)
-                .help("Check notification permission again")
-                .accessibilityLabel("Refresh permission status")
-                .accessibilityIdentifier("camlid.permissions.refresh")
             }
-            if canRequest {
-                Button("Allow Notifications…") { editor.onAuthorizeNotifications?() }
-                    .accessibilityIdentifier("camlid.permissions.notifications.request")
-            }
-            Button("Open Notifications Settings…") { editor.onOpenNotificationSettings?() }
-                .accessibilityLabel("Open Notifications in System Settings")
-                .accessibilityIdentifier("camlid.permissions.notifications.settings")
             if let error = editor.permissionSettingsError {
                 CamLidStatusLabel(error, systemImage: "exclamationmark.triangle", tone: .warning)
             }
+            SettingsFieldOutcome(editor: editor, key: "notificationCategories")
         } header: {
-            Text("Notifications — optional", bundle: .module)
-        } footer: {
-            Text("Choose alert categories in Defaults. CamLid doesn’t need Screen Recording or Full Disk Access.", bundle: .module)
+            Text("Notifications")
+        }
+        Section {
+            LabeledContent {
+                Button("Open Activity…", action: onOpen)
+                    .help("Search, export or delete local activity")
+            } label: {
+                Text("Kept on this Mac for 14 days; never prompts, code or transcripts.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("History")
         }
     }
+    private var onOpen: () -> Void { onOpenActivity }
 }
 
 private struct PermissionStatusLabel: View {
@@ -300,88 +330,31 @@ private struct PermissionStatusLabel: View {
     }
 }
 
-private struct SettingsDefaultsPane: View {
-    @ObservedObject var editor: SettingsEditor
-    var body: some View {
-        Section {
-            SettingsNumberField(editor: editor, title: "Default Timed duration", field: .timer, unit: "minutes")
-            SettingsNumberField(editor: editor, title: "Default Sleep when done", field: .completionDelay, unit: "minutes")
-        } header: {
-            Text("New sessions")
-        } footer: {
-            Text("Defaults apply when starting a mode. Dashboard edits apply to the current session.")
-        }
-        Section("App") {
-            Toggle("Launch at login", isOn: Binding(get: { editor.draft.launchAtLogin }, set: editor.setLaunchAtLogin))
-                .help("Open CamLid at login without starting a session")
-                .accessibilityLabel("Launch at login")
-                .accessibilityIdentifier("camlid.settings.launchAtLogin")
-            Text(editor.loginMessage).font(.caption).foregroundStyle(.secondary)
-            if editor.loginState == "error" || editor.loginState == "requiresApproval" || (editor.draft.launchAtLogin != (editor.loginState == "enabled")) {
-                Button("Apply startup preference") { editor.onApplyLogin?() }
-            }
-            SettingsFieldOutcome(editor: editor, key: "launchAtLogin")
-        }
-        Section("Notifications") {
-            ForEach(NotificationCategory.allCases, id: \.self) { category in
-                Toggle(category.title, isOn: Binding(get: { editor.draft.notificationCategories?.contains(category) ?? false },
-                    set: { editor.setNotification(category, enabled: $0) }))
-                    .help("Send a local notification for " + category.title.lowercased())
-                    .accessibilityLabel(category.title)
-                    .accessibilityIdentifier("camlid.settings.notification." + category.rawValue)
-            }
-            Text(notificationMessage)
-                .font(.caption).foregroundStyle(.secondary)
-            if ["notDetermined", "unavailable"].contains(editor.notificationPermission), !(editor.draft.notificationCategories ?? []).isEmpty {
-                Button("Allow notifications…") { editor.onAuthorizeNotifications?() }
-            }
-            SettingsFieldOutcome(editor: editor, key: "notificationCategories")
-        }
-        Section("Display") {
-            VStack(alignment: .leading, spacing: 4) {
-                Toggle("Allow display sleep", isOn: Binding(get: { editor.draft.allowDisplaySleep ?? true }, set: editor.setAllowDisplaySleep))
-                    .help("Allow the display to sleep during an awake session; off keeps the display awake too")
-                    .accessibilityLabel("Allow display sleep")
-                    .accessibilityIdentifier("camlid.settings.allowDisplaySleep")
-                Text("When on, the display may sleep while the system keeps running. When off, both stay awake during a session.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text("Saved preference only in this preview. Power control is unavailable.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            SettingsFieldOutcome(editor: editor, key: "allowDisplaySleep")
-        }
-    }
-    private var notificationMessage: String {
-        switch editor.notificationPermission {
-        case "denied": "Notifications are disabled in macOS. Enable CamLid in System Settings → Notifications."
-        case "requesting": "Waiting for macOS notification approval."
-        case "authorized", "provisional": "Notifications allowed by macOS. Preview alerts never claim a power change."
-        case "unavailable", "unknown": "Notification permission is unavailable. Retry from an installed app."
-        default: "Alerts are local only. Turn on a category to request permission. Preview alerts never claim a power change."
-        }
-    }
-}
-
 private struct SettingsAgentsPane: View {
     @ObservedObject var editor: SettingsEditor
+    @State private var showsOthers = false
     private var orderedBadges: [AgentBadgeState] {
         AgentBadgeState.providers.map { provider in
             editor.badges.first { $0.provider == provider }
                 ?? AgentBadgeState(provider: provider, enabled: editor.draft.parsedAdapters().contains(provider), tasks: [])
         }.sortedForAgentDisplay(detectedFirst: true)
     }
+    /// Agents that are selected or installed here; the rest (not installed, or not supported yet) sit under "Other agents".
+    private func isRelevant(_ state: AgentBadgeState) -> Bool {
+        editor.draft.parsedAdapters().contains(state.provider) || state.cliDetected == true || state.appDetected == true
+    }
+    private var supported: [AgentBadgeState] { orderedBadges.filter(isRelevant) }
+    private var others: [AgentBadgeState] { orderedBadges.filter { !isRelevant($0) } }
+
     var body: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
-                BadgeFlowLayout(spacing: 8, lineSpacing: 8) {
-                    ForEach(orderedBadges) { state in
-                        SettingsAgentBadge(state: state, enabled: editor.draft.parsedAdapters().contains(state.provider), showsCLIInstallation: true) {
-                            editor.setProvider(state.provider, enabled: $0)
-                        }
-                    }
+                badges(supported)
+                if !others.isEmpty {
+                    DisclosureGroup("Other agents (\(others.count))", isExpanded: $showsOthers) { badges(others) }
+                        .disclosureGroupStyle(RowDisclosureStyle())
+                        .help("Not installed on this Mac, or not supported yet")
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
                 ForEach(orderedBadges) { state in
                     SettingsFieldOutcome(editor: editor, key: "provider:" + state.provider)
                 }
@@ -396,11 +369,71 @@ private struct SettingsAgentsPane: View {
                     .accessibilityIdentifier("camlid.agents.enableAll")
             }
         }
+        WatchedProgramsSection(editor: editor)
+    }
+
+    private func badges(_ states: [AgentBadgeState]) -> some View {
+        BadgeFlowLayout(spacing: 8, lineSpacing: 8) {
+            ForEach(states) { state in
+                SettingsAgentBadge(state: state, enabled: editor.draft.parsedAdapters().contains(state.provider), showsCLIInstallation: true) {
+                    editor.setProvider(state.provider, enabled: $0)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private struct SettingsLifetimePane: View {
+/// Programs that keep an Auto session awake while they run; the add form opens in a sheet.
+private struct WatchedProgramsSection: View {
     @ObservedObject var editor: SettingsEditor
+    @State private var adding = false
+    private var rules: [LifetimeRule] { editor.draft.lifetimeRules ?? [] }
+
+    var body: some View {
+        Section {
+            ForEach(rules) { rule in
+                HStack {
+                    Toggle(isOn: Binding(
+                        get: { rule.enabled },
+                        set: { enabled in
+                            var updated = rules
+                            guard let index = updated.firstIndex(where: { $0.id == rule.id }) else { return }
+                            updated[index].enabled = enabled
+                            editor.setLifetimeRules(updated)
+                        })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(rule.label)
+                            Text(rule.selectorValue).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        }
+                    }
+                    .accessibilityIdentifier("camlid.settings.lifetime.enabled." + rule.id.uuidString)
+                    Button("Remove") { editor.setLifetimeRules(rules.filter { $0.id != rule.id }) }
+                        .accessibilityIdentifier("camlid.settings.lifetime.remove." + rule.id.uuidString)
+                }
+            }
+            HStack {
+                Text(rules.isEmpty ? "None" : "\(rules.count) of \(LifetimeRule.maximumRules)")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Add Program…") { adding = true }
+                    .disabled(rules.count >= LifetimeRule.maximumRules)
+                    .help("Keep an Auto session awake while a program runs")
+                    .accessibilityIdentifier("camlid.settings.lifetime.add")
+            }
+            SettingsFieldOutcome(editor: editor, key: "lifetimeRules")
+        } header: {
+            Text("Watched programs")
+        } footer: {
+            Text("A watched program keeps an Auto session awake while it runs; it doesn’t start a session.")
+        }
+        .sheet(isPresented: $adding) { AddWatchedProgramSheet(editor: editor, isPresented: $adding) }
+    }
+}
+
+private struct AddWatchedProgramSheet: View {
+    @ObservedObject var editor: SettingsEditor
+    @Binding var isPresented: Bool
     @State private var selectorKind: LifetimeSelectorKind = .exactExecutablePath
     @State private var selectorValue = ""
     @State private var label = ""
@@ -415,79 +448,46 @@ private struct SettingsLifetimePane: View {
     }
 
     var body: some View {
-        Section {
-            if rules.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("No watched programs yet", systemImage: "eye.slash")
-                        .font(.callout)
-                    Text("Add a program below to keep an Auto session awake while it runs.")
-                        .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Add a watched program").font(.headline)
+            Form {
+                Picker("Selection type", selection: $selectorKind) {
+                    Text("Executable path").tag(LifetimeSelectorKind.exactExecutablePath)
+                    Text("App bundle ID").tag(LifetimeSelectorKind.applicationBundleID)
                 }
-            }
-            ForEach(rules) { rule in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Toggle(rule.label, isOn: Binding(
-                            get: { rule.enabled },
-                            set: { enabled in
-                                var updated = rules
-                                guard let index = updated.firstIndex(where: { $0.id == rule.id }) else { return }
-                                updated[index].enabled = enabled
-                                editor.setLifetimeRules(updated)
-                            }))
-                            .accessibilityIdentifier("camlid.settings.lifetime.enabled." + rule.id.uuidString)
-                        Spacer()
-                        Button("Remove") { editor.setLifetimeRules(rules.filter { $0.id != rule.id }) }
-                            .accessibilityIdentifier("camlid.settings.lifetime.remove." + rule.id.uuidString)
+                .accessibilityIdentifier("camlid.settings.lifetime.selectorKind")
+                .onChange(of: selectorKind) { _, _ in error = nil }
+                LabeledContent(selectorTitle) {
+                    HStack(spacing: 8) {
+                        TextField(selectorPlaceholder, text: $selectorValue)
+                            .labelsHidden().textFieldStyle(.roundedBorder)
+                            .accessibilityIdentifier("camlid.settings.lifetime.selectorValue")
+                        Button("Choose…") { chooseProgram() }
+                            .help(selectorKind == .exactExecutablePath ? "Choose an installed executable" : "Choose an installed app")
                     }
-                    Text((rule.selectorKind == .exactExecutablePath ? "Executable path · " : "App bundle ID · ") + rule.selectorValue)
-                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 }
-                .padding(.vertical, 2)
-            }
-            SettingsFieldOutcome(editor: editor, key: "lifetimeRules")
-        } header: {
-            Text("Watched programs")
-        } footer: {
-            Text("Watching a program doesn’t start a session or prove AI work. It only keeps an already-started Auto session awake while the program runs.")
-        }
-
-        Section("Add a watched program") {
-            Picker("Selection type", selection: $selectorKind) {
-                Text("Executable path").tag(LifetimeSelectorKind.exactExecutablePath)
-                Text("App bundle ID").tag(LifetimeSelectorKind.applicationBundleID)
-            }
-            .accessibilityIdentifier("camlid.settings.lifetime.selectorKind")
-            .onChange(of: selectorKind) { _, _ in error = nil }
-            LabeledContent(selectorTitle) {
-                HStack(spacing: 8) {
-                    TextField(selectorPlaceholder, text: $selectorValue)
+                LabeledContent("Label") {
+                    TextField("Name for this program", text: $label)
                         .labelsHidden().textFieldStyle(.roundedBorder)
-                        .accessibilityIdentifier("camlid.settings.lifetime.selectorValue")
-                    Button("Choose…") { chooseProgram() }
-                        .help(selectorKind == .exactExecutablePath ? "Choose an installed executable" : "Choose an installed app")
+                        .accessibilityIdentifier("camlid.settings.lifetime.label")
                 }
-            }
-            LabeledContent("Label") {
-                TextField("Name for this program", text: $label)
-                    .labelsHidden().textFieldStyle(.roundedBorder)
-                    .accessibilityIdentifier("camlid.settings.lifetime.label")
-            }
-            Button("Add Program") { addRule() }
-                .disabled(selectorValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    || label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    || rules.count >= LifetimeRule.maximumRules)
-                .help("Add this program to the watched list")
-                .accessibilityIdentifier("camlid.settings.lifetime.add")
-            if rules.count >= LifetimeRule.maximumRules {
-                Text("The limit is 20 rules.").font(.caption).foregroundStyle(.secondary)
             }
             if let error {
-                CamLidStatusLabel(error, systemImage: "exclamationmark.circle",
-                                  tone: .danger, font: .caption)
+                CamLidStatusLabel(error, systemImage: "exclamationmark.circle", tone: .danger, font: .caption)
                     .accessibilityIdentifier("camlid.settings.lifetime.error")
             }
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { isPresented = false }
+                    .keyboardShortcut(.cancelAction)
+                Button("Add") { addRule() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(selectorValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
         }
+        .padding(20)
+        .frame(width: 460)
     }
 
     private func chooseProgram() {
@@ -544,7 +544,7 @@ private struct SettingsLifetimePane: View {
             updated.append(rule)
             editor.setLifetimeRules(updated)
             guard editor.fieldMessages["lifetimeRules"] == nil else { error = editor.fieldMessages["lifetimeRules"]; return }
-            selectorValue = ""; label = ""; error = nil
+            isPresented = false
         } catch {
             self.error = "Use an exact normalized path or installed bundle ID, with a label of at most 80 characters."
         }
@@ -554,6 +554,7 @@ private struct SettingsLifetimePane: View {
 private struct SettingsClosedLidSection: View {
     @ObservedObject var editor: SettingsEditor
     @State private var confirmingUntested = false
+    @State private var showsDetails = false
 
     private var systemText: String { "\(editor.systemModel), macOS \(editor.systemBuild)" }
     private var testedText: String {
@@ -567,36 +568,20 @@ private struct SettingsClosedLidSection: View {
 
     var body: some View {
         Section {
-            Toggle("Keep awake with the lid closed", isOn: Binding(get: { editor.draft.closedLidOptIn }, set: editor.setClosedLidOptIn))
-                .help("Lets sessions keep this Mac awake with the lid closed, within the safety limits")
-                .accessibilityIdentifier("camlid.settings.closedLid.enabled")
-            SettingsFieldOutcome(editor: editor, key: "closedLidOptIn")
-            Picker("Mode", selection: Binding(get: { editor.draft.powerMode }, set: editor.setPowerMode)) {
-                Text(PowerMode.standard.title).tag(PowerMode.standard)
-                Text(PowerMode.strict.title).tag(PowerMode.strict)
-                    .selectionDisabled(!editor.strictTested && editor.draft.powerMode != .strict)
-            }
-            .help("Standard is the default. Strict is experimental; it can be chosen only on a Mac where it was tested.")
-            .accessibilityLabel(Text("Closed-lid mode"))
-            .accessibilityIdentifier("camlid.settings.closedLid.mode")
-            Text(editor.draft.powerMode.disclosure)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if !editor.strictTested {
-                Text("Strict isn’t tested on this Mac, so it can’t be chosen.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            SettingsFieldOutcome(editor: editor, key: "powerMode")
-            ValueRow(title: "This Mac", value: systemText)
-            ValueRow(title: "Testing", value: testedText)
-            if !editor.closedLidPermit.hasPrefix("qualified:") {
-                Toggle("Allow on this untested Mac", isOn: Binding(
-                    get: { editor.closedLidPermit == "untestedAcknowledged" },
-                    set: { allow in
-                        if allow { confirmingUntested = true } else { editor.onSetUntestedAcknowledgement?(false) }
-                    }))
-                    .help("Closed lid has not been tested on this model and macOS build")
-                    .accessibilityIdentifier("camlid.settings.closedLid.allowUntested")
+            // The one status line; details below on request.
+            PreviewBuildNotice(text: editor.capabilityText.isEmpty ? nil : editor.capabilityText)
+            HStack {
+                Button(installed ? "Reinstall helper…" : "Install helper…") { editor.onInstallHelper?() }
+                    .disabled(editor.helperBusy)
+                    .help("Asks for an administrator password once. Installing doesn’t start a session or change sleep settings.")
+                    .accessibilityIdentifier("camlid.settings.helper.install")
+                if installed {
+                    Button("Remove helper…") { editor.onUninstallHelper?() }
+                        .disabled(editor.helperBusy)
+                        .help("Restores the sleep setting and removes the helper")
+                        .accessibilityIdentifier("camlid.settings.helper.remove")
+                }
+                if editor.helperBusy { ProgressView().controlSize(.small) }
             }
             ForEach(editor.keepAwakeApps.filter(\.resetsSleepSetting), id: \.self) { app in
                 Label("\(app.name) resets the sleep setting and will interrupt closed lid. Quit \(app.name) or remove its helper.",
@@ -606,30 +591,48 @@ private struct SettingsClosedLidSection: View {
             }
             let others = editor.keepAwakeApps.filter { !$0.resetsSleepSetting }.map(\.name)
             if !others.isEmpty {
-                Label("Other keep-awake apps are running: \(others.joined(separator: ", ")). They won’t stop closed lid, but your Mac may stay awake after CamLid finishes.",
-                      systemImage: "info.circle")
+                Label("Also keeping the Mac awake: \(others.joined(separator: ", ")).", systemImage: "info.circle")
                     .font(.caption)
+                    .help("They won’t stop closed lid, but your Mac may stay awake after CamLid finishes.")
+            }
+            Toggle("Keep awake with the lid closed", isOn: Binding(get: { editor.draft.closedLidOptIn }, set: editor.setClosedLidOptIn))
+                .help("Lets sessions keep this Mac awake with the lid closed, within the safety limits")
+                .accessibilityIdentifier("camlid.settings.closedLid.enabled")
+            SettingsFieldOutcome(editor: editor, key: "closedLidOptIn")
+            VStack(alignment: .leading, spacing: 4) {
+                Picker("Mode", selection: Binding(get: { editor.draft.powerMode }, set: editor.setPowerMode)) {
+                    Text(PowerMode.standard.title).tag(PowerMode.standard)
+                    Text(PowerMode.strict.title).tag(PowerMode.strict)
+                        .selectionDisabled(!editor.strictTested && editor.draft.powerMode != .strict)
+                }
+                .help(editor.draft.powerMode.disclosure)
+                .accessibilityLabel(Text("Closed-lid mode"))
+                .accessibilityIdentifier("camlid.settings.closedLid.mode")
+                Text(editor.draft.powerMode.summary + (editor.strictTested ? "" : " Strict isn’t tested on this Mac."))
+                    .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            ValueRow(title: "Helper", value: editor.helperBusy ? "Working…" : helperLabel)
-            Text(editor.helperMessage)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button(installed ? "Reinstall helper…" : "Install helper…") { editor.onInstallHelper?() }
-                    .disabled(editor.helperBusy)
-                    .help("Asks for an administrator password once")
-                    .accessibilityIdentifier("camlid.settings.helper.install")
-                if installed {
-                    Button("Remove helper…") { editor.onUninstallHelper?() }
-                        .disabled(editor.helperBusy)
-                        .accessibilityIdentifier("camlid.settings.helper.remove")
-                }
+            SettingsFieldOutcome(editor: editor, key: "powerMode")
+            if editor.draft.powerMode == .standard, !editor.closedLidPermit.hasPrefix("qualified:") {
+                Toggle("Allow on this untested Mac", isOn: Binding(
+                    get: { editor.closedLidPermit == "untestedAcknowledged" },
+                    set: { allow in
+                        if allow { confirmingUntested = true } else { editor.onSetUntestedAcknowledgement?(false) }
+                    }))
+                    .help("Closed lid has not been tested on this model and macOS build")
+                    .accessibilityIdentifier("camlid.settings.closedLid.allowUntested")
             }
+            DisclosureGroup("Details", isExpanded: $showsDetails) {
+                ValueRow(title: "This Mac", value: systemText)
+                ValueRow(title: "Testing", value: testedText)
+                ValueRow(title: "Helper", value: editor.helperBusy ? "Working…" : helperLabel)
+                Text(editor.helperMessage)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .disclosureGroupStyle(RowDisclosureStyle())
         } header: {
             Text("Closed lid")
-        } footer: {
-            Text("Installing the helper doesn’t start a session or change sleep settings by itself. Settings are kept when CamLid quits; a running session is never resumed after a restart.")
         }
         .alert("Allow closed lid on an untested Mac?", isPresented: $confirmingUntested) {
             Button("Allow") { editor.onSetUntestedAcknowledgement?(true) }
@@ -651,113 +654,47 @@ private struct SettingsClosedLidSection: View {
 
 private struct SettingsSafetyPane: View {
     @ObservedObject var editor: SettingsEditor
-    let onOpenSleepDiagnostics: (() -> Void)?
     @Binding var isExpanded: Bool
 
-    private var powerSourceSummary: String {
-        if editor.draft.chargingOnly {
-            return editor.draft.batteryModeAllowed
-                ? "Charger required. Battery is allowed but won’t be used until Require charger is off."
-                : "Sessions require the charger. Battery sessions are off."
-        }
-        return editor.draft.batteryModeAllowed
-            ? "Sessions can run on battery within the limits below."
-            : "Sessions won’t start on battery until Allow battery sessions is on."
-    }
-
     var body: some View {
-        Section {
-            PreviewBuildNotice(text: editor.capabilityText.isEmpty ? nil : editor.capabilityText)
-        }
         SettingsClosedLidSection(editor: editor)
         Section {
-            Toggle("Require charger", isOn: Binding(get: { editor.draft.chargingOnly }, set: editor.setChargingOnly))
-                .accessibilityLabel(Text("Require charger", bundle: .module))
-                .help("Battery sessions remain blocked while the charger is required")
-            Toggle("Allow battery sessions", isOn: $editor.batterySessionsAllowed)
+            Toggle("Allow on battery", isOn: Binding(get: { editor.batteryAllowed }, set: editor.setBatteryAllowed))
                 .accessibilityIdentifier("camlid.settings.batteryMode")
-                .accessibilityLabel(Text("Allow battery sessions", bundle: .module))
-                .help("Takes effect when Require charger is off")
-            SettingsFieldOutcome(editor: editor, key: "chargingOnly")
-            SettingsFieldOutcome(editor: editor, key: "batteryModeAllowed")
-            Text(powerSourceSummary)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        } header: {
-            Text("Power source", bundle: .module)
-        }
-        Section {
-            SettingsNumberField(editor: editor, title: "Start on battery at or above", field: .batteryEntry, unit: "%")
-            SettingsNumberField(editor: editor, title: "Stop below battery level", field: .batteryFloor, unit: "%")
-            SettingsNumberField(editor: editor, title: "Battery session limit", field: .batteryCap, unit: "minutes")
-            Text("Battery sessions stop at the shorter battery or session limit, measured from session start. Reconnecting the charger doesn’t extend this deadline.", bundle: .module)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        } header: {
-            Text("Battery limits", bundle: .module)
-        }
-        Section {
-            VStack(alignment: .leading, spacing: 4) {
-                LabeledContent("Overheating protection", value: "Always on")
-                    .help("Uses macOS thermal pressure, independently of the temperature reading")
-                Text("Stops immediately at critical thermal pressure, or after 30 seconds at serious pressure.")
-                    .font(.caption).foregroundStyle(.secondary)
+                .help("Off: sessions need the charger. On: sessions may run on battery within the limits below.")
+            SettingsFieldOutcome(editor: editor, key: "batteryAllowed")
+            if editor.batteryAllowed {
+                SettingsNumberField(editor: editor, title: "Stop below battery level", field: .batteryFloor, unit: "%")
+                SettingsNumberField(editor: editor, title: "Battery time limit", field: .batteryCap, unit: "minutes")
             }
-            SettingsNumberField(editor: editor, title: "Session time limit", field: .runCap, unit: "minutes")
-            Text("Auto and finite Timed stop at this limit. Infinite ignores it only on charger power.")
-                .font(.caption).foregroundStyle(.secondary)
         } header: {
-            Text("Safety limits", bundle: .module)
+            Text("Battery", bundle: .module)
         } footer: {
-            Text("Low battery and overheating stop every mode. Keep the Mac ventilated.", bundle: .module)
-        }
-        if let onOpenSleepDiagnostics {
-            Section {
-                Button("Why is my Mac awake?…", action: onOpenSleepDiagnostics)
-                    .help("Inspect current sleep requests by app or process; no power settings are changed")
-                    .accessibilityIdentifier("camlid.settings.sleepDiagnostics")
+            if editor.batteryAllowed {
+                Text("Counted from the start of the session; plugging in doesn’t extend it.", bundle: .module)
             }
+        }
+        Section {
+            SettingsNumberField(editor: editor, title: "Session time limit", field: .runCap, unit: "minutes")
+        } header: {
+            Text("Limits", bundle: .module)
+        } footer: {
+            Text("Overheating, low battery and the time limit stop every session. Infinite Timed ignores the time limit only on the charger.", bundle: .module)
         }
         Section {
             DisclosureGroup("Advanced", isExpanded: $isExpanded) {
+                SettingsNumberField(editor: editor, title: "Start on battery at or above", field: .batteryEntry, unit: "%")
                 VStack(alignment: .leading, spacing: 4) {
                     SettingsNumberField(editor: editor, title: "Retain waiting sessions", field: .waitRetention, unit: "minutes")
-                    Text("Waiting sessions remain tracked for this long. Waiting never keeps the Mac awake.", bundle: .module)
+                    Text("Waiting never keeps the Mac awake.", bundle: .module)
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Toggle("Stop if CPU stays busy", isOn: Binding(get: { editor.draft.cpuStopEnabled }, set: editor.setCPUStop))
-                        .accessibilityLabel(Text("Stop if CPU stays busy", bundle: .module))
-                        .accessibilityIdentifier("camlid.settings.cpuStopEnabled")
-                        .help("Optional stop at 90% CPU for 2 minutes; thermal protection always applies")
-                    Text("Stops at 90% CPU for 2 minutes.").font(.caption).foregroundStyle(.secondary)
-                }
+                Toggle("Stop if CPU stays busy", isOn: Binding(get: { editor.draft.cpuStopEnabled }, set: editor.setCPUStop))
+                    .accessibilityLabel(Text("Stop if CPU stays busy", bundle: .module))
+                    .accessibilityIdentifier("camlid.settings.cpuStopEnabled")
+                    .help("Stops a session at 90% CPU for 2 minutes")
                 SettingsFieldOutcome(editor: editor, key: "cpuStopEnabled")
-            }.disclosureGroupStyle(RowDisclosureStyle()).help("Waiting and CPU safety preferences")
-        }
-    }
-}
-
-private struct SettingsActivityPane: View {
-    let onOpen: () -> Void
-    var body: some View {
-        Section {
-            Label("History stays on this Mac", systemImage: "lock.shield")
-                .font(.callout)
-            Text("CamLid records mode changes, safety stops and agent activity — never prompts, code or transcripts.")
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Kept for 14 days or up to 20 MiB, whichever comes first. Exports hide identifiers.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Spacer()
-                Button("Open Activity…", action: onOpen)
-                    .help("Search, export or delete local activity")
-            }
-        } header: {
-            Text("Private history")
-        } footer: {
-            Text("Search, export or delete local activity at any time.")
+            }.disclosureGroupStyle(RowDisclosureStyle()).help("Battery start level, waiting and CPU preferences")
         }
     }
 }

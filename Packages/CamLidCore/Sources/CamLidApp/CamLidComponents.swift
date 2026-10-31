@@ -237,7 +237,7 @@ struct PreviewBuildNotice: View {
             font: font,
             help: ready
                 ? "Sessions can keep this Mac awake with the lid closed, within the safety limits."
-                : "Closed lid isn’t available yet. Settings › Safety shows what is missing."
+                : "Closed lid isn’t available yet. Settings › Closed Lid shows what is missing."
         )
     }
 }

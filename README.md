@@ -5,7 +5,7 @@ sleep when they are done.
 
 **Status (2026-10-31): early, unsigned, tested on one Mac.** Closed-lid operation has passed attended trials on
 Mac17,3 with macOS 26A434 only ([trial record](specs/014-persistent-helper/g2-trial.md)). On any other model or
-macOS build it stays off unless you explicitly accept "untested configuration" in Settings › Safety. Builds are
+macOS build it stays off unless you explicitly accept "untested configuration" in Settings › Closed Lid. Builds are
 ad-hoc signed and not notarized.
 
 ## What it does
@@ -19,7 +19,7 @@ ad-hoc signed and not notarized.
     and its child processes, shown as "(estimated)"
     ([spec 015](specs/015-agent-activity-observer/spec.md)). Launching an agent without a prompt does not count.
   - Watched programs: optional rules that keep the Mac awake while a given program runs.
-- **Safety stops** on low battery, high thermal pressure, unplugged charger (unless battery sessions are allowed),
+- **Safety stops** on low battery, high thermal pressure, unplugged charger (unless "Allow on battery" is on),
   sustained CPU load (optional) and session time limits. Missing readings never count as healthy.
 - **When a session ends with the lid closed, the Mac sleeps** (unless an external display is connected).
 
@@ -68,8 +68,8 @@ swift test --package-path Packages/CamLidPowerWire
 ## Install and use
 
 1. Open `/Applications/CamLid.app`; its icon appears in the menu bar.
-2. Settings › Safety › Closed lid: check "This Mac" and "Testing", click **Install helper…** and enter your password,
-   then turn on **Keep awake with the lid closed**.
+2. Settings › Closed Lid: click **Install helper…**, enter your password, then turn on **Keep awake with the lid
+   closed**. Details shows this Mac and whether it was tested.
 3. Settings › Agents: select the agents that may keep the Mac awake.
 4. In the menu bar Dashboard, click **Auto** or **Timed**. Click the active mode again to stop.
 

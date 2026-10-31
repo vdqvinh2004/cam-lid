@@ -70,7 +70,7 @@ import CamLidCLI
     }
 
     @Test(arguments: ["authorized", "denied", "unavailable", "unknown"]) func notificationsPaneRendersWithoutOSRequests(_ status: String) throws {
-        let editor = SettingsEditor(configuration: try Configuration(), revision: 1, section: .permissions)
+        let editor = SettingsEditor(configuration: try Configuration(), revision: 1, section: .general)
         editor.notificationPermission = status
         editor.onAuthorizeNotifications = { Issue.record("Rendering cannot request notifications") }
         let host = NSHostingController(rootView: SettingsView(editor: editor, statusSummary: "No power",

@@ -3,10 +3,13 @@ import SwiftUI
 import CamLidCore
 
 public enum SettingsSection: String, Codable, CaseIterable, Sendable {
-    case defaults, agents, lifetime, safety, permissions, activity
-    public var title: String { self == .lifetime ? "Watched Programs" : rawValue.capitalized }
+    // Three panes (owner-approved cleanup, 2026-11-01). A stored older pane name falls back to the default pane.
+    case general, agents, safety
+    public var title: String {
+        switch self { case .general: "General"; case .agents: "Agents"; case .safety: "Closed Lid" }
+    }
     public var symbol: String {
-        switch self { case .defaults: "slider.horizontal.3"; case .agents: "terminal"; case .lifetime: "eye"; case .safety: "shield"; case .permissions: "lock.shield"; case .activity: "clock" }
+        switch self { case .general: "gearshape"; case .agents: "terminal"; case .safety: "laptopcomputer" }
     }
 }
 
@@ -225,6 +228,12 @@ public final class SettingsEditor: ObservableObject {
     public func setBatteryModeAllowed(_ enabled: Bool) {
         draft.batteryModeAllowed = enabled
         apply(key: "batteryModeAllowed") { _ in var patch = ConfigPatch(); patch.batteryModeAllowed = enabled; return patch }
+    }
+    /// One choice for battery sessions: "Require charger" off and "Allow battery sessions" on, saved together.
+    public var batteryAllowed: Bool { !draft.chargingOnly && draft.batteryModeAllowed }
+    public func setBatteryAllowed(_ allowed: Bool) {
+        draft.chargingOnly = !allowed; draft.batteryModeAllowed = allowed
+        apply(key: "batteryAllowed") { _ in var p = ConfigPatch(); p.chargingOnly = !allowed; p.batteryModeAllowed = allowed; return p }
     }
     public func setChargingOnly(_ enabled: Bool) { draft.chargingOnly = enabled; apply(key: "chargingOnly") { _ in var p = ConfigPatch(); p.chargingOnly = enabled; return p } }
     /// Refused by the app while a session runs (spec 016 FR-009); the draft then returns to the saved mode.
@@ -446,6 +455,9 @@ public final class SettingsEditor: ObservableObject {
         if pending.contains("mode") { draft.mode = oldDraft.mode }
         if pending.contains("chargingOnly") { draft.chargingOnly = oldDraft.chargingOnly }
         if pending.contains("batteryModeAllowed") { draft.batteryModeAllowed = oldDraft.batteryModeAllowed }
+        if pending.contains("batteryAllowed") {
+            draft.chargingOnly = oldDraft.chargingOnly; draft.batteryModeAllowed = oldDraft.batteryModeAllowed
+        }
         if pending.contains("allowDisplaySleep") { draft.allowDisplaySleep = oldDraft.allowDisplaySleep }
         if pending.contains("launchAtLogin") { draft.launchAtLogin = oldDraft.launchAtLogin }
         if pending.contains("closedLidOptIn") { draft.closedLidOptIn = oldDraft.closedLidOptIn }

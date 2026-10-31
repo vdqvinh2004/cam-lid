@@ -213,8 +213,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
             onCommit: { _, _ in .failed("App unavailable. Draft preserved.") },
             onClose: { [weak self] in self?.settingsWindow?.performClose(nil) },
             onOpenActivityLog: { [weak self] in self?.send(.activity) },
-            onSectionChange: { [weak self] section in self?.send(.section(section)); self?.toolbar?.select(section) }, showsPanePicker: false,
-            onOpenSleepDiagnostics: { [weak self] in self?.send(.sleepDiagnostics) })
+            onSectionChange: { [weak self] section in self?.send(.section(section)); self?.toolbar?.select(section) }, showsPanePicker: false)
         let host = NSHostingController(rootView: view)
         host.sizingOptions = []
         let window = NSWindow(contentViewController: host)

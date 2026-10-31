@@ -9,6 +9,14 @@ public enum PowerMode: String, Codable, Sendable, CaseIterable {
     /// Strict uses an undocumented kernel interface; it is opt-in and qualified per Mac separately (ADR 0003).
     public var isExperimental: Bool { self == .strict }
 
+    /// One line under the mode choice; `disclosure` is the full statement (shown as help).
+    public var summary: String {
+        switch self {
+        case .standard: "Turns off sleep while a session runs and restores it afterwards."
+        case .strict: "Experimental: blocks only lid-close sleep; a restart always clears it."
+        }
+    }
+
     /// Plain statement shown wherever the mode is chosen (spec 014 FR-012).
     public var disclosure: String {
         switch self {
