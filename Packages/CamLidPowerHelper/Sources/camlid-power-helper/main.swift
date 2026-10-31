@@ -70,7 +70,9 @@ do {
     }
     controller.log = logLine
     controller.sleepSystem = NativeHelperEnvironment.sleepNow
-    let runtime = PowerHelperRuntime(service: controller, onStartupFailure: exitAfterFailedStart)
+    // Explicit @Sendable closures: references formed in top-level (main-actor) code are main-actor isolated, and the
+    // runtime calls these from its own queue ("data race detected" at every helper stop).
+    let runtime = PowerHelperRuntime(service: controller, onStartupFailure: { @Sendable in exitAfterFailedStart() })
     // Best-effort lid mode ends its single episode on any sleep or wake; Standard's daemon ends only a Strict lease,
     // and only when the system sleeps (ADR 0003).
     let sleepObserver = bestEffortLidMode ? try RootDomainGeneralInterestObserver { reason in
@@ -92,7 +94,7 @@ do {
         source.setEventHandler {
             sleepObserver?.invalidate()
             listener.invalidate()
-            runtime.shutdown(completion: exitAfterShutdown)
+            runtime.shutdown(completion: { @Sendable in exitAfterShutdown() })
         }
         source.resume()
         return source

@@ -857,15 +857,14 @@ private struct CustomNumberInput: NSViewRepresentable {
     }
 }
 
-/// A label/value row VoiceOver reads as both ("This Mac, Mac17,3, macOS 26A434"). Combining a `LabeledContent`
-/// inside a Form kept only the label: VoiceOver read "Testing" without "Tested".
+/// A label/value row VoiceOver reads as both ("This Mac: Mac17,3, macOS 26A434"). In a Form these rows are exposed
+/// without a value attribute (combined or explicit), so the value is part of the label.
 private struct ValueRow: View {
     let title: String
     let value: String
     var body: some View {
         LabeledContent(title) { Text(value) }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(title))
-            .accessibilityValue(Text(value))
+            .accessibilityLabel(Text("\(title): \(value)"))
     }
 }
