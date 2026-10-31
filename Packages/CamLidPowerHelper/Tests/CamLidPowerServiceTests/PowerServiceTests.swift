@@ -3,7 +3,7 @@ import Testing
 import LidRecoveryJournal
 @testable import CamLidPowerService
 
-private final class FakeBackend: SleepOverrideBackend {
+final class FakeBackend: SleepOverrideBackend {
     var disabled = false
     var writes: [Bool] = []
     var writeFails = false
@@ -21,7 +21,7 @@ private final class FakeBackend: SleepOverrideBackend {
     }
 }
 
-private final class FakeStore: PowerIntentStore {
+final class FakeStore: PowerIntentStore {
     var record: JournalEntry?
     var commits = 0
     var failAt: Int?
@@ -44,7 +44,7 @@ private final class FakeStore: PowerIntentStore {
     }
 }
 
-private final class Fixture {
+final class Fixture {
     let backend = FakeBackend()
     let store = FakeStore()
     let owner = UUID()
@@ -52,13 +52,16 @@ private final class Fixture {
     var safetyDelay = 0.0
     var safety =  HelperSafety(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501,
                               lidClosed: false, externalDisplays: 0)
+    /// Set to offer Strict (ADR 0003) with fake kernel calls.
+    var clamshell: FakeClamshellCalls?
     lazy var service = makeService()
     func makeService(bootID: String = "boot-a") -> PowerLeaseService {
         PowerLeaseService(backend: backend, store: store, bootID: bootID,
                           clock: { self.time }, safety: {
                               self.time += self.safetyDelay
                               return self.safety
-                          })
+                          },
+                          strict: clamshell.map { ClamshellBitMechanism(calls: $0.calls, foreignPolicy: { .clear }) })
     }
     func acquire(seconds: Int = 300) -> PowerReply {
         service.start()

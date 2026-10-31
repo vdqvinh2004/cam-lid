@@ -11,6 +11,15 @@ import Testing
         #expect(decoded.sequence == 7 && decoded.sessionSeconds == 300 && decoded.version == 1)
     }
 
+    @Test func theMechanismRoundTripsAndAnOldClientMeansStandard() throws {
+        let strict = PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 60, mechanism: .strict)
+        #expect(try JSONDecoder().decode(PowerRequest.self, from: JSONEncoder().encode(strict)).mechanism == .strict)
+        let old = Data(#"{"version":1,"operation":"acquire","sequence":1,"sessionSeconds":60}"#.utf8)
+        #expect(try JSONDecoder().decode(PowerRequest.self, from: old).mechanism == nil)
+        let unknown = Data(#"{"version":1,"operation":"acquire","mechanism":"everything"}"#.utf8)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(PowerRequest.self, from: unknown) }
+    }
+
     @Test func unknownOperationsAreRejectedWhenDecoding() {
         let json = Data(#"{"version":1,"operation":"format-disk"}"#.utf8)
         #expect(throws: DecodingError.self) { try JSONDecoder().decode(PowerRequest.self, from: json) }

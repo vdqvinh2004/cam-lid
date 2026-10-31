@@ -73,6 +73,11 @@ struct AgentActivityIntegrationTests {
     /// Trial 8: root-owned processes made every scan "incomplete", so Auto never trusted a completion.
     @Test func otherUsersProcessesDoNotMakeTheScanIncomplete() {
         #expect(NativeProcessList().agentSnapshot().complete)
-        #expect(NativeProcessList().lifetimeSnapshot()?.complete == true)
+        // Some of the user's own processes refuse inspection; they leave a scan incomplete only if they could match.
+        #expect(NativeProcessList().lifetimeSnapshot(ruleNames: ["no-such-tool"])?.complete == true)
+        let path = try! LifetimeRule(selectorKind: .exactExecutablePath, selectorValue: "/opt/tools/A-Very-Long-Worker-Name", label: "W")
+        let bundle = try! LifetimeRule(selectorKind: .applicationBundleID, selectorValue: "com.example.app", label: "App")
+        #expect(NativeProcessList.kernelNames(of: [path]) == ["a-very-long-work"])
+        #expect(NativeProcessList.kernelNames(of: [path, bundle]) == nil)
     }
 }

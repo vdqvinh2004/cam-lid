@@ -1,16 +1,16 @@
 # Tasks: Strict mode, lid-only
 
-**Feature context:** `016-strict-lid-only` · **Status:** 1/15 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `016-strict-lid-only` · **Status:** 6/15 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decision
 - [x] T001 ADR 0003 accepted; ADR 0001 amended. — `85bae08`.
 
 ## Phase 1 — Helper
-- [ ] T101 `PowerRequest.mechanism` (optional, default `standard`) with wire round-trip tests, old-client decode test.
-- [ ] T102 `ClamshellBitMechanism` with an injected native interface; tests: apply order (assertion then bit), renewal re-sets the bit and extends the assertion, clear is idempotent, failed apply discards both, `readApplied` nil.
-- [ ] T103 `PowerLeaseService` selects the mechanism per acquire; one lease across mechanisms; journal family prefix; tests for each mechanism and for refusing a second lease.
-- [ ] T104 Recovery job and boot handling by family: orphaned Strict record → clear bit; previous-boot Strict record → acknowledged without a write. Tests.
-- [ ] T105 Interruption: system sleep observed during a Strict lease ends it with `systemSleptWhileHeld`; no own sleep request after a Strict restore. Tests.
+- [x] T101 `PowerRequest.mechanism` (optional, default `standard`) with wire round-trip tests, old-client decode test. — `PowerRequest.Mechanism` (`standard` | `strict`); round-trip, old-client and unknown-value tests.
+- [x] T102 `ClamshellBitMechanism` with an injected native interface; tests: apply order (assertion then bit), renewal re-sets the bit and extends the assertion, clear is idempotent, failed apply discards both, `readApplied` nil. — `ClamshellBitMechanism.swift` (`ClamshellBitCalls.native`), 5 tests with fake calls.
+- [x] T103 `PowerLeaseService` selects the mechanism per acquire; one lease across mechanisms; journal family prefix; tests for each mechanism and for refusing a second lease. — `strict:` init parameter, `mechanism(for:)` by owner-identity prefix (`clamshell-bit-v1:`), new protocol properties `restartClearsPolicy` and `acknowledgedClearIsRestore`; `StrictLeaseTests`.
+- [x] T104 Recovery job and boot handling by family: orphaned Strict record → clear bit; previous-boot Strict record → acknowledged without a write. Tests. — Same-boot helper restart also clears the bit; the recovery job and uninstall get the Strict mechanism in `main.swift`.
+- [x] T105 Interruption: system sleep observed during a Strict lease ends it with `systemSleptWhileHeld`; no own sleep request after a Strict restore. Tests. — `observeSystemSleep()`; the Standard daemon now runs the passive root-domain observer (Standard leases ignore it). The observer has not been exercised physically in Standard mode.
 
 ## Phase 2 — App
 - [ ] T201 `PowerMode.strict` availability (helper installed, Strict row, AC), remove `helperArgument`/reinstall switching; `QualifiedSupportRows` per mechanism with row `mac17-3-26a434` for Strict; tests.

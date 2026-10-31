@@ -53,6 +53,10 @@ public final class PowerHelperRuntime: @unchecked Sendable {
         queue.async { [self] in service.observeSystemEvent(reason: reason) }
     }
 
+    public func observeSystemSleep() {
+        queue.async { [self] in service.observeSystemSleep() }
+    }
+
     public func shutdown(completion: @escaping @Sendable () -> Void) {
         queue.async { [self] in
             timer?.cancel()

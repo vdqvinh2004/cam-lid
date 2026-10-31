@@ -35,7 +35,7 @@ if launchMode == .recovery || launchMode == .release {
         let runner = NativePMSetRunner()
         let service = PowerLeaseService(backend: PMSetBackend(execute: runner.execute), store: storage.journal,
             bootID: try NativeHelperEnvironment.bootID(), clock: { NativeHelperEnvironment.now },
-            safety: NativeHelperEnvironment.safety)
+            safety: NativeHelperEnvironment.safety, strict: ClamshellBitMechanism())
         service.log = logLine
         if launchMode == .recovery { service.sleepSystem = NativeHelperEnvironment.sleepNow }   // never while uninstalling
         let outcome = service.recoverOrphanedPolicy(graceSeconds: launchMode == .release ? -.infinity : 10)
@@ -66,13 +66,17 @@ do {
         let backend = PMSetBackend(execute: runner.execute)
         controller = PowerLeaseService(backend: backend, store: storage.journal,
             bootID: try NativeHelperEnvironment.bootID(), clock: { NativeHelperEnvironment.now },
-            safety: NativeHelperEnvironment.safety)
+            safety: NativeHelperEnvironment.safety, strict: ClamshellBitMechanism())
     }
     controller.log = logLine
     controller.sleepSystem = NativeHelperEnvironment.sleepNow
     let runtime = PowerHelperRuntime(service: controller, onStartupFailure: exitAfterFailedStart)
+    // Best-effort lid mode ends its single episode on any sleep or wake; Standard's daemon ends only a Strict lease,
+    // and only when the system sleeps (ADR 0003).
     let sleepObserver = bestEffortLidMode ? try RootDomainGeneralInterestObserver { reason in
         runtime.observeSystemEvent(reason: reason)
+    } : launchMode == .standard ? try RootDomainGeneralInterestObserver { reason in
+        if reason == "sleepObserved" { runtime.observeSystemSleep() }
     } : nil
     let delegate = PowerHelperListenerDelegate(runtime: runtime, peerRequirement: requirement)
     let listener = NSXPCListener(machServiceName: PowerHelperIdentity.serviceName)

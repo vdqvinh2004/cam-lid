@@ -58,7 +58,10 @@ public final class PowerLeaseService {
         var sequence: UInt64
     }
 
-    private let mechanism: any LeasePowerMechanism
+    /// The mechanism of the current lease or journal record; one of `primary` and `strict`.
+    private var mechanism: any LeasePowerMechanism
+    private let primary: any LeasePowerMechanism
+    private let strict: (any LeasePowerMechanism)?
     private let store: any PowerIntentStore
     private let clock: () -> Double
     private let safety: () throws -> HelperSafety
@@ -80,13 +83,19 @@ public final class PowerLeaseService {
     public private(set) var mutationAttempted = false
 
     public convenience init(backend: any SleepOverrideBackend, store: any PowerIntentStore, bootID: String,
-                            clock: @escaping () -> Double, safety: @escaping () throws -> HelperSafety) {
-        self.init(mechanism: GlobalSleepMechanism(backend), store: store, bootID: bootID, clock: clock, safety: safety)
+                            clock: @escaping () -> Double, safety: @escaping () throws -> HelperSafety,
+                            strict: (any LeasePowerMechanism)? = nil) {
+        self.init(mechanism: GlobalSleepMechanism(backend), store: store, bootID: bootID, clock: clock, safety: safety,
+                  strict: strict)
     }
 
+    /// `strict` is offered on request (ADR 0003); at most one lease of either mechanism exists at a time.
     public init(mechanism: any LeasePowerMechanism, store: any PowerIntentStore, bootID: String,
-                clock: @escaping () -> Double, safety: @escaping () throws -> HelperSafety) {
+                clock: @escaping () -> Double, safety: @escaping () throws -> HelperSafety,
+                strict: (any LeasePowerMechanism)? = nil) {
         self.mechanism = mechanism
+        self.primary = mechanism
+        self.strict = strict
         self.store = store
         self.bootID = bootID
         self.clock = clock
@@ -117,16 +126,16 @@ public final class PowerLeaseService {
             _ = try now()
             record = try store.load()
             if let record {
-                let isLidSpecific = record.ownerIdentity.hasPrefix("lid-specific-v1:")
-                guard isLidSpecific == (mechanism.family == "lid-specific-v1") else {
-                    throw PowerServiceFailure.journal
-                }
+                guard let owner = mechanism(for: record) else { throw PowerServiceFailure.journal }
+                mechanism = owner
             }
             if let record, !(record.intent == .restoreLidPolicy && record.disposition == .acknowledged) {
                 state = "recoveryRequired"
                 // Never clear an uncertain enable or interrupted restore. Another boot's override is
                 // cleared only when its policy persists across reboot and our enable was acknowledged.
-                if try mechanism.readApplied() == false {
+                if record.bootID != bootID, mechanism.restartClearsPolicy {
+                    try acknowledgeRestored()   // the restart already cleared the kernel bit
+                } else if try mechanism.readApplied() == false {
                     try acknowledgeRestored()
                 } else if record.bootID == bootID || mechanism.restoresOwnedPolicyAfterReboot,
                           record.intent == .enableLidOverride && record.disposition == .acknowledged
@@ -185,11 +194,13 @@ public final class PowerLeaseService {
     /// another boot, and only for a policy that survives reboot. Uncertain journal entries are left
     /// for inspection. A racing journal writer makes the restore fail and the caller retries.
     public func recoverOrphanedPolicy(graceSeconds: Double) -> OrphanRecovery {
-        guard state == "starting", mechanism.restoresOwnedPolicyAfterReboot else { return .nothingToRecover }
+        guard state == "starting" else { return .nothingToRecover }
         do {
             let current = try now()
-            guard let loaded = try store.load(),
-                  loaded.intent == .enableLidOverride && loaded.disposition == .acknowledged
+            guard let loaded = try store.load(), let owner = mechanism(for: loaded),
+                  owner.restoresOwnedPolicyAfterReboot || owner.restartClearsPolicy else { return .nothingToRecover }
+            mechanism = owner
+            guard loaded.intent == .enableLidOverride && loaded.disposition == .acknowledged
                     || finishesInterruptedRestore(loaded) else { return .nothingToRecover }
             record = loaded
             let deadline = Double(loaded.continuousDeadlineNanos) / 1_000_000_000
@@ -197,6 +208,10 @@ public final class PowerLeaseService {
             let expired = finishesInterruptedRestore(loaded) || loaded.bootID != bootID || current > deadline + graceSeconds
             log("recover record=\(loaded.intent) boot=\(loaded.bootID == bootID ? "same" : "other") now=\(current) deadline=\(deadline) grace=\(graceSeconds) expired=\(expired)")
             guard expired else { return .leaseStillValid }
+            if loaded.bootID != bootID, mechanism.restartClearsPolicy {
+                try acknowledgeRestored()
+                return .restored
+            }
             if try mechanism.readApplied() == false {
                 try acknowledgeRestored()
                 return .restored
@@ -220,6 +235,10 @@ public final class PowerLeaseService {
                 guard state == "ready" || state == "restored", terminalEventReason == nil else {
                     return reply(false, "notReady")
                 }
+                guard let requested = request.mechanism == .strict ? strict : primary else {
+                    return reply(false, "mechanismUnavailable")
+                }
+                mechanism = requested
                 guard request.token == nil, request.sequence == 1,
                       let seconds = request.sessionSeconds,
                       (1...mechanism.maximumSessionSeconds).contains(seconds), uid > 0 else {
@@ -343,6 +362,15 @@ public final class PowerLeaseService {
         }
     }
 
+    /// The system slept while a Strict lease held the lid bit: powerd cleared the shared bit with the lid closed, or
+    /// the user chose Sleep. Either way the hold is over; end it with a reason the app can explain (spec 016 FR-006).
+    /// A Standard lease blocks sleep altogether, so this never applies to it.
+    public func observeSystemSleep() {
+        guard lease != nil, state == "active", mechanism.restartClearsPolicy else { return }
+        do { try restore(reason: "systemSleptWhileHeld") }
+        catch { state = "recoveryRequired"; reason = "restorationFailed" }
+    }
+
     public func poll() {
         // A restore that failed here may have been finished by the recovery job; take its verified result instead of
         // refusing every session until restart. Never after another app's override, which must stay visible.
@@ -398,7 +426,7 @@ public final class PowerLeaseService {
     /// policy reads back as cleared, take that result; otherwise the caller reports the failure as before.
     private func adoptRestoreWrittenElsewhere() -> Bool {
         guard let latest = try? store.load(), latest.intent == .restoreLidPolicy, latest.disposition == .acknowledged,
-              (try? mechanism.readApplied()) == false else { return false }
+              mechanism.acknowledgedClearIsRestore || (try? mechanism.readApplied()) == false else { return false }
         record = latest
         lease = nil
         state = "restored"
@@ -411,7 +439,8 @@ public final class PowerLeaseService {
     /// reboot (global `SleepDisabled`) finishing it writes the default back. Without this, a restore cut off by
     /// shutdown left the Mac unable to sleep after the next boot (G2 trial 7).
     private func finishesInterruptedRestore(_ entry: JournalEntry) -> Bool {
-        mechanism.restoresOwnedPolicyAfterReboot && entry.intent == .restoreLidPolicy && entry.disposition == .pending
+        (mechanism.restoresOwnedPolicyAfterReboot || mechanism.acknowledgedClearIsRestore)
+            && entry.intent == .restoreLidPolicy && entry.disposition == .pending
     }
 
     private func restore(reason stopReason: String) throws {
@@ -442,7 +471,9 @@ public final class PowerLeaseService {
             case .callsAcknowledgedOnly:
                 try save(intent: .restoreLidPolicy, disposition: .acknowledged, lease: lease)
                 lease = nil
-                state = isForeignStop ? "recoveryRequired" : "cleanupAcknowledged"
+                // No read-back exists for the kernel clamshell bit: its acknowledged clear is the restore (ADR 0003).
+                state = isForeignStop ? "recoveryRequired"
+                    : mechanism.acknowledgedClearIsRestore ? "restored" : "cleanupAcknowledged"
             }
             reason = stopReason
             sleepIfLidClosed(after: stopReason)
@@ -459,10 +490,18 @@ public final class PowerLeaseService {
                                                             "foreignPolicyUnreadable", "sleepObserved", "wakeObserved"]
 
     private func sleepIfLidClosed(after stopReason: String) {
-        guard !Self.reasonsWithoutSleep.contains(stopReason), let reading = try? safety(),
+        // Clearing the kernel clamshell bit with the lid closed already sleeps the Mac (E3, E4).
+        guard !mechanism.restartClearsPolicy, !Self.reasonsWithoutSleep.contains(stopReason), let reading = try? safety(),
               reading.lidClosed == true, reading.externalDisplays == 0 else { return }
         log("sleep requested reason=\(stopReason)")
         sleepSystem()
+    }
+
+    /// The mechanism that wrote a record: its owner identity starts with the family, except Standard's (`uid:`).
+    private func mechanism(for entry: JournalEntry) -> (any LeasePowerMechanism)? {
+        let tag = entry.ownerIdentity.hasPrefix("uid:") ? GlobalSleepMechanism.familyName
+            : entry.ownerIdentity.split(separator: ":").first.map(String.init)
+        return [primary, strict].compactMap { $0 }.first { $0.family == tag }
     }
 
     private func acknowledgeRestored() throws {
@@ -486,7 +525,7 @@ public final class PowerLeaseService {
             guard let previous = record else { throw PowerServiceFailure.journal }
             deadline = previous.continuousDeadlineNanos
         }
-        let familyPrefix = mechanism.family == "lid-specific-v1" ? "lid-specific-v1:" : ""
+        let familyPrefix = mechanism.family == GlobalSleepMechanism.familyName ? "" : "\(mechanism.family):"
         let entry = JournalEntry(revision: next, sessionID: lease?.token.uuidString ?? record!.sessionID,
             ownerIdentity: lease.map { "\(familyPrefix)uid:\($0.uid):connection:\($0.owner.uuidString)" } ?? record!.ownerIdentity,
             bootID: bootID, generation: record?.generation ?? 1,

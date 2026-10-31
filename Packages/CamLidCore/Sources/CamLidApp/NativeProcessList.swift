@@ -16,9 +16,23 @@ struct NativeProcessList: ProcessListProvider {
 
     func snapshot() -> [ProcessRecord] { agentSnapshot().records }
 
+    /// The kernel names enabled lifetime rules could match, or nil when a rule has no such name (see `lifetimeSnapshot`).
+    static func kernelNames(of rules: [LifetimeRule]) -> Set<String>? {
+        var names = Set<String>()
+        for rule in rules where rule.enabled {
+            guard rule.selectorKind == .exactExecutablePath else { return nil }
+            names.insert(String(URL(fileURLWithPath: rule.selectorValue).lastPathComponent.lowercased().prefix(Int(MAXCOMLEN))))
+        }
+        return names
+    }
+
     /// Another user's process (root's login, daemons) is unreadable but cannot be this user's, and a pid that exited
     /// meanwhile is gone; only an unreadable process of this user leaves a scan incomplete (trial 8: every scan was).
-    static func unreadableOwnProcess(_ pid: Int32) -> Bool { kernelEntry(pid)?.uid == getuid() }
+    /// `couldBe`, when given, limits the gap to processes whose kernel name could be one of those executables.
+    static func unreadableOwnProcess(_ pid: Int32, couldBe names: Set<String>? = nil) -> Bool {
+        guard let entry = kernelEntry(pid), entry.uid == getuid() else { return false }
+        return names.map { $0.contains(agentName(pid: pid, processName: entry.name)) } ?? true
+    }
 
     func agentSnapshot() -> AgentSnapshot {
         let count = proc_listallpids(nil, 0)
@@ -34,7 +48,12 @@ struct NativeProcessList: ProcessListProvider {
             var info = proc_bsdinfo()
             let size = MemoryLayout<proc_bsdinfo>.size
             let result = withUnsafeMutablePointer(to: &info) { proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, $0, Int32(size)) }
-            guard result == size else { if Self.unreadableOwnProcess(pid) { complete = false }; continue }
+            guard result == size else {
+                // Some of the user's own processes refuse inspection (cua-driver, 2026-10-31); only one that could be
+                // an agent leaves the agent scan incomplete.
+                if Self.unreadableOwnProcess(pid, couldBe: Self.executableNames) { complete = false }
+                continue
+            }
             guard info.pbi_uid == getuid(), info.pbi_ruid == getuid() else { continue }
             let name = Self.agentName(pid: pid, processName: withUnsafeBytes(of: info.pbi_name) { bytes in
                 String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
@@ -50,7 +69,9 @@ struct NativeProcessList: ProcessListProvider {
 
     /// Full, bounded same-user metadata is collected only when an explicit
     /// lifetime rule is configured. A failed or truncated scan stays unknown.
-    func lifetimeSnapshot() -> LifetimeProcessSnapshot? {
+    /// `ruleNames`: kernel names (lowercased, at most 16 characters) the enabled rules could match; nil when a rule
+    /// cannot be named that way (a bundle ID), so any unreadable process of the user leaves the scan incomplete.
+    func lifetimeSnapshot(ruleNames: Set<String>? = nil) -> LifetimeProcessSnapshot? {
         let now = ContinuousTime.now
         let userID = getuid()
         let count = proc_listallpids(nil, 0)
@@ -74,7 +95,7 @@ struct NativeProcessList: ProcessListProvider {
             let result = withUnsafeMutablePointer(to: &info) {
                 proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, $0, Int32(size))
             }
-            guard result == size else { if Self.unreadableOwnProcess(pid) { complete = false }; continue }
+            guard result == size else { if Self.unreadableOwnProcess(pid, couldBe: ruleNames) { complete = false }; continue }
             guard info.pbi_uid == userID, info.pbi_ruid == userID else { continue }
             guard let identity = try? LifetimeProcessIdentity(pid: pid,
                 startTime: Double(info.pbi_start_tvsec) + Double(info.pbi_start_tvusec) / 1_000_000,

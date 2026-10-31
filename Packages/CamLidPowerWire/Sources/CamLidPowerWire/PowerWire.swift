@@ -2,18 +2,22 @@ import Foundation
 
 public struct PowerRequest: Codable, Sendable {
     public enum Operation: String, Codable, Sendable { case inspect, acquire, renew, release }
+    /// How an `acquire` keeps the closed Mac awake (ADR 0003). Absent means `standard`, so older clients keep working.
+    public enum Mechanism: String, Codable, Sendable { case standard, strict }
     public var version = 1
     public let operation: Operation
     public var token: UUID?
     public var sequence: UInt64?
     public var sessionSeconds: Int?
+    public var mechanism: Mechanism?
 
     public init(operation: Operation, token: UUID? = nil, sequence: UInt64? = nil,
-                sessionSeconds: Int? = nil) {
+                sessionSeconds: Int? = nil, mechanism: Mechanism? = nil) {
         self.operation = operation
         self.token = token
         self.sequence = sequence
         self.sessionSeconds = sessionSeconds
+        self.mechanism = mechanism
     }
 }
 

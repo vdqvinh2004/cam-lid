@@ -19,6 +19,12 @@ public protocol LeasePowerMechanism: AnyObject {
     /// True when the policy this mechanism sets survives a reboot (global `SleepDisabled`), so an
     /// acknowledged enable from a previous boot may be restored from the journal.
     var restoresOwnedPolicyAfterReboot: Bool { get }
+    /// True when the policy lives in kernel memory (the clamshell bit): a restart clears it, so a record from a
+    /// previous boot needs no write, and clearing it with the lid closed sleeps the Mac through the kernel.
+    var restartClearsPolicy: Bool { get }
+    /// True when no read-back exists and an acknowledged clear call is the restore (ADR 0003): the next session
+    /// may start and any process may finish an interrupted restore. Never true for the frozen lid-specific path.
+    var acknowledgedClearIsRestore: Bool { get }
     func admissionAllowed() throws -> Bool
     func apply(remainingNanos: UInt64, episodeID: UUID) throws
     func prepareRenewal(remainingNanos: UInt64, episodeID: UUID) throws
@@ -36,6 +42,8 @@ public protocol LeasePowerMechanism: AnyObject {
 public extension LeasePowerMechanism {
     var leaseSeconds: Double { PowerLeaseService.leaseSeconds }
     var restoresOwnedPolicyAfterReboot: Bool { false }
+    var restartClearsPolicy: Bool { false }
+    var acknowledgedClearIsRestore: Bool { false }
     func prepareRenewal(remainingNanos: UInt64, episodeID: UUID) throws {}
     func completeRenewal() throws {}
     func discardOwnedResourcesAfterFailedApply() throws {}
@@ -43,7 +51,8 @@ public extension LeasePowerMechanism {
 }
 
 final class GlobalSleepMechanism: LeasePowerMechanism {
-    let family = "pmset-global-v1"
+    static let familyName = "pmset-global-v1"
+    let family = familyName
     let maximumSessionSeconds = PowerLeaseService.maximumSessionSeconds
     private let backend: any SleepOverrideBackend
     private(set) var applyAcknowledged = false

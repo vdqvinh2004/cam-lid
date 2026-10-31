@@ -1133,6 +1133,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let started = uptime()
         lastProcessPoll = started
         let scanLifetimeRules = hasLifetimeRules && session?.requestedMode == .auto
+        let lifetimeNames = NativeProcessList.kernelNames(of: config.lifetimeRules ?? [])
         let sampleActivity = sampleActivityNow
         let excludeUnderOrca = config.orcaMetadataAllowed
         Task { [weak self] in
@@ -1142,7 +1143,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 let snapshot = processList.agentSnapshot()
                 let candidates = ProcessDiscovery(provider: InMemoryProcessList(records: snapshot.records),
                     patterns: AgentProviderCatalog.processPatterns, maxFallbackEntries: 20).discover()
-                let lifetime = scanLifetimeRules ? processList.lifetimeSnapshot() : nil
+                let lifetime = scanLifetimeRules ? processList.lifetimeSnapshot(ruleNames: lifetimeNames) : nil
                 return (candidates, snapshot.complete, installation, lifetime, sampleActivity(excludeUnderOrca))
             }.value
             guard let self else { return }
