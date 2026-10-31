@@ -7,9 +7,11 @@ public struct AgentActivitySample: Sendable, Equatable {
     public let alive: Bool
     /// Cumulative CPU seconds of the agent process and its descendants; nil when unreadable.
     public let cpuSeconds: Double?
+    /// Seconds since the agent process started; nil when unknown.
+    public let processAgeSeconds: Double?
 
-    public init(at: Double, alive: Bool, cpuSeconds: Double?) {
-        self.at = at; self.alive = alive; self.cpuSeconds = cpuSeconds
+    public init(at: Double, alive: Bool, cpuSeconds: Double?, processAgeSeconds: Double? = nil) {
+        self.at = at; self.alive = alive; self.cpuSeconds = cpuSeconds; self.processAgeSeconds = processAgeSeconds
     }
 }
 
@@ -30,6 +32,9 @@ public enum AgentActivityClassifier {
     public static let busyCPUFraction = 0.03
     /// How long an unknown result keeps holding (the policy bounds unknown holds with this).
     public static let unknownHoldSeconds = 15.0
+    /// Launching costs CPU without any work (calibration: 0.054–0.34 of a core for about 20 s); owner saw a freshly
+    /// opened Claude Code read as working before any prompt. CPU in this window is not counted as activity.
+    public static let startupSeconds = 25.0
 
     public static func step(_ memory: inout AgentActivityMemory, _ sample: AgentActivitySample) -> (state: TaskState, reason: String) {
         guard sample.at.isFinite else { return (.unknown, "unreadable") }
@@ -46,6 +51,7 @@ public enum AgentActivityClassifier {
         // A drop (a child exited, or pid reuse) has no usable delta; it only restarts the baseline.
         memory.lastCPU = cpu
         memory.lastAt = sample.at
+        if let age = sample.processAgeSeconds, age >= 0, age < startupSeconds { return (.unknown, "starting") }
         if busy == true {
             memory.lastActiveAt = sample.at
             return (.working, "cpu")

@@ -18,7 +18,7 @@ struct QARefinementSupport {
             helperController: HelperController(status: { .notInstalled }, keepAwakeApps: { [] }),
             holdTransportFactory: { NeverTransport() }, closedLidSupportRow: { nil }, systemIdentity: { (nil, nil) },
             // Never the agents actually running on this Mac (this suite itself runs under one).
-            activitySampler: { ([], ContinuousTime.now) })
+            activitySampler: { _ in ([], ContinuousTime.now) })
     }
     func cleanup() { UserDefaults().removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
 }

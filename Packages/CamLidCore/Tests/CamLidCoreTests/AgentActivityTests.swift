@@ -60,4 +60,12 @@ import Testing
         #expect(ProcessDiscovery.confidenceCap(for: .activity) == .inferred)
         #expect(ProcessDiscovery.canArmAuto(kind: .activity))
     }
+
+    @Test func launchCPUIsNotWork() {
+        var m = AgentActivityMemory()
+        _ = C.step(&m, AgentActivitySample(at: 0, alive: true, cpuSeconds: 0, processAgeSeconds: 2))
+        #expect(C.step(&m, AgentActivitySample(at: 5, alive: true, cpuSeconds: 1.5, processAgeSeconds: 7)) == (.unknown, "starting"))
+        #expect(C.step(&m, AgentActivitySample(at: 25, alive: true, cpuSeconds: 1.6, processAgeSeconds: 27)) == (.idle, "quiet"))
+        #expect(C.step(&m, AgentActivitySample(at: 30, alive: true, cpuSeconds: 2.2, processAgeSeconds: 32)) == (.working, "cpu"))
+    }
 }

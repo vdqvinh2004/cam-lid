@@ -27,9 +27,10 @@ extension NativeProcessList {
         return Double(timebase.numer) / Double(timebase.denom) / 1_000_000_000
     }()
 
-    /// Outermost process of each agent (by process name), with the CPU time of it and every descendant. Processes
-    /// started under Orca are left out: Orca reports their state as lifecycle evidence, which takes precedence.
-    func activityProcesses(providerByName: [String: String], orcaNames: Set<String>) -> [AgentActivityProcess] {
+    /// Outermost process of each agent (by process name), with the CPU time of it and every descendant. When Orca
+    /// observation is on, processes started under Orca (its terminal host is `orca-terminal-host-…`) are left out:
+    /// Orca reports their state as lifecycle evidence, which takes precedence.
+    func activityProcesses(providerByName: [String: String], excludeUnderOrca: Bool) -> [AgentActivityProcess] {
         let count = proc_listallpids(nil, 0)
         guard count > 0 else { return [] }
         let capacity = min(Self.maximumProcesses, Int(count) + 32)
@@ -78,7 +79,7 @@ extension NativeProcessList {
         for (pid, entry) in entries {
             guard let provider = providerByName[entry.name] else { continue }
             let above = ancestors(pid)
-            guard !above.contains(where: { providerByName[$0] == provider || orcaNames.contains($0) }) else { continue }
+            guard !above.contains(where: { providerByName[$0] == provider || (excludeUnderOrca && $0.hasPrefix("orca")) }) else { continue }
             result.append(AgentActivityProcess(provider: provider, pid: pid, startTime: entry.start, cpuSeconds: subtreeCPU(pid)))
             if result.count >= 20 { break }
         }

@@ -161,7 +161,14 @@ public enum HelperAdminCommand {
         switch arguments[index + 1] {
         // Pressing Install is the explicit choice, so an identity file from an earlier install is moved aside
         // (kept as identity.json.previous and restored by uninstall), as `camlid helper install --replace-pins` does.
-        case "install": result = installer.install(appBundle: appBundle, replacePins: true)
+        case "install":
+            // "Reinstall" after an app update: the pins and the installed helper belong to the old build, so remove
+            // it (restoring the sleep setting first) and install the helper bundled with this build.
+            if installer.status(appBundle: appBundle) != .notInstalled {
+                let removed = installer.uninstall()
+                guard removed.accepted || removed.reason == "notInstalled" else { result = removed; break }
+            }
+            result = installer.install(appBundle: appBundle, replacePins: true)
         case "uninstall": result = installer.uninstall()
         default: print("helper-admin: invalidOperation"); return 2
         }

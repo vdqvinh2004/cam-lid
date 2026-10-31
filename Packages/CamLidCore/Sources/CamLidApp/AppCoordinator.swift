@@ -100,7 +100,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     /// Spec 015: outside-observed working/idle tasks for directly run agents, by provider.
     private var activityTasks: [String: [AgentTask]] = [:]
     private var activityMemory: [String: AgentActivityMemory] = [:]
-    private let sampleActivityNow: @Sendable () -> (processes: [AgentActivityProcess], at: Double)
+    private let sampleActivityNow: @Sendable (_ excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double)
     private var installationSnapshot: AgentInstallationSnapshot?
     private var lifetimeTracker = LifetimeRuleTracker()
     private var lifetimeProcessSnapshot: LifetimeProcessSnapshot?
@@ -147,8 +147,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
          holdTransportFactory: (() -> any PowerHoldTransport)? = nil,
          closedLidSupportRow: (() -> String?)? = nil,
          systemIdentity: (() -> (model: String?, osBuild: String?))? = nil,
-         activitySampler: (@Sendable () -> (processes: [AgentActivityProcess], at: Double))? = nil) {
-        self.sampleActivityNow = activitySampler ?? { AppCoordinator.sampleActivity(NativeProcessList()) }
+         activitySampler: (@Sendable (_ excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double))? = nil) {
+        self.sampleActivityNow = activitySampler ?? { AppCoordinator.sampleActivity(NativeProcessList(), excludeUnderOrca: $0) }
         self.healthReader = healthReader
         self.helper = helperController ?? HelperController()
         self.makeHoldTransport = holdTransportFactory ?? { XPCPowerHoldTransport() }
@@ -1128,6 +1128,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         lastProcessPoll = started
         let scanLifetimeRules = hasLifetimeRules && session?.requestedMode == .auto
         let sampleActivity = sampleActivityNow
+        let excludeUnderOrca = config.orcaMetadataAllowed
         Task { [weak self] in
             let (candidates, complete, installation, lifetime, activity) = await Task.detached(priority: .utility) {
                 let installation = AgentCLIInstallation.snapshot()
@@ -1136,7 +1137,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 let candidates = ProcessDiscovery(provider: InMemoryProcessList(records: snapshot.records),
                     patterns: AgentProviderCatalog.processPatterns, maxFallbackEntries: 20).discover()
                 let lifetime = scanLifetimeRules ? processList.lifetimeSnapshot() : nil
-                return (candidates, snapshot.complete, installation, lifetime, sampleActivity())
+                return (candidates, snapshot.complete, installation, lifetime, sampleActivity(excludeUnderOrca))
             }.value
             guard let self else { return }
             self.processPolling = false
@@ -1210,14 +1211,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     /// Agents observed for activity: directly run terminal agents (spec 015).
     nonisolated static let activityProviders: Set<String> = ["claude", "codex", "opencode"]
 
-    nonisolated static func sampleActivity(_ list: NativeProcessList) -> (processes: [AgentActivityProcess], at: Double) {
+    nonisolated static func sampleActivity(_ list: NativeProcessList, excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double) {
         let observed = activityProviders
         var byName: [String: String] = [:]
         for info in AgentProviderCatalog.providers where observed.contains(info.id) {
             for name in info.processNames { byName[name] = info.id }
         }
-        let orcaNames = Set(AgentProviderCatalog.info(for: "orca")?.processNames ?? [])
-        return (list.activityProcesses(providerByName: byName, orcaNames: orcaNames), ContinuousTime.now)
+        return (list.activityProcesses(providerByName: byName, excludeUnderOrca: excludeUnderOrca), ContinuousTime.now)
     }
 
     /// Classifies each observed agent process and keeps the result as `activity` tasks. A process that is gone has
@@ -1228,7 +1228,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         for process in processes {
             let key = "activity-\(process.provider)-\(process.pid)-\(String(process.startTime.bitPattern, radix: 16))"
             var state = activityMemory[key] ?? AgentActivityMemory()
-            let result = AgentActivityClassifier.step(&state, AgentActivitySample(at: at, alive: true, cpuSeconds: process.cpuSeconds))
+            let result = AgentActivityClassifier.step(&state, AgentActivitySample(at: at, alive: true, cpuSeconds: process.cpuSeconds,
+                processAgeSeconds: Date().timeIntervalSince1970 - process.startTime))
             memory[key] = state
             guard let task = try? AgentTask(id: key, sessionID: "activity-\(process.provider)", runID: key,
                 state: result.state, evidenceKind: .activity, confidence: .inferred,
