@@ -460,6 +460,21 @@ public final class PowerLeaseService {
             || stopReason == "foreignPolicyUnreadable"
         do {
             try save(intent: .restoreLidPolicy, disposition: .pending, lease: lease)
+        } catch {
+            if case JournalFailure.revisionConflict = error, adoptRestoreWrittenElsewhere() { return }
+            // The journal is bookkeeping; writing the default policy back is always safe. A full or read-only disk
+            // (or a journal fault) must not keep the Mac awake, so clear without it and stay recoveryRequired: the
+            // next start finds the policy cleared and acknowledges the restore. The frozen lid-specific path keeps
+            // its own rule (no clear without a journaled intent).
+            if mechanism.restoresOwnedPolicyAfterReboot || mechanism.acknowledgedClearIsRestore {
+                log("restore journal failed: \(error); clearing without it")
+                mutationAttempted = true
+                if (try? mechanism.clear()) != nil { sleepIfLidClosed(after: stopReason) }
+            }
+            mechanism.releaseOwnedResourcesAfterFailedRestore()
+            throw error
+        }
+        do {
             mutationAttempted = true
             switch try mechanism.clear() {
             case .verifiedReadback:

@@ -71,6 +71,21 @@ final class Fixture {
 }
 
 @Suite struct PowerServiceTests {
+    /// A full or read-only disk must not keep the Mac awake: the restore clears the policy even when the journal
+    /// cannot record it, and the next start acknowledges the restore it finds.
+    @Test func aRestoreWhoseJournalWriteFailsStillClearsTheSetting() throws {
+        let f = Fixture()
+        let started = f.acquire()
+        #expect(f.backend.disabled)
+        f.store.failAt = f.store.commits + 1                       // the pending-restore record
+        let stopped = f.service.handle(PowerRequest(operation: .release, token: started.token), owner: f.owner, uid: 501)
+        #expect(!stopped.accepted && f.service.state == "recoveryRequired")
+        #expect(f.backend.disabled == false)
+        let restarted = f.makeService()
+        restarted.start()
+        #expect(restarted.state == "restored")
+    }
+
     /// 2026-10-31 14:29: a release met the recovery job's journal lock (`busy`), failed, and the helper refused every
     /// session until restart although the recovery job restored 45 s later.
     @Test func aBusyJournalIsRetriedNotAFailedRelease() throws {
