@@ -344,6 +344,10 @@ public final class PowerLeaseService {
     }
 
     public func poll() {
+        // A restore that failed here may have been finished by the recovery job; take its verified result instead of
+        // refusing every session until restart. Never after another app's override, which must stay visible.
+        if state == "recoveryRequired", reason != "foreignGlobalSleepDisabled", reason != "foreignPolicyUnreadable",
+           adoptRestoreWrittenElsewhere() { return }
         guard let current = lease, state == "active" else { return }
         let stopReason: String?
         do {
@@ -488,7 +492,13 @@ public final class PowerLeaseService {
             bootID: bootID, generation: record?.generation ?? 1,
             operationID: UUID().uuidString, intent: intent, disposition: disposition,
             continuousDeadlineNanos: deadline)
-        try store.commit(entry, replacing: record?.revision)
+        // The recovery job reads the journal every 15 s under a non-blocking lock; meeting it is `busy` for a few
+        // milliseconds, not a failure (it failed a release and stuck the helper until restart, 2026-10-31 14:29).
+        var attempt = 0
+        while true {
+            do { try store.commit(entry, replacing: record?.revision); break }
+            catch JournalFailure.busy where attempt < 20 { attempt += 1; usleep(25_000) }
+        }
         record = entry
     }
 

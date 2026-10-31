@@ -27,6 +27,7 @@ private final class FakeStore: PowerIntentStore {
     var failAt: Int?
     var loadFails = false
     var afterCommit: (() -> Void)?
+    var busyCommits = 0
     func load() throws -> JournalEntry? {
         if loadFails { throw PowerServiceFailure.journal }
         return record
@@ -34,6 +35,7 @@ private final class FakeStore: PowerIntentStore {
     var beforeCommit: (() -> Void)?
     func commit(_ entry: JournalEntry, replacing revision: UInt64?) throws {
         if let hook = beforeCommit { beforeCommit = nil; hook() }
+        if busyCommits > 0 { busyCommits -= 1; throw JournalFailure.busy }
         commits += 1
         if failAt == commits { throw PowerServiceFailure.journal }
         guard record?.revision == revision else { throw JournalFailure.revisionConflict }
@@ -66,6 +68,36 @@ private final class Fixture {
 }
 
 @Suite struct PowerServiceTests {
+    /// 2026-10-31 14:29: a release met the recovery job's journal lock (`busy`), failed, and the helper refused every
+    /// session until restart although the recovery job restored 45 s later.
+    @Test func aBusyJournalIsRetriedNotAFailedRelease() throws {
+        let f = Fixture()
+        let started = f.acquire()
+        f.store.busyCommits = 3
+        let stopped = f.service.handle(PowerRequest(operation: .release, token: started.token), owner: f.owner, uid: 501)
+        #expect(stopped.accepted && stopped.state == "restored")
+        #expect(f.backend.disabled == false)
+    }
+
+    @Test func aHelperStuckAfterAFailedRestoreAdoptsTheRecoveryJobsRestore() throws {
+        let f = Fixture()
+        let started = f.acquire()
+        f.store.busyCommits = 100
+        let failed = f.service.handle(PowerRequest(operation: .release, token: started.token), owner: f.owner, uid: 501)
+        #expect(!failed.accepted && failed.state == "recoveryRequired")
+        // The recovery job restores and journals it.
+        f.store.busyCommits = 0
+        f.backend.disabled = false
+        let record = try #require(f.store.record)
+        f.store.record = JournalEntry(revision: record.revision + 1, sessionID: record.sessionID,
+            ownerIdentity: record.ownerIdentity, bootID: record.bootID, generation: record.generation,
+            operationID: UUID().uuidString, intent: .restoreLidPolicy, disposition: .acknowledged,
+            continuousDeadlineNanos: record.continuousDeadlineNanos)
+        f.service.poll()
+        let again = f.acquire()
+        #expect(again.accepted && again.state == "active")
+    }
+
     /// Trial 8: a restore with the lid closed must sleep the Mac, whoever caused it; never with an external display,
     /// on shutdown, or when another app owns the override.
     @Test(arguments: [("release", true, 0, true), ("disconnect", true, 0, true), ("release", false, 0, false),
