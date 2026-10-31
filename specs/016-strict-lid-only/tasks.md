@@ -1,6 +1,6 @@
 # Tasks: Strict mode, lid-only
 
-**Feature context:** `016-strict-lid-only` · **Status:** 9/15 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `016-strict-lid-only` · **Status:** 9/16 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decision
 - [x] T001 ADR 0003 accepted; ADR 0001 amended. — `85bae08`.
@@ -22,6 +22,7 @@
 - [ ] T302 S2: app kill during a Strict session with the lid closed; helper clears the bit; Mac sleeps.
 - [ ] T303 S3: helper kill during a Strict session; recovery job clears the bit.
 - [ ] T304 S4: restart during a Strict session; nothing to recover after boot.
+- [ ] T306 S5 (both modes): battery session with the lid closed, battery sessions allowed; unplugging mid-session continues; the session stops at the stop level (or a raised test level) and the Mac sleeps.
 - [ ] T305 E5 observation (optional): display plug/unplug and a 15-minute hold; record whether powerd clears the bit.
 
 ## Phase 4 — Close

@@ -71,6 +71,37 @@ final class Fixture {
 }
 
 @Suite struct PowerServiceTests {
+    /// Battery sessions (owner decision 2026-11-01, both mechanisms): only when the client names a floor, and only
+    /// while the battery stays at or above it; the helper stops on its own below it.
+    @Test func batteryPowerNeedsAFloorAndStopsBelowIt() throws {
+        func onBattery(_ percent: Double) -> HelperSafety {
+            HelperSafety(onAC: false, batteryPercent: percent, thermalNominal: true, consoleUID: 501, lidClosed: false, externalDisplays: 0)
+        }
+        let noFloor = Fixture(); noFloor.safety = onBattery(80)
+        #expect(noFloor.acquire().reason == "safetyRefused" && noFloor.backend.writes.isEmpty)
+
+        let f = Fixture(); f.safety = onBattery(80)
+        f.service.start()
+        let held = f.service.handle(PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 300, batteryFloorPercent: 20),
+                                    owner: f.owner, uid: 501)
+        #expect(held.accepted && f.backend.disabled)
+        f.time += 10
+        #expect(f.service.handle(PowerRequest(operation: .renew, token: held.token, sequence: 2), owner: f.owner, uid: 501).accepted)
+        f.safety = onBattery(19)
+        f.service.poll()
+        #expect(f.service.reason == "safetyStop" && f.backend.disabled == false)
+
+        let low = Fixture(); low.safety = onBattery(30)
+        low.service.start()
+        #expect(low.service.handle(PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 300, batteryFloorPercent: 40),
+                                   owner: low.owner, uid: 501).reason == "safetyRefused")
+        for floor in [5, 60] {
+            let bad = Fixture(); bad.service.start()
+            #expect(bad.service.handle(PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 300, batteryFloorPercent: floor),
+                                       owner: bad.owner, uid: 501).reason == "invalidRequest")
+        }
+    }
+
     /// A full or read-only disk must not keep the Mac awake: the restore clears the policy even when the journal
     /// cannot record it, and the next start acknowledges the restore it finds.
     @Test func aRestoreWhoseJournalWriteFailsStillClearsTheSetting() throws {

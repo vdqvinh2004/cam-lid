@@ -72,8 +72,9 @@ public final class XPCPowerHoldTransport: PowerHoldTransport, @unchecked Sendabl
 
     static func request(for action: HoldAction) -> PowerRequest {
         switch action {
-        case .acquire(let seconds, let strict):
-            PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: seconds, mechanism: strict ? .strict : nil)
+        case .acquire(let seconds, let strict, let batteryFloor):
+            PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: seconds, mechanism: strict ? .strict : nil,
+                         batteryFloorPercent: batteryFloor)
         case .renew(let token, let sequence): PowerRequest(operation: .renew, token: token, sequence: sequence)
         case .release(let token): PowerRequest(operation: .release, token: token)
         }

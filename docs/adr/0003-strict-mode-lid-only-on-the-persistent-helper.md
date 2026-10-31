@@ -75,3 +75,10 @@ shared bit powerd may clear, and an undocumented interface that a macOS update m
 This ADR grants no authority to install, run root code or change power state. Each attended trial still needs the
 owner's go-ahead at the time. Implementation follows a new spec and its tasks; E5 becomes a post-release
 observation unless the spec makes it a gate.
+
+## Amendment (2026-11-01): battery sessions
+Owner decision: decision 6 no longer requires AC power for either mode. When the user allows battery sessions
+(Settings › Safety: "Require charger" off, "Allow battery sessions" on), the app names the battery stop level in the
+acquire request and the helper holds on battery while the battery stays at or above it (10–50%), stopping by itself
+below it. Without that request the helper still requires the charger. The app keeps the battery entry level and the
+battery session limit. Physical trials on battery are still needed for both modes.

@@ -21,9 +21,13 @@ public struct HelperSafety: Sendable {
         self.externalDisplays = externalDisplays
     }
 
-    func permits(_ uid: UInt32) -> Bool {
-        onAC && thermalNominal && consoleUID == uid && lidClosed != nil && externalDisplays == 0 &&
-        batteryPercent.map { $0.isFinite && (20...100).contains($0) } == true
+    /// Without `batteryFloor` the charger is required (and at least 20% battery); with it, battery power is
+    /// allowed while the battery stays at or above the floor.
+    func permits(_ uid: UInt32, batteryFloor: Int? = nil) -> Bool {
+        let minimum = onAC ? 20.0 : batteryFloor.map(Double.init)
+        guard let minimum else { return false }
+        return thermalNominal && consoleUID == uid && lidClosed != nil && externalDisplays == 0 &&
+            batteryPercent.map { $0.isFinite && $0 >= minimum && $0 <= 100 } == true
     }
 }
 
@@ -56,7 +60,11 @@ public final class PowerLeaseService {
         let cap: Double
         var deadline: Double
         var sequence: UInt64
+        /// Battery allowed down to this percent for this lease; nil means the charger is required.
+        var batteryFloor: Int? = nil
     }
+    /// The floors a client may ask for; below 10% the helper never holds.
+    public static let batteryFloorRange = 10...50
 
     /// The mechanism of the current lease or journal record; one of `primary` and `strict`.
     private var mechanism: any LeasePowerMechanism
@@ -111,11 +119,11 @@ public final class PowerLeaseService {
         return value
     }
 
-    private func safe(uid: UInt32, requiresOpen: Bool = false) throws -> Bool {
+    private func safe(uid: UInt32, batteryFloor: Int?, requiresOpen: Bool = false) throws -> Bool {
         let before = try now()
         let reading = try safety()
         let after = try now()
-        return after - before <= Self.maximumSafetyReadSeconds && reading.permits(uid) &&
+        return after - before <= Self.maximumSafetyReadSeconds && reading.permits(uid, batteryFloor: batteryFloor) &&
             (!requiresOpen || reading.lidClosed == false)
     }
 
@@ -240,22 +248,25 @@ public final class PowerLeaseService {
                 }
                 mechanism = requested
                 guard request.token == nil, request.sequence == 1,
+                      request.batteryFloorPercent.map(Self.batteryFloorRange.contains) ?? true,
                       let seconds = request.sessionSeconds,
                       (1...mechanism.maximumSessionSeconds).contains(seconds), uid > 0 else {
                     return reply(false, "invalidRequest")
                 }
                 let start = try now()
-                guard try safe(uid: uid, requiresOpen: true) else { return reply(false, "safetyRefused") }
+                let floor = request.batteryFloorPercent
+                guard try safe(uid: uid, batteryFloor: floor, requiresOpen: true) else { return reply(false, "safetyRefused") }
                 guard try mechanism.admissionAllowed() else { return reply(false, "preexistingOverride") }
                 guard try now() < start + mechanism.leaseSeconds else { return reply(false, "admissionExpired") }
                 let token = UUID()
                 let pending = Lease(token: token, owner: owner, uid: uid, cap: start + Double(seconds),
-                                    deadline: min(start + mechanism.leaseSeconds, start + Double(seconds)), sequence: 1)
+                                    deadline: min(start + mechanism.leaseSeconds, start + Double(seconds)), sequence: 1,
+                                    batteryFloor: floor)
                 restoreAttempted = false
                 try save(intent: .enableLidOverride, disposition: .pending, lease: pending)
                 // A slow fsync/safety check must not authorize an already expired mutation.
                 guard terminalEventReason == nil, try now() < pending.deadline,
-                      try safe(uid: uid, requiresOpen: true), try now() < pending.deadline else {
+                      try safe(uid: uid, batteryFloor: floor, requiresOpen: true), try now() < pending.deadline else {
                     state = "recoveryRequired"
                     reason = "admissionExpiredBeforeWrite"
                     return reply(false, reason)
@@ -298,7 +309,7 @@ public final class PowerLeaseService {
                       request.sessionSeconds == nil else { return reply(false, "invalidLease") }
                 let time = try now()
                 guard terminalEventReason == nil, time < current.deadline, time < current.cap,
-                      try safe(uid: uid) else {
+                      try safe(uid: uid, batteryFloor: current.batteryFloor) else {
                     try restore(reason: terminalEventReason ?? "renewalRefused")
                     return reply(false, terminalEventReason ?? "renewalRefused")
                 }
@@ -385,7 +396,7 @@ public final class PowerLeaseService {
             if time >= current.cap { stopReason = "sessionExpired" }
             else if time >= current.deadline { stopReason = "heartbeatExpired" }
             else {
-                let healthy = try safe(uid: current.uid)
+                let healthy = try safe(uid: current.uid, batteryFloor: current.batteryFloor)
                 if healthy {
                     let overrideStillSet = try mechanism.readApplied()
                     // This is a read-only coexistence check. A failed read is unknown, never

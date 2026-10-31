@@ -10,14 +10,18 @@ public struct PowerRequest: Codable, Sendable {
     public var sequence: UInt64?
     public var sessionSeconds: Int?
     public var mechanism: Mechanism?
+    /// On `acquire`: the user allows closed lid on battery down to this percent (10–50). Absent means the charger
+    /// is required, as for older clients.
+    public var batteryFloorPercent: Int?
 
     public init(operation: Operation, token: UUID? = nil, sequence: UInt64? = nil,
-                sessionSeconds: Int? = nil, mechanism: Mechanism? = nil) {
+                sessionSeconds: Int? = nil, mechanism: Mechanism? = nil, batteryFloorPercent: Int? = nil) {
         self.operation = operation
         self.token = token
         self.sequence = sequence
         self.sessionSeconds = sessionSeconds
         self.mechanism = mechanism
+        self.batteryFloorPercent = batteryFloorPercent
     }
 }
 

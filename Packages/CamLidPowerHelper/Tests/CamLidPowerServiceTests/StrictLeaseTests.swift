@@ -38,6 +38,15 @@ import Testing
         #expect(acquireStrict(plain).reason == "mechanismUnavailable")
     }
 
+    @Test func strictRunsOnBatteryWhenTheClientAllowsIt() {
+        let (f, fake) = fixture()
+        f.safety = HelperSafety(onAC: false, batteryPercent: 70, thermalNominal: true, consoleUID: 501, lidClosed: false, externalDisplays: 0)
+        f.service.start()
+        let held = f.service.handle(PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 300, mechanism: .strict,
+                                                 batteryFloorPercent: 20), owner: f.owner, uid: 501)
+        #expect(held.accepted && fake.bit)
+    }
+
     @Test func renewalSetsTheBitAgain() {
         let (f, fake) = fixture()
         let held = acquireStrict(f)

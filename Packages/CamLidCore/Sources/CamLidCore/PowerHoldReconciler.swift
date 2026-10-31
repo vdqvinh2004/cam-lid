@@ -13,8 +13,9 @@ public struct HoldReply: Equatable, Sendable {
 }
 
 public enum HoldAction: Equatable, Sendable {
-    /// `strict` asks for the lid-only mechanism (ADR 0003) instead of Standard.
-    case acquire(sessionSeconds: Int, strict: Bool = false)
+    /// `strict` asks for the lid-only mechanism (ADR 0003) instead of Standard. `batteryFloor` allows battery power
+    /// down to that percent; nil means the helper requires the charger.
+    case acquire(sessionSeconds: Int, strict: Bool = false, batteryFloor: Int? = nil)
     case renew(token: UUID, sequence: UInt64)
     case release(token: UUID)
 }
@@ -68,7 +69,8 @@ public struct PowerHoldReconciler: Sendable {
         }
     }
 
-    public mutating func next(desired: Bool, remainingSessionSeconds: Double?, now: Double, strict: Bool = false) -> HoldAction? {
+    public mutating func next(desired: Bool, remainingSessionSeconds: Double?, now: Double, strict: Bool = false,
+                              batteryFloor: Int? = nil) -> HoldAction? {
         guard inFlight == nil, now.isFinite else { return nil }
         if !desired { return nextWhenNotDesired(now: now) }
         switch status {
@@ -76,7 +78,8 @@ public struct PowerHoldReconciler: Sendable {
             if let retryAt, now < retryAt { return nil }
             guard let remaining = remainingSessionSeconds, remaining.isFinite,
                   remaining >= Self.minimumSessionSeconds else { return nil }
-            let action = HoldAction.acquire(sessionSeconds: min(Int(remaining), Self.maximumSessionSeconds), strict: strict)
+            let action = HoldAction.acquire(sessionSeconds: min(Int(remaining), Self.maximumSessionSeconds), strict: strict,
+                                            batteryFloor: batteryFloor)
             inFlight = action
             status = .acquiring
             restoration = .pending

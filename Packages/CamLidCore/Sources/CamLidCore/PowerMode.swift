@@ -17,7 +17,7 @@ public enum PowerMode: String, Codable, Sendable, CaseIterable {
             + "the battery or temperature guard trips, or CamLid stops responding. It is less strict than Strict mode."
         case .strict:
             "Experimental. Strict blocks only lid-close sleep and changes no saved setting: a restart clears it, and ending "
-            + "a session with the lid closed sleeps the Mac. It needs the charger. macOS can end it early, for example when "
+            + "a session with the lid closed sleeps the Mac. macOS can end it early, for example when "
             + "a display is connected; the session then stops and says so."
         }
     }

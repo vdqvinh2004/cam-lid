@@ -61,7 +61,7 @@ struct PowerHoldIntegrationTests {
         await settle { transport.actions.contains { if case .acquire = $0 { true } else { false } } }
         await settle { app.dashboardData().leaseVerified }
         #expect(app.dashboardData().leaseVerified && app.dashboardData().powerActuationAvailable)
-        if case .acquire(let seconds, _)? = transport.actions.first { #expect(seconds <= PowerHoldReconciler.maximumSessionSeconds) }
+        if case .acquire(let seconds, _, _)? = transport.actions.first { #expect(seconds <= PowerHoldReconciler.maximumSessionSeconds) }
         app.menuBarStopProtection()
         await settle { transport.actions.contains { if case .release = $0 { true } else { false } } }
         await settle { !app.dashboardData().leaseVerified }
@@ -86,7 +86,7 @@ struct PowerHoldIntegrationTests {
         #expect(app.closedLidCapabilityText == "Closed lid ready · Strict (experimental)")
         await app.startPreviewSession()
         await settle { transport.actions.contains { if case .acquire = $0 { true } else { false } } }
-        if case .acquire(_, let strict)? = transport.actions.first { #expect(strict) } else { Issue.record("no acquire") }
+        if case .acquire(_, let strict, _)? = transport.actions.first { #expect(strict) } else { Issue.record("no acquire") }
         // The mode cannot change while the session runs.
         guard case .failed(let reason) = choose(app, .standard) else { Issue.record("switch was allowed"); return }
         #expect(reason.contains("Stop the session"))
@@ -114,6 +114,26 @@ struct PowerHoldIntegrationTests {
     @Test @MainActor func aStrictInterruptionIsExplained() {
         #expect(AppCoordinator.helperReasonText("systemSleptWhileHeld").contains("slept during a Strict session"))
         #expect(AppCoordinator.helperReasonText("mechanismUnavailable").contains("Reinstall"))
+    }
+
+    /// Owner decision 2026-11-01: battery sessions apply to closed lid in both modes, down to the stop level.
+    @Test @MainActor func theBatteryStopLevelGoesToTheHelperOnlyWhenBatterySessionsAreAllowed() async throws {
+        let (app, transport, support) = try await rig(row: "test-row")
+        defer { support.cleanup() }
+        await app.startPreviewSession()
+        await settle { transport.actions.contains { if case .acquire = $0 { true } else { false } } }
+        if case .acquire(_, _, let floor)? = transport.actions.first { #expect(floor == nil) }   // charger required (default)
+        app.menuBarStopProtection()
+        await settle { transport.actions.contains { if case .release = $0 { true } else { false } } }
+
+        var patch = ConfigPatch(); patch.chargingOnly = false; patch.batteryModeAllowed = true; patch.batteryFloorPercent = 25
+        let first = app.applySettingsPatch(patch, expectedRevision: 1)
+        if case .conflict(_, let revision) = first { _ = app.applySettingsPatch(patch, expectedRevision: revision) }
+        await app.startPreviewSession()
+        await settle { transport.actions.filter { if case .acquire = $0 { true } else { false } }.count == 2 }
+        if case .acquire(_, _, let floor)? = transport.actions.last(where: { if case .acquire = $0 { true } else { false } }) {
+            #expect(floor == 25)
+        } else { Issue.record("no second acquire") }
     }
 
     @Test @MainActor func aHelperRefusalOutranksTheLidRunNotice() async throws {

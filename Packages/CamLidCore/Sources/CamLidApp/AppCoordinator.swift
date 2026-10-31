@@ -562,7 +562,11 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             min($0.capDeadlineMonotonic.map { $0 - now } ?? .infinity, Double(PowerHoldReconciler.maximumSessionSeconds))
         }
         guard let action = holdReconciler.next(desired: holdDesired, remainingSessionSeconds: remaining, now: now,
-                                               strict: config.powerMode == .strict) else { return }
+                                               strict: config.powerMode == .strict,
+                                               // Battery sessions allowed in Settings › Safety: the helper may hold on
+                                               // battery down to the stop level, and stops itself below it.
+                                               batteryFloor: config.chargingOnly || !config.batteryModeAllowed
+                                                   ? nil : config.batteryFloorPercent) else { return }
         let transport = holdTransport ?? makeHoldTransport()
         holdTransport = transport
         Task { @MainActor [weak self] in
@@ -571,7 +575,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             let finished = self.uptime()
             if let reply {
                 self.holdReconciler.received(reply, now: finished)
-                if case .acquire(let seconds, _) = action, reply.accepted, var active = self.session {
+                if case .acquire(let seconds, _, _) = action, reply.accepted, var active = self.session {
                     // A fresh lease is bounded by the helper; the policy cap must not outlive it.
                     let limit = finished + Double(seconds)
                     active.capDeadlineMonotonic = min(active.capDeadlineMonotonic ?? limit, limit)
@@ -624,7 +628,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         switch reason {
         case "systemSleptWhileHeld": "The Mac slept during a Strict session (macOS can end Strict, for example when a display changes). Start a new session to continue."
         case "mechanismUnavailable": "The installed helper doesn’t offer Strict yet. Reinstall it in Settings › Safety."
-        case "safetyRefused": "Closed lid can only start with the lid open, on AC power, with at least 20% battery, normal temperature and no external display."
+        case "safetyRefused": "Closed lid can only start with the lid open, normal temperature and no external display, on the charger (or on battery above the stop level when battery sessions are allowed)."
         case "preexistingOverride", "foreignGlobalSleepDisabled": "Another app already disables sleep, so CamLid left it alone."
         case "overrideChanged": "Another app changed the sleep setting (for example LidRun), so closed lid stopped."
         case "recoveryRequired", "restorationFailed", "startupInspectionFailed":

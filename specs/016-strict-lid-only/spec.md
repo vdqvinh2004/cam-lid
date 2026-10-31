@@ -20,7 +20,7 @@ end. The journal records the mechanism, so the helper and the recovery job know 
 ## User Scenarios & Testing
 
 ### User Story 1 — Choose Strict and keep a closed Mac awake (Priority: P1)
-1. On a Mac with a qualified Strict row, the helper installed and AC power, Settings › Safety lets the owner choose
+1. On a Mac with a qualified Strict row and the helper installed, Settings › Safety lets the owner choose
    Strict (experimental). On any other Mac, Strict shows as unavailable with the reason.
 2. A Timed or Auto session in Strict keeps the Mac awake with the lid closed. `SleepDisabled` stays 0 throughout.
 3. When the session ends with the lid closed, the Mac sleeps (through the kernel's clamshell path).
@@ -36,7 +36,8 @@ If macOS clears the bit during a session (for example powerd after a display cha
 session stops with "Interrupted by the system" instead of ending silently.
 
 ### Edge cases
-- Battery power, external display at start, or lid closed at start: Strict refuses to start, with a reason.
+- Battery power without battery sessions allowed (or below the stop level), external display at start, or lid
+  closed at start: Strict refuses to start, with a reason. On battery, it stops by itself below the stop level.
 - An external display connected during a session: the kernel keeps a docked Mac awake on its own; the session goes on.
 - Switching mode while a lease or an unresolved journal entry exists: refused (existing rule).
 - A macOS update: the build no longer matches the Strict row, so Strict becomes unavailable until requalified.
@@ -50,7 +51,8 @@ session stops with "Interrupted by the system" instead of ending silently.
 - **FR-003** Strict apply: create the idle assertion (timeout = lease + 6 s, release on timeout), then set the bit.
   Renewal: set the bit again and extend the assertion. Clear: clear the bit, release the assertion. Clearing is
   unconditional and idempotent.
-- **FR-004** Strict admission: AC power, no external display, lid open, the existing battery/thermal/CPU guards, and
+- **FR-004** Strict admission: the charger, or battery above the stop level when battery sessions are allowed
+  (amendment 2026-11-01), no external display, lid open, the existing battery/thermal/CPU guards, and
   no foreign `SleepDisabled`.
 - **FR-005** The recovery job clears the bit for an orphaned Strict record (lease expired, owner gone) and journals
   the restore. A Strict record from a previous boot is acknowledged as restored without a write.
@@ -69,4 +71,4 @@ session stops with "Interrupted by the system" instead of ending silently.
 - **SC-003** E5 (powerd interference) is recorded as an observation, not a gate.
 
 ## Out of scope
-Battery-powered Strict, untested-Mac acceptance for Strict, removing the frozen code, Developer ID signing.
+Untested-Mac acceptance for Strict, removing the frozen code, Developer ID signing.

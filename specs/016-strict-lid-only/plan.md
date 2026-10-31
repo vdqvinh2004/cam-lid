@@ -17,7 +17,8 @@
 - **Recovery job:** `recoverOrphanedPolicy` picks the mechanism from the record's family; for Strict it clears the
   bit (no assertion to release in another process) and journals the restore.
 - **App (`CamLidCore`/`CamLidApp`):** `PowerMode.strict` no longer means a separate daemon: `helperArgument` and the
-  reinstall-to-switch rule go; availability = helper installed + Strict row match + AC. `QualifiedSupportRows` gains a
+  reinstall-to-switch rule go; availability = helper installed + Strict row match (power source checked by the helper; battery allowed with a floor
+  since 2026-11-01). `QualifiedSupportRows` gains a
   mechanism. The reconciler sends the mode's mechanism with `acquire`. Settings › Safety gets the Strict choice and
   new disclosure text; the Dashboard banner explains `systemSleptWhileHeld`.
 
