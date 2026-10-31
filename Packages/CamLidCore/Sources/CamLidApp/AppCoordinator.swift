@@ -45,6 +45,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var holdReconciler = PowerHoldReconciler()
     private var holdTransport: (any PowerHoldTransport)?
     private let makeHoldTransport: () -> any PowerHoldTransport
+    private let sleepSystem: () -> Void
     /// Support row that qualifies closed-lid actuation on this Mac and OS build, or nil. `QualifiedSupportRows`
     /// is empty today, so the helper is never asked to hold power in a shipped build.
     private let closedLidSupportRow: () -> String?
@@ -147,7 +148,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
          holdTransportFactory: (() -> any PowerHoldTransport)? = nil,
          closedLidSupportRow: (() -> String?)? = nil,
          systemIdentity: (() -> (model: String?, osBuild: String?))? = nil,
-         activitySampler: (@Sendable (_ excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double))? = nil) {
+         activitySampler: (@Sendable (_ excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double))? = nil,
+         sleepSystem: (() -> Void)? = nil) {
+        // Real sleep only follows the real lid reading; a coordinator with injected health never sleeps the Mac.
+        self.sleepSystem = sleepSystem ?? (healthReader == nil ? LiveSensorProvider.sleepUnlessExternalDisplay : {})
         self.sampleActivityNow = activitySampler ?? { AppCoordinator.sampleActivity(NativeProcessList(), excludeUnderOrca: $0) }
         self.healthReader = healthReader
         self.helper = helperController ?? HelperController()
@@ -538,6 +542,11 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             let finished = self.uptime()
             if let reply {
                 self.holdReconciler.received(reply, now: finished)
+                // Releasing with the lid closed hands the Mac back to macOS, which would sleep on a lid close.
+                if case .release = action, reply.accepted, self.currentHealth().lidState == .closed {
+                    self.record(category: .stateTransition, newState: self.sessionStateForRecord(), reasons: ["lidClosedSleep"])
+                    self.sleepSystem()
+                }
                 if case .acquire(let seconds) = action, reply.accepted, var active = self.session {
                     // A fresh lease is bounded by the helper; the policy cap must not outlive it.
                     let limit = finished + Double(seconds)
@@ -560,9 +569,6 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             return "Closed lid is off on this untested Mac (\(identity)). To allow it, see Settings › Safety › Closed lid."
         }
         if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Safety." }
-        if let app = helper.keepAwakeApps.first(where: \.resetsSleepSetting)?.name {
-            return "\(app) resets the sleep setting, so closed lid will be interrupted. Quit \(app) or remove its helper."
-        }
         // A stopped session keeps the helper's reason; the reconciler itself resets once the session stops.
         if let stop = session.stopReasons.first(where: { $0.hasPrefix("helper") }) {
             switch stop {
@@ -570,6 +576,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             case "helperReleaseFailed": return "The sleep setting could not be restored yet. CamLid is retrying."
             default: return Self.helperReasonText(String(stop.dropFirst("helper:".count)))
             }
+        }
+        if let app = helper.keepAwakeApps.first(where: \.resetsSleepSetting)?.name {
+            return "\(app) resets the sleep setting, so closed lid will be interrupted. Quit \(app) or remove its helper."
         }
         let others = helper.keepAwakeApps.filter { !$0.resetsSleepSetting }.map(\.name)
         if !others.isEmpty {
@@ -586,7 +595,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     static func helperReasonText(_ reason: String) -> String {
         switch reason {
-        case "safetyRefused": "Closed lid declined for safety: it needs AC power, at least 20% battery, normal temperature and no external display."
+        case "safetyRefused": "Closed lid can only start with the lid open, on AC power, with at least 20% battery, normal temperature and no external display."
         case "preexistingOverride", "foreignGlobalSleepDisabled": "Another app already disables sleep, so CamLid left it alone."
         case "overrideChanged": "Another app changed the sleep setting (for example LidRun), so closed lid stopped."
         case "recoveryRequired", "restorationFailed", "startupInspectionFailed":

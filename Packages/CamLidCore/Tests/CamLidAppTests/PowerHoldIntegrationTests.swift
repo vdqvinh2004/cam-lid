@@ -33,7 +33,8 @@ private final class FakeHoldTransport: PowerHoldTransport, @unchecked Sendable {
 @Suite("Helper hold integration", .serialized)
 struct PowerHoldIntegrationTests {
     @MainActor private func rig(row: String?, keepAwake: [KeepAwakeApp] = [],
-                                system: @escaping () -> (model: String?, osBuild: String?) = { ("Mac99,1", "99Z1") })
+                                system: @escaping () -> (model: String?, osBuild: String?) = { ("Mac99,1", "99Z1") },
+                                lid: @escaping () -> LidState = { .open }, sleep: @escaping () -> Void = {})
         async throws -> (AppCoordinator, FakeHoldTransport, QARefinementSupport) {
         let support = QARefinementSupport()
         let transport = FakeHoldTransport()
@@ -45,9 +46,9 @@ struct PowerHoldIntegrationTests {
         let app = AppCoordinator(historyDirectory: support.root.appendingPathComponent("history"),
             controlDirectory: support.root.appendingPathComponent("control"),
             preferences: UserDefaults(suiteName: support.suite)!,
-            healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) },
+            healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: lid()) },
             helperController: helper, holdTransportFactory: { transport }, closedLidSupportRow: { row },
-            systemIdentity: system)
+            systemIdentity: system, sleepSystem: sleep)
         var patch = ConfigPatch(); patch.closedLidOptIn = true
         _ = app.applySettingsPatch(patch, expectedRevision: 1)
         app.changeMode(.timed)
@@ -67,6 +68,32 @@ struct PowerHoldIntegrationTests {
         await settle { !app.dashboardData().leaseVerified }
         #expect(transport.actions.contains { if case .release = $0 { true } else { false } })
         #expect(!app.dashboardData().leaseVerified)
+    }
+
+    /// Trial 8: restoring the setting with the lid already closed left the Mac awake; a release then sleeps it.
+    @Test(arguments: [LidState.open, .closed])
+    @MainActor func releasingWithTheLidClosedSleepsTheMac(_ state: LidState) async throws {
+        var lid = LidState.open
+        var sleeps = 0
+        let (app, transport, support) = try await rig(row: "test-row", lid: { lid }, sleep: { sleeps += 1 })
+        defer { support.cleanup() }
+        await app.startPreviewSession()
+        await settle { app.dashboardData().leaseVerified }
+        lid = state
+        app.menuBarStopProtection()
+        await settle { transport.actions.contains { if case .release = $0 { true } else { false } } }
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        #expect(sleeps == (state == .closed ? 1 : 0))
+    }
+
+    @Test @MainActor func aHelperRefusalOutranksTheLidRunNotice() async throws {
+        let (app, transport, support) = try await rig(row: "test-row", keepAwake: [KeepAwakeApp(name: "LidRun", resetsSleepSetting: true)])
+        defer { support.cleanup() }
+        transport.refuseAcquireWith = "safetyRefused"
+        await app.startPreviewSession()
+        await settle { app.dashboardData().state == .safetyStopped }
+        await settle { app.dashboardData().bannerMessage?.contains("lid open") == true }
+        #expect(app.dashboardData().bannerMessage?.contains("only start with the lid open") == true)
     }
 
     @Test @MainActor func withoutAQualifiedRowNothingReachesTheHelper() async throws {
