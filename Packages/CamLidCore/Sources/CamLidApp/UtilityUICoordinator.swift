@@ -158,7 +158,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         if popover?.contentViewController !== dashboardHost { popover?.contentViewController = dashboardHost }
         resizeDashboard()
         if show, let anchor = anchorWindow?.contentView {
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             popover?.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
             // The transparent, non-key anchor cannot transfer keyboard focus.
             // Explicitly focus the presented surface, never a timer refresh.
@@ -178,7 +178,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
     private func showSettings() {
         guard let state else { return }
         if let settingsWindow, settingsWindow.isVisible {
-            settingsWindow.makeKeyAndOrderFront(nil); visibilityChanged(); return
+            Self.bringToFront(settingsWindow); visibilityChanged(); return
         }
         let editor = SettingsEditor(configuration: state.configuration, revision: state.revision, section: state.settingsSection)
         settingsEditor = editor; editor.installationPending = state.installationPending
@@ -239,7 +239,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
                 self?.quitAfterSettingsClose = false; self?.send(.quitDecision(false))
             })
         window.delegate = closeGuard; toolbar = SettingsToolbar(editor: editor, window: window)
-        NSApp.activate(ignoringOtherApps: true); window.makeKeyAndOrderFront(nil)
+        Self.bringToFront(window)
         visibilityChanged()
     }
     private func showHistory(show: Bool) {
@@ -316,10 +316,16 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
                               onCheck: { [weak self] in self?.send(.checkUpdates) })
         present(view, title: "Updates", window: &updatesWindow, width: 460, height: view.preferredHeight, show: show)
     }
+    /// Opens a window in front of every other app's windows, also when it was already open behind them.
+    static func bringToFront(_ window: NSWindow) {
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+    }
     private func present<Content: View>(_ view: Content, title: String, window: inout NSWindow?, width: CGFloat, height: CGFloat, show: Bool = true) {
         if let existing = window {
             if let host = existing.contentViewController as? NSHostingController<Content> { host.rootView = view }
-            if show { existing.makeKeyAndOrderFront(nil) }; return
+            if show { Self.bringToFront(existing) }; return
         }
         guard show else { return }
         let host = NSHostingController(rootView: view)
@@ -327,7 +333,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         let created = NSWindow(contentViewController: host)
         created.isReleasedWhenClosed = false; created.title = title; created.delegate = self
         created.setContentSize(NSSize(width: width, height: height)); created.center(); window = created
-        NSApp.activate(ignoringOtherApps: true); created.makeKeyAndOrderFront(nil)
+        Self.bringToFront(created)
     }
     public func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }

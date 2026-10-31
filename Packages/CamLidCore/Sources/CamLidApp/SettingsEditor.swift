@@ -279,6 +279,11 @@ public final class SettingsEditor: ObservableObject {
             return badge.settingsUnavailableReason == nil
         }
     }
+    /// True when every agent that can be selected is selected (the button then offers Disable All).
+    public var allProvidersEnabled: Bool { selectableProviders.allSatisfy { draft.parsedAdapters().contains($0) } }
+    public func disableAllProviders() {
+        for provider in draft.parsedAdapters() { setProvider(provider, enabled: false) }
+    }
     public func enableAllProviders() {
         for provider in selectableProviders where !draft.parsedAdapters().contains(provider) {
             setProvider(provider, enabled: true)

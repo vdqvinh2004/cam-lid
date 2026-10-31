@@ -890,6 +890,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 })
             } catch { refusalNotice = "Couldn’t open CamLid UI. Retry from the menu."; refresh(); return }
         }
+        // macOS 14+ activation is cooperative: this process got the menu-bar click and must hand activation to the
+        // UI process, or its windows open behind the frontmost app.
+        if let pid = utilityUI?.pid, let app = NSRunningApplication(processIdentifier: pid) {
+            NSApp.yieldActivation(to: app)
+        } else if let identifier = Bundle.main.bundleIdentifier {
+            NSApp.yieldActivation(toApplicationWithBundleIdentifier: identifier)
+        }
         utilityUI?.send(.show(surface, utilityUIState()))
     }
     func diagnosticSnapshot() async -> DiagnosticSnapshot {

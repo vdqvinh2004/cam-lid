@@ -349,21 +349,23 @@ private struct SettingsAgentsPane: View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
                 badges(supported)
-                if !others.isEmpty {
-                    DisclosureGroup("Other agents (\(others.count))", isExpanded: $showsOthers) { badges(others) }
-                        .disclosureGroupStyle(RowDisclosureStyle())
-                        .help("Not installed on this Mac, or not supported yet")
+                // The all-or-none action shares the "Other agents" row instead of sitting alone on an empty line.
+                HStack(alignment: .top) {
+                    if !others.isEmpty {
+                        DisclosureGroup("Other agents (\(others.count))", isExpanded: $showsOthers) { badges(others) }
+                            .disclosureGroupStyle(RowDisclosureStyle())
+                            .help("Not installed on this Mac, or not supported yet")
+                    } else {
+                        Spacer()
+                    }
+                    Button(editor.allProvidersEnabled ? "Disable All" : "Enable All") {
+                        editor.allProvidersEnabled ? editor.disableAllProviders() : editor.enableAllProviders()
+                    }
+                    .help(editor.allProvidersEnabled ? "Ignore every agent for sleep decisions" : "Include all agents in sleep decisions")
+                    .accessibilityIdentifier("camlid.agents.enableAll")
                 }
                 ForEach(orderedBadges) { state in
                     SettingsFieldOutcome(editor: editor, key: "provider:" + state.provider)
-                }
-                if !editor.selectableProviders.allSatisfy({ editor.draft.parsedAdapters().contains($0) }) {
-                    HStack {
-                        Spacer()
-                        Button("Enable All") { editor.enableAllProviders() }
-                            .help("Include all agents in sleep decisions")
-                            .accessibilityIdentifier("camlid.agents.enableAll")
-                    }
                 }
             }
         } header: {

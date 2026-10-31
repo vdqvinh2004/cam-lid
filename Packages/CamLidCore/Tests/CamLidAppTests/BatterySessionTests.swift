@@ -206,4 +206,16 @@ struct BatterySessionTests {
         editor.discard()
         #expect(editor.batteryAllowed)
     }
+
+    /// One button switches between Enable All and Disable All.
+    @Test func disableAllClearsEverySelectedAgent() throws {
+        var current = try Configuration(adapterEnrollment: ["orca", "claude"])
+        let editor = SettingsEditor(configuration: current, revision: 1, section: .agents)
+        editor.configureAutosave { patch, revision in
+            do { current = try current.applying(patch); return .saved(revision: revision + 1) }
+            catch { return .failed("Invalid setting") }
+        }
+        editor.disableAllProviders()
+        #expect(current.adapterEnrollment.isEmpty && editor.draft.parsedAdapters().isEmpty)
+    }
 }
