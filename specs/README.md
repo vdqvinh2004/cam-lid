@@ -24,7 +24,8 @@ Experimental feature spec (not a milestone; no gate change):
 
 - [Persistent Helper, Standard mode (014)](014-persistent-helper/spec.md) — Draft, 0/20 tasks. Replaces the blocked exclusive-create/one-use admission with a root LaunchDaemon installed once through administrator authentication ([ADR 0001](../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md)). The 012/013 mechanism stays as the experimental, frozen **Strict** mode. No gate passed; native actions still need explicit owner approval.
 
-- [Agent Activity Observer (015)](015-agent-activity-observer/spec.md) — Phases 0–3 done (9/11); calibration (T401) and trial (T402) pending. Observer-only working/idle inference for agents run directly in a terminal (Claude Code, Codex, OpenCode) so Auto works without Orca; no hooks or configuration edits.
+- [Agent Activity Observer (015)](015-agent-activity-observer/spec.md) — Phases 0–3 done and trial 8 passed (T402, 10/11); calibration of Codex and OpenCode (T401) pending. Observer-only working/idle inference for agents run directly in a terminal (Claude Code, Codex, OpenCode) so Auto works without Orca; no hooks or configuration edits.
+- [Strict Mode, Lid-Only (016)](016-strict-lid-only/spec.md) — Draft (1/15). Strict runs the lid-only clamshell bit on the persistent helper (ADR 0003); experimental, AC only, per-row qualified.
 
 Each folder contains its scoped spec/plan/tasks; supporting research/model/quickstart/checklists
 exist where applicable (012 uses the linked decision memo and runbooks). Base runtime contracts reside with M2/M3; M8 adds scoped automation extensions while consuming the existing policy/transport/backend contracts.

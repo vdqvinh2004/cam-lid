@@ -1,6 +1,6 @@
 # Tasks: Agent Activity Observer
 
-**Feature context:** `015-agent-activity-observer` · **Status:** 9/11 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `015-agent-activity-observer` · **Status:** 10/11 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [x] T001 Record the owner decisions (observer only; Claude Code back) in ADR 0002 and mark the hook/plugin tasks in spec 004 (T003–T005, T007, T011) as closed by that decision. — ADR 0002 written; spec 004 T003, T004, T005, T007, T011 closed by it.
