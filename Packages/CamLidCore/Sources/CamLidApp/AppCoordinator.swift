@@ -332,7 +332,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             refusalNotice = "Choose a mode before starting."
             refresh(); toggleDashboard(show: true); return
         }
-        if config.closedLidOptIn, !closedLidPermit().allowsActuation {
+        if config.closedLidOptIn, !closedLidAllowed {
             refusalNotice = "Closed-lid preview refused: power control is unavailable."
             record(category: .configuration, newState: sessionStateForRecord(), reasons: ["backendUnverified"])
             refresh()
@@ -484,6 +484,30 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         session?.effectiveState ?? (config.mode == .off ? .off : .ready)
     }
 
+    /// The Strict row for this Mac (ADR 0003). Strict has no untested acceptance: no row, no Strict.
+    var strictRow: String? {
+        let system = systemIdentity()
+        return QualifiedSupportRows.matching(model: system.model, osBuild: system.osBuild, in: QualifiedSupportRows.strictRows)
+    }
+
+    /// Whether the chosen closed-lid mode may act on this Mac: Standard follows its permit, Strict its own row.
+    var closedLidAllowed: Bool {
+        config.powerMode == .strict ? strictRow != nil : closedLidPermit().allowsActuation
+    }
+
+    /// Refuses a mode change while a session or hold exists, or to Strict on a Mac without a Strict row.
+    private func powerModeRefusal(_ patch: ConfigPatch) -> String? {
+        guard let target = patch.powerMode else { return nil }
+        let decision = PowerModeSwitch.decide(from: config.powerMode, to: target,
+            leaseActive: session != nil || holdReconciler.status != .inactive, journalUnresolved: false,
+            targetAvailable: target == .standard || strictRow != nil)
+        return switch decision {
+        case .allowed: nil
+        case .refused(reason: "modeUnavailable"): "Strict isn’t tested on this Mac, so it can’t be chosen."
+        case .refused: "Stop the session before changing the closed-lid mode."
+        }
+    }
+
     func closedLidPermit() -> ClosedLidPermit {
         if let row = closedLidSupportRow() { return .qualified(rowID: row) }
         let system = systemIdentity()
@@ -510,7 +534,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     /// One line shown in the Dashboard and Settings in place of the old fixed preview notice.
     var closedLidCapabilityText: String {
         let permit = closedLidPermit()
-        if !permit.allowsActuation { return "Can’t keep your Mac awake · this Mac isn’t tested" }
+        if config.powerMode == .strict {
+            if strictRow == nil { return "Can’t keep your Mac awake · Strict isn’t tested on this Mac" }
+        } else if !permit.allowsActuation { return "Can’t keep your Mac awake · this Mac isn’t tested" }
         switch helper.state {
         case "installed": break
         case "notInstalled": return "Can’t keep your Mac awake · helper not installed"
@@ -518,12 +544,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         default: return "Can’t keep your Mac awake · the helper needs attention in Settings › Safety"
         }
         if !config.closedLidOptIn { return "Closed lid is off · turn it on in Settings › Safety" }
+        if config.powerMode == .strict { return "Closed lid ready · Strict (experimental)" }
         if case .qualified = permit { return "Closed lid ready · tested Mac" }
         return "Closed lid ready · untested Mac"
     }
 
     private var holdDesired: Bool {
-        guard closedLidPermit().allowsActuation, config.closedLidOptIn, helper.state == "installed",
+        guard closedLidAllowed, config.closedLidOptIn, helper.state == "installed",
               let state = session?.effectiveState else { return false }
         return state == .protected || state == .completionGrace
     }
@@ -534,7 +561,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let remaining = session.map {
             min($0.capDeadlineMonotonic.map { $0 - now } ?? .infinity, Double(PowerHoldReconciler.maximumSessionSeconds))
         }
-        guard let action = holdReconciler.next(desired: holdDesired, remainingSessionSeconds: remaining, now: now) else { return }
+        guard let action = holdReconciler.next(desired: holdDesired, remainingSessionSeconds: remaining, now: now,
+                                               strict: config.powerMode == .strict) else { return }
         let transport = holdTransport ?? makeHoldTransport()
         holdTransport = transport
         Task { @MainActor [weak self] in
@@ -543,7 +571,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             let finished = self.uptime()
             if let reply {
                 self.holdReconciler.received(reply, now: finished)
-                if case .acquire(let seconds) = action, reply.accepted, var active = self.session {
+                if case .acquire(let seconds, _) = action, reply.accepted, var active = self.session {
                     // A fresh lease is bounded by the helper; the policy cap must not outlive it.
                     let limit = finished + Double(seconds)
                     active.capDeadlineMonotonic = min(active.capDeadlineMonotonic ?? limit, limit)
@@ -561,7 +589,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let permit = closedLidPermit()
         let system = systemIdentity()
         let identity = "\(system.model ?? "unknown Mac"), macOS \(system.osBuild ?? "unknown build")"
-        if !permit.allowsActuation {
+        if config.powerMode == .strict, strictRow == nil {
+            return "Strict isn’t tested on this Mac (\(identity)). Choose Standard in Settings › Safety › Closed lid."
+        }
+        if config.powerMode == .standard, !permit.allowsActuation {
             return "Closed lid is off on this untested Mac (\(identity)). To allow it, see Settings › Safety › Closed lid."
         }
         if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Safety." }
@@ -591,6 +622,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     static func helperReasonText(_ reason: String) -> String {
         switch reason {
+        case "systemSleptWhileHeld": "The Mac slept during a Strict session (macOS can end Strict, for example when a display changes). Start a new session to continue."
+        case "mechanismUnavailable": "The installed helper doesn’t offer Strict yet. Reinstall it in Settings › Safety."
         case "safetyRefused": "Closed lid can only start with the lid open, on AC power, with at least 20% battery, normal temperature and no external display."
         case "preexistingOverride", "foreignGlobalSleepDisabled": "Another app already disables sleep, so CamLid left it alone."
         case "overrideChanged": "Another app changed the sleep setting (for example LidRun), so closed lid stopped."
@@ -839,7 +872,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             notificationPermission: outcomeNotifications.permissionState,
             accessibilityPermission: permissions.accessibility, permissionSettingsError: permissions.settingsError,
             helperState: helper.state, helperMessage: helper.message, helperBusy: helper.busy,
-            closedLidPermit: closedLidPermit().statusCode,
+            closedLidPermit: closedLidPermit().statusCode, strictTested: strictRow != nil,
             systemModel: systemIdentity().model ?? "unknown", systemBuild: systemIdentity().osBuild ?? "unknown",
             keepAwakeApps: helper.keepAwakeApps, capabilityText: closedLidCapabilityText)
     }
@@ -993,6 +1026,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         guard revision == expectedRevision else {
             return .conflict(configuration: config, revision: revision)
         }
+        if let refusal = powerModeRefusal(patch) { return .failed(refusal) }
         guard let candidate = try? config.applying(patch) else { return .failed("Invalid setting. Last applied value retained.") }
         return applySettings(candidate, expectedRevision: expectedRevision)
     }
@@ -1007,6 +1041,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configConflict"])
             return .conflict(configuration: config, revision: revision)
         }
+        if let refusal = powerModeRefusal(patch) { return .failed(refusal) }
         guard revision < Int.max, let candidate = try? config.applying(patch),
               let data = try? JSONEncoder().encode(PersistedSettings(schemaVersion: 1, revision: revision + 1, configuration: candidate)) else {
             return .failed("Invalid setting. Last applied value retained.")
@@ -1561,7 +1596,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             let reason: String = if authorityUnavailable { "appUnavailable" }
                 else if terminationFlowActive { "applicationTerminating" }
                 else if config.mode == .off { "modeOff" }
-                else if config.closedLidOptIn && !closedLidPermit().allowsActuation { "closedLidNotPermitted" }
+                else if config.closedLidOptIn && !closedLidAllowed { "closedLidNotPermitted" }
                 else { config.batteryEntryRefusal(health: currentHealth()) ?? "notStarted" }
             return reply(3, ["accepted": false, "reason": reason, "detail": refusalNotice ?? NSNull()])
         }
@@ -1569,6 +1604,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         return reply(0, ["accepted": true, "mode": active.requestedMode.rawValue,
             "effectiveState": (session ?? active).effectiveState.rawValue,
             "closedLid": config.closedLidOptIn, "closedLidPermit": closedLidPermit().statusCode,
+            "powerMode": config.powerMode.rawValue,
             "powerActuation": holdReconciler.leaseVerified(now: uptime()),
             "note": "Power is held once the helper confirms; check `camlid status` for leaseVerified."])
     }

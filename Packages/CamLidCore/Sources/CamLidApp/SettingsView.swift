@@ -35,6 +35,7 @@ public struct SettingsDraft: Sendable, Equatable {
 
     public var mode: RequestedMode
     public var closedLidOptIn: Bool
+    public var powerMode: PowerMode
     public var completionDelayMinutes: Int
     public var waitRetentionMinutes: Int
     public var batteryFloorPercent: Int
@@ -58,6 +59,7 @@ public struct SettingsDraft: Sendable, Equatable {
     public init(configuration: Configuration) {
         mode = configuration.mode
         closedLidOptIn = configuration.closedLidOptIn
+        powerMode = configuration.powerMode
         completionDelayMinutes = configuration.completionDelayMinutes
         waitRetentionMinutes = configuration.waitRetentionMinutes
         batteryFloorPercent = configuration.batteryFloorPercent
@@ -118,6 +120,7 @@ public struct SettingsDraft: Sendable, Equatable {
         var patch = ConfigPatch()
         patch.mode = mode
         patch.closedLidOptIn = closedLidOptIn
+        patch.powerMode = powerMode
         patch.completionDelayMinutes = completionDelayMinutes
         patch.waitRetentionMinutes = waitRetentionMinutes
         patch.batteryFloorPercent = batteryFloorPercent
@@ -554,6 +557,8 @@ private struct SettingsClosedLidSection: View {
 
     private var systemText: String { "\(editor.systemModel), macOS \(editor.systemBuild)" }
     private var testedText: String {
+        // Each mode is tested separately (ADR 0003).
+        if editor.draft.powerMode == .strict { return editor.strictTested ? "Tested" : "Not tested" }
         if editor.closedLidPermit.hasPrefix("qualified:") { return "Tested" }
         return editor.closedLidPermit == "untestedAcknowledged" ? "Untested — allowed" : "Not tested"
     }
@@ -566,14 +571,22 @@ private struct SettingsClosedLidSection: View {
                 .help("Lets sessions keep this Mac awake with the lid closed, within the safety limits")
                 .accessibilityIdentifier("camlid.settings.closedLid.enabled")
             SettingsFieldOutcome(editor: editor, key: "closedLidOptIn")
-            ValueRow(title: "Mode", value: PowerMode.standard.title)
-            Text(PowerMode.standard.disclosure)
+            Picker("Mode", selection: Binding(get: { editor.draft.powerMode }, set: editor.setPowerMode)) {
+                Text(PowerMode.standard.title).tag(PowerMode.standard)
+                Text(PowerMode.strict.title).tag(PowerMode.strict)
+                    .selectionDisabled(!editor.strictTested && editor.draft.powerMode != .strict)
+            }
+            .help("Standard is the default. Strict is experimental; it can be chosen only on a Mac where it was tested.")
+            .accessibilityLabel(Text("Closed-lid mode"))
+            .accessibilityIdentifier("camlid.settings.closedLid.mode")
+            Text(editor.draft.powerMode.disclosure)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            ValueRow(title: "Strict (experimental)", value: "Unavailable")
-            Text(PowerMode.strict.disclosure)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if !editor.strictTested {
+                Text("Strict isn’t tested on this Mac, so it can’t be chosen.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            SettingsFieldOutcome(editor: editor, key: "powerMode")
             ValueRow(title: "This Mac", value: systemText)
             ValueRow(title: "Testing", value: testedText)
             if !editor.closedLidPermit.hasPrefix("qualified:") {

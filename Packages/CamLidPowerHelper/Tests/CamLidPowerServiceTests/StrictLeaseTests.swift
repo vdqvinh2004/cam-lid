@@ -88,8 +88,11 @@ import Testing
 
     @Test func systemSleepDuringAStrictLeaseEndsItAsAnInterruption() {
         let (f, fake) = fixture()
-        #expect(acquireStrict(f).accepted)
+        let held = acquireStrict(f)
+        #expect(held.accepted)
         f.service.observeSystemSleep()
+        let renew = f.service.handle(PowerRequest(operation: .renew, token: held.token, sequence: 2), owner: f.owner, uid: 501)
+        #expect(!renew.accepted && renew.reason == "systemSleptWhileHeld")
         #expect(!fake.bit && f.service.state == "restored" && f.service.reason == "systemSleptWhileHeld")
         // The helper is not latched: the next session may start.
         #expect(acquireStrict(f).accepted)

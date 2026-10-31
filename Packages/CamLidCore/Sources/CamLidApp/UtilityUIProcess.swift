@@ -25,6 +25,7 @@ struct UtilityUIState: Codable, Sendable {
     var helperMessage = "Helper status has not been checked."
     var helperBusy = false
     var closedLidPermit = "notPermitted"
+    var strictTested = false
     var systemModel = ""
     var systemBuild = ""
     var keepAwakeApps: [KeepAwakeApp] = []

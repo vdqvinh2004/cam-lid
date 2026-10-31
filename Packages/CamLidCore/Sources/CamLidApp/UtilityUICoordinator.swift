@@ -86,7 +86,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         settingsEditor?.loginState = state.loginState; settingsEditor?.loginMessage = state.loginMessage
         settingsEditor?.helperState = state.helperState; settingsEditor?.helperMessage = state.helperMessage
         settingsEditor?.helperBusy = state.helperBusy
-        settingsEditor?.closedLidPermit = state.closedLidPermit
+        settingsEditor?.closedLidPermit = state.closedLidPermit; settingsEditor?.strictTested = state.strictTested
         settingsEditor?.systemModel = state.systemModel; settingsEditor?.systemBuild = state.systemBuild
         settingsEditor?.keepAwakeApps = state.keepAwakeApps; settingsEditor?.capabilityText = state.capabilityText
         settingsEditor?.notificationPermission = state.notificationPermission
@@ -193,7 +193,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         editor.helperState = state.helperState; editor.helperMessage = state.helperMessage; editor.helperBusy = state.helperBusy
         editor.onInstallHelper = { [weak self] in self?.send(.installHelper) }
         editor.onUninstallHelper = { [weak self] in self?.send(.uninstallHelper) }
-        editor.closedLidPermit = state.closedLidPermit
+        editor.closedLidPermit = state.closedLidPermit; editor.strictTested = state.strictTested
         editor.systemModel = state.systemModel; editor.systemBuild = state.systemBuild
         editor.keepAwakeApps = state.keepAwakeApps; editor.capabilityText = state.capabilityText
         editor.onSetUntestedAcknowledgement = { [weak self] in self?.send(.setUntestedAcknowledgement($0)) }

@@ -290,6 +290,8 @@ public final class PowerLeaseService {
                 poll()
                 return reply(state == "active", reason, token: state == "active" ? token : nil)
             case .renew:
+                // The app was asleep too; its first renewal after wake learns why its Strict lease ended.
+                if lease == nil, reason == "systemSleptWhileHeld" { return reply(false, reason) }
                 guard var current = lease, state == "active", current.owner == owner,
                       current.uid == uid, current.token == request.token,
                       let sequence = request.sequence, sequence > current.sequence,

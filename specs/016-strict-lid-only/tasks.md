@@ -1,6 +1,6 @@
 # Tasks: Strict mode, lid-only
 
-**Feature context:** `016-strict-lid-only` · **Status:** 6/15 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `016-strict-lid-only` · **Status:** 9/15 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decision
 - [x] T001 ADR 0003 accepted; ADR 0001 amended. — `85bae08`.
@@ -13,9 +13,9 @@
 - [x] T105 Interruption: system sleep observed during a Strict lease ends it with `systemSleptWhileHeld`; no own sleep request after a Strict restore. Tests. — `observeSystemSleep()`; the Standard daemon now runs the passive root-domain observer (Standard leases ignore it). The observer has not been exercised physically in Standard mode.
 
 ## Phase 2 — App
-- [ ] T201 `PowerMode.strict` availability (helper installed, Strict row, AC), remove `helperArgument`/reinstall switching; `QualifiedSupportRows` per mechanism with row `mac17-3-26a434` for Strict; tests.
-- [ ] T202 Reconciler sends the mechanism; Strict admission reasons (battery, external display, lid closed) and `systemSleptWhileHeld` text; tests.
-- [ ] T203 Settings › Safety Strict choice and disclosure; Dashboard shows the mode. Build, run and inspect the app (light/dark, keyboard, VoiceOver labels).
+- [x] T201 `PowerMode.strict` availability (helper installed, Strict row, AC), remove `helperArgument`/reinstall switching; `QualifiedSupportRows` per mechanism with row `mac17-3-26a434` for Strict; tests. — `Configuration.powerMode` (older files mean Standard), `QualifiedSupportRows.strictRows`, `closedLidAllowed`; a switch is refused while a session or hold exists and to Strict without a Strict row (`PowerModeSwitch`). AC is enforced by the helper.
+- [x] T202 Reconciler sends the mechanism; Strict admission reasons (battery, external display, lid closed) and `systemSleptWhileHeld` text; tests. — `HoldAction.acquire(sessionSeconds:strict:)`; the helper answers the first renewal after an interruption with `systemSleptWhileHeld`; texts for it and `mechanismUnavailable`. Battery/display/lid reasons reuse `safetyRefused`.
+- [x] T203 Settings › Safety Strict choice and disclosure; Dashboard shows the mode. Build, run and inspect the app (light/dark, keyboard, VoiceOver labels). — "Closed-lid mode" pop-up (Strict selectable only with a Strict row), per-mode disclosure and Testing row; the Dashboard line reads "Closed lid ready · Strict (experimental)". Inspected in the running app (dark appearance, VoiceOver labels); light appearance and keyboard order not checked.
 
 ## Phase 3 — Attended trials (owner go-ahead each time)
 - [ ] T301 Strict trial S1: Auto with Claude Code, lid closed, Sleep when done (as trial 8); `SleepDisabled` stays 0; Mac sleeps at the end.

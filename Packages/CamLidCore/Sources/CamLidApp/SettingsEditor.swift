@@ -53,6 +53,8 @@ public final class SettingsEditor: ObservableObject {
     @Published public var helperMessage = "Helper status has not been checked."
     @Published public var helperBusy = false
     @Published public var closedLidPermit = "notPermitted"
+    /// This Mac has a Strict row (ADR 0003); without one Strict cannot be chosen.
+    @Published public var strictTested = false
     @Published public var systemModel = ""
     @Published public var systemBuild = ""
     @Published public var keepAwakeApps: [KeepAwakeApp] = []
@@ -225,6 +227,8 @@ public final class SettingsEditor: ObservableObject {
         apply(key: "batteryModeAllowed") { _ in var patch = ConfigPatch(); patch.batteryModeAllowed = enabled; return patch }
     }
     public func setChargingOnly(_ enabled: Bool) { draft.chargingOnly = enabled; apply(key: "chargingOnly") { _ in var p = ConfigPatch(); p.chargingOnly = enabled; return p } }
+    /// Refused by the app while a session runs (spec 016 FR-009); the draft then returns to the saved mode.
+    public func setPowerMode(_ mode: PowerMode) { draft.powerMode = mode; apply(key: "powerMode") { _ in var p = ConfigPatch(); p.powerMode = mode; return p } }
     public func setClosedLidOptIn(_ enabled: Bool) { draft.closedLidOptIn = enabled; apply(key: "closedLidOptIn") { _ in var p = ConfigPatch(); p.closedLidOptIn = enabled; return p } }
     public func setLaunchAtLogin(_ enabled: Bool) { draft.launchAtLogin = enabled; apply(key: "launchAtLogin") { _ in var p = ConfigPatch(); p.launchAtLogin = enabled; return p } }
     public func setNotification(_ category: NotificationCategory, enabled: Bool) {
@@ -445,6 +449,7 @@ public final class SettingsEditor: ObservableObject {
         if pending.contains("allowDisplaySleep") { draft.allowDisplaySleep = oldDraft.allowDisplaySleep }
         if pending.contains("launchAtLogin") { draft.launchAtLogin = oldDraft.launchAtLogin }
         if pending.contains("closedLidOptIn") { draft.closedLidOptIn = oldDraft.closedLidOptIn }
+        if pending.contains("powerMode") { draft.powerMode = oldDraft.powerMode }
         if pending.contains("notificationCategories") { draft.notificationCategories = oldDraft.notificationCategories }
         if pending.contains("cpuStopEnabled") { draft.cpuStopEnabled = oldDraft.cpuStopEnabled }
         for provider in AgentBadgeState.providers where pending.contains("provider:" + provider) {

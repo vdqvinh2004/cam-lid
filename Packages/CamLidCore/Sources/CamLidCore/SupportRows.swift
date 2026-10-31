@@ -19,6 +19,12 @@ public enum QualifiedSupportRows {
         SupportRow(id: "mac17-3-26a434", model: "Mac17,3", osBuild: "26A434"),
     ]
 
+    /// Strict (ADR 0003) is qualified separately: it uses an undocumented kernel interface, and an untested Mac
+    /// cannot accept it. Mac17,3 / 26A434 passed experiments E1–E4 and E6 on 2026-10-31 (E5 not run).
+    public static let strictRows: [SupportRow] = [
+        SupportRow(id: "mac17-3-26a434", model: "Mac17,3", osBuild: "26A434"),
+    ]
+
     public static func matching(model: String?, osBuild: String?, in table: [SupportRow] = rows) -> String? {
         guard let model, let osBuild else { return nil }
         return table.first { $0.model == model && $0.osBuild == osBuild }?.id

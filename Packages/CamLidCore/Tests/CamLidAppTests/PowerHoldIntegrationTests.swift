@@ -61,12 +61,59 @@ struct PowerHoldIntegrationTests {
         await settle { transport.actions.contains { if case .acquire = $0 { true } else { false } } }
         await settle { app.dashboardData().leaseVerified }
         #expect(app.dashboardData().leaseVerified && app.dashboardData().powerActuationAvailable)
-        if case .acquire(let seconds)? = transport.actions.first { #expect(seconds <= PowerHoldReconciler.maximumSessionSeconds) }
+        if case .acquire(let seconds, _)? = transport.actions.first { #expect(seconds <= PowerHoldReconciler.maximumSessionSeconds) }
         app.menuBarStopProtection()
         await settle { transport.actions.contains { if case .release = $0 { true } else { false } } }
         await settle { !app.dashboardData().leaseVerified }
         #expect(transport.actions.contains { if case .release = $0 { true } else { false } })
         #expect(!app.dashboardData().leaseVerified)
+    }
+
+    // MARK: Strict (spec 016 phase 2)
+
+    /// Saves at the current revision (a conflict reply names it).
+    @MainActor private func choose(_ app: AppCoordinator, _ mode: PowerMode) -> SettingsCommitResult {
+        var patch = ConfigPatch(); patch.powerMode = mode
+        let first = app.applySettingsPatch(patch, expectedRevision: 1)
+        guard case .conflict(_, let revision) = first else { return first }
+        return app.applySettingsPatch(patch, expectedRevision: revision)
+    }
+
+    @Test @MainActor func strictOnATestedMacAsksTheHelperForTheLidOnlyMechanism() async throws {
+        let (app, transport, support) = try await rig(row: "test-row", system: { ("Mac17,3", "26A434") })
+        defer { support.cleanup() }
+        guard case .saved = choose(app, .strict) else { Issue.record("Strict not saved"); return }
+        #expect(app.closedLidCapabilityText == "Closed lid ready · Strict (experimental)")
+        await app.startPreviewSession()
+        await settle { transport.actions.contains { if case .acquire = $0 { true } else { false } } }
+        if case .acquire(_, let strict)? = transport.actions.first { #expect(strict) } else { Issue.record("no acquire") }
+        // The mode cannot change while the session runs.
+        guard case .failed(let reason) = choose(app, .standard) else { Issue.record("switch was allowed"); return }
+        #expect(reason.contains("Stop the session"))
+    }
+
+    @Test @MainActor func strictCannotBeChosenOnAMacWithoutAStrictRow() async throws {
+        let (app, _, support) = try await rig(row: "test-row")      // Standard row, no Strict row
+        defer { support.cleanup() }
+        guard case .failed(let reason) = choose(app, .strict) else { Issue.record("Strict was allowed"); return }
+        #expect(reason.contains("isn’t tested"))
+    }
+
+    @Test @MainActor func strictAfterAMacOSUpdateHoldsNothingAndSaysSo() async throws {
+        var build = "26A434"
+        let (app, transport, support) = try await rig(row: "test-row", system: { ("Mac17,3", build) })
+        defer { support.cleanup() }
+        guard case .saved = choose(app, .strict) else { Issue.record("Strict not saved"); return }
+        build = "26B100"                                              // macOS updated: no Strict row any more
+        #expect(app.closedLidCapabilityText.contains("Strict isn’t tested"))
+        await app.startPreviewSession()
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        #expect(!transport.actions.contains { if case .acquire = $0 { true } else { false } })
+    }
+
+    @Test @MainActor func aStrictInterruptionIsExplained() {
+        #expect(AppCoordinator.helperReasonText("systemSleptWhileHeld").contains("slept during a Strict session"))
+        #expect(AppCoordinator.helperReasonText("mechanismUnavailable").contains("Reinstall"))
     }
 
     @Test @MainActor func aHelperRefusalOutranksTheLidRunNotice() async throws {

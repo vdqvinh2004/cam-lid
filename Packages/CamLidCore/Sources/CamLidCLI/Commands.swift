@@ -816,7 +816,7 @@ public enum Commands {
         for key in [
             "mode", "closedLidOptIn", "completionDelayMinutes", "waitRetentionMinutes",
             "batteryFloorPercent", "chargingOnly", "batteryModeAllowed", "batteryEntryPercent", "batteryCapMinutes", "runCapMinutes", "cpuStopEnabled", "allowDisplaySleep",
-            "adapterEnrollment", "orcaMetadataConsent", "launchAtLogin", "notificationCategories", "lifetimeRules", "telemetryEnabled",
+            "adapterEnrollment", "orcaMetadataConsent", "launchAtLogin", "notificationCategories", "lifetimeRules", "telemetryEnabled", "powerMode",
         ] {
             if dict[key] is NSNull {
                 return .failure(fail(
@@ -889,4 +889,5 @@ private struct StrictConfigPatchDTO: Decodable {
     var lifetimeRules: [LifetimeRule]?
     var launchAtLogin: Bool?
     var telemetryEnabled: Bool?
+    var powerMode: PowerMode?
 }
