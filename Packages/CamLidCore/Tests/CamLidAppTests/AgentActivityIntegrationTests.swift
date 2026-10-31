@@ -53,4 +53,10 @@ struct AgentActivityIntegrationTests {
         #expect(AgentBadgeState(provider: "codex", enabled: true, tasks: [activity]).compactDetail.hasSuffix("(estimated)"))
         #expect(!AgentBadgeState(provider: "codex", enabled: true, tasks: [activity, lifecycle]).estimated)
     }
+
+    /// Terminals start shells through a root-owned `login`; the ancestor walk must still read it (Orca's host is above it).
+    @Test func theKernelTableReadsAnyProcessesParent() {
+        #expect(NativeProcessList.kernelEntry(getpid())?.parent == getppid())
+        #expect(NativeProcessList.kernelEntry(1)?.name == "launchd")
+    }
 }
