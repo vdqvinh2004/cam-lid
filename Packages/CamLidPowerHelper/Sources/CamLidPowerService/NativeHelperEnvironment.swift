@@ -106,6 +106,13 @@ public enum NativeHelperEnvironment {
             externalDisplays: online.filter { CGDisplayIsBuiltin($0) == 0 }.count)
     }
 
+    public static func sleepNow() {
+        let port = IOPMFindPowerManagement(mach_port_t(MACH_PORT_NULL))
+        guard port != 0 else { return }
+        _ = IOPMSleepSystem(port)
+        IOServiceClose(port)
+    }
+
     public static func systemSleepEventReason(messageType: UInt32) -> String? {
         switch messageType {
         case 0xe000_0280: return "sleepObserved"

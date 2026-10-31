@@ -71,6 +71,10 @@ public final class PowerLeaseService {
     private var terminalEventReason: String?
     /// Diagnostic sink for state transitions only (never request payloads); a no-op unless the host sets it.
     public var log: (String) -> Void = { _ in }
+    /// Asks the system to sleep. Restoring the setting with the lid already closed does not sleep the Mac by itself
+    /// (macOS sleeps on the lid-close event; trial 8 stayed awake 4 min), so every restore with the lid closed and no
+    /// external display ends with this request, whether the app released, died or a guard tripped.
+    public var sleepSystem: () -> Void = {}
     public private(set) var state = "starting"
     public private(set) var reason = "notStarted"
     public private(set) var mutationAttempted = false
@@ -437,12 +441,24 @@ public final class PowerLeaseService {
                 state = isForeignStop ? "recoveryRequired" : "cleanupAcknowledged"
             }
             reason = stopReason
+            sleepIfLidClosed(after: stopReason)
         } catch {
             if case JournalFailure.revisionConflict = error, adoptRestoreWrittenElsewhere() { return }
             log("restore failed: \(error)")
             mechanism.releaseOwnedResourcesAfterFailedRestore()
             throw error
         }
+    }
+
+    /// Not after shutdown, boot recovery, another app's override, or a sleep/wake the system is already doing.
+    private static let reasonsWithoutSleep: Set<String> = ["helperStopping", "helperRestart", "foreignGlobalSleepDisabled",
+                                                            "foreignPolicyUnreadable", "sleepObserved", "wakeObserved"]
+
+    private func sleepIfLidClosed(after stopReason: String) {
+        guard !Self.reasonsWithoutSleep.contains(stopReason), let reading = try? safety(),
+              reading.lidClosed == true, reading.externalDisplays == 0 else { return }
+        log("sleep requested reason=\(stopReason)")
+        sleepSystem()
     }
 
     private func acknowledgeRestored() throws {

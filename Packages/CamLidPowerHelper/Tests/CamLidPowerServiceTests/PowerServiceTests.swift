@@ -66,6 +66,26 @@ private final class Fixture {
 }
 
 @Suite struct PowerServiceTests {
+    /// Trial 8: a restore with the lid closed must sleep the Mac, whoever caused it; never with an external display,
+    /// on shutdown, or when another app owns the override.
+    @Test(arguments: [("release", true, 0, true), ("disconnect", true, 0, true), ("release", false, 0, false),
+                      ("release", true, 1, false), ("shutdown", true, 0, false)])
+    func aClosedLidRestoreSleepsTheMac(_ cause: String, _ closed: Bool, _ displays: Int, _ sleeps: Bool) throws {
+        let f = Fixture()
+        var requested = 0
+        f.service.sleepSystem = { requested += 1 }
+        let started = f.acquire()
+        f.safety = HelperSafety(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501,
+                                lidClosed: closed, externalDisplays: displays)
+        switch cause {
+        case "release": _ = f.service.handle(PowerRequest(operation: .release, token: started.token), owner: f.owner, uid: 501)
+        case "disconnect": f.service.disconnected(owner: f.owner)
+        default: f.service.shutdown()
+        }
+        #expect(f.backend.disabled == false)
+        #expect(requested == (sleeps ? 1 : 0))
+    }
+
     @Test func startsAndRestoresAfterStop() throws {
         let f = Fixture()
         let started = f.acquire()

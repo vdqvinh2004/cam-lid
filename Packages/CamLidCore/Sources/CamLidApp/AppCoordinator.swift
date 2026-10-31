@@ -45,7 +45,6 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var holdReconciler = PowerHoldReconciler()
     private var holdTransport: (any PowerHoldTransport)?
     private let makeHoldTransport: () -> any PowerHoldTransport
-    private let sleepSystem: () -> Void
     /// Support row that qualifies closed-lid actuation on this Mac and OS build, or nil. `QualifiedSupportRows`
     /// is empty today, so the helper is never asked to hold power in a shipped build.
     private let closedLidSupportRow: () -> String?
@@ -148,10 +147,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
          holdTransportFactory: (() -> any PowerHoldTransport)? = nil,
          closedLidSupportRow: (() -> String?)? = nil,
          systemIdentity: (() -> (model: String?, osBuild: String?))? = nil,
-         activitySampler: (@Sendable (_ excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double))? = nil,
-         sleepSystem: (() -> Void)? = nil) {
-        // Real sleep only follows the real lid reading; a coordinator with injected health never sleeps the Mac.
-        self.sleepSystem = sleepSystem ?? (healthReader == nil ? LiveSensorProvider.sleepUnlessExternalDisplay : {})
+         activitySampler: (@Sendable (_ excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double))? = nil) {
         self.sampleActivityNow = activitySampler ?? { AppCoordinator.sampleActivity(NativeProcessList(), excludeUnderOrca: $0) }
         self.healthReader = healthReader
         self.helper = helperController ?? HelperController()
@@ -542,11 +538,6 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             let finished = self.uptime()
             if let reply {
                 self.holdReconciler.received(reply, now: finished)
-                // Releasing with the lid closed hands the Mac back to macOS, which would sleep on a lid close.
-                if case .release = action, reply.accepted, self.currentHealth().lidState == .closed {
-                    self.record(category: .stateTransition, newState: self.sessionStateForRecord(), reasons: ["lidClosedSleep"])
-                    self.sleepSystem()
-                }
                 if case .acquire(let seconds) = action, reply.accepted, var active = self.session {
                     // A fresh lease is bounded by the helper; the policy cap must not outlive it.
                     let limit = finished + Double(seconds)
@@ -1158,7 +1149,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             self.processPolling = false
             self.installationSnapshot = installation
             self.lifetimeProcessSnapshot = lifetime
-            self.receiveProcessSnapshot(candidates, complete: complete, observedAt: started)
+            let orcaHosted = Set(activity.processes.filter(\.orcaHosted).map(\.pid))
+            self.receiveProcessSnapshot(candidates.filter { !orcaHosted.contains($0.identity.pid) }, complete: complete, observedAt: started)
             self.receiveActivity(activity.processes, at: activity.at)
             // Presence never fabricates working/idle/completion or an Auto hold.
         }
@@ -1179,8 +1171,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             switch result {
             case .success(let snapshot): self.receiveOrcaMetadataSnapshot(snapshot)
             case .failure(let error):
-                let issue = error as? OrcaPollError
-                self.invalidateOrcaMetadata(issue: issue == nil ? "orcaMetadataInvalid" : "orcaMetadataUnavailable")
+                // One failed poll keeps the last good state; `refresh` drops it once nothing good arrived for 15 s.
+                self.orcaMetadataIssue = error is OrcaPollError ? "orcaMetadataUnavailable" : "orcaMetadataInvalid"
             }
         }
     }
@@ -1190,7 +1182,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let now = uptime(), duration = snapshot.receivedAt - snapshot.queryStartedAt
         let age = now - snapshot.receivedAt
         guard duration.isFinite, duration >= 0, duration <= 4.5, age.isFinite, age >= 0, age <= 1 else {
-            invalidateOrcaMetadata(issue: "orcaMetadataStale"); return
+            orcaMetadataIssue = "orcaMetadataStale"; return   // a late reply is skipped, not trusted and not a reset
         }
         do {
             let events = try orcaMetadataTracker.consume(OrcaUISnapshot(statuses: snapshot.statuses,
@@ -1240,7 +1232,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     func receiveActivity(_ processes: [AgentActivityProcess], at: Double) {
         var tasks: [String: [AgentTask]] = [:]
         var memory: [String: AgentActivityMemory] = [:]
-        for process in processes {
+        for process in processes where !process.orcaHosted {
             let key = "activity-\(process.provider)-\(process.pid)-\(String(process.startTime.bitPattern, radix: 16))"
             var state = activityMemory[key] ?? AgentActivityMemory()
             let result = AgentActivityClassifier.step(&state, AgentActivitySample(at: at, alive: true, cpuSeconds: process.cpuSeconds,
@@ -1260,9 +1252,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     /// True when outside activity classifies this provider's running processes (none unknown).
     private func activityClassified(_ provider: String) -> Bool {
-        // shortcut: with Orca observed, running processes but no activity tasks are taken as Orca-hosted (Orca reports
-        // them); the process count does not separate them yet. Upgrade by excluding Orca-hosted processes from the count.
-        guard let tasks = activityTasks[provider], !tasks.isEmpty else { return config.orcaMetadataAllowed }
+        guard let tasks = activityTasks[provider], !tasks.isEmpty else { return false }
         return !tasks.contains { $0.state == .unknown }
     }
 
@@ -1280,12 +1270,11 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     func receiveProcessSnapshot(_ candidates: [ProcessCandidate], complete: Bool, observedAt: Double) {
         let age = uptime() - observedAt
-        guard age.isFinite, age >= 0, age <= 0.2 else {
-            processCandidates = []; lastProcessSuccess = -Double.infinity; lastProcessObservation = -Double.infinity; return
-        }
+        // A late or incomplete scan is skipped; completion turns uncertain only after 15 s without a good scan.
+        guard age.isFinite, age >= 0, age <= 0.2 else { return }
         processCandidates = Array(candidates.prefix(20))
         lastProcessObservation = observedAt
-        lastProcessSuccess = complete && candidates.count <= 20 ? observedAt : -Double.infinity
+        if complete && candidates.count <= 20 { lastProcessSuccess = observedAt }
     }
 
     // MARK: - Same-user preview control

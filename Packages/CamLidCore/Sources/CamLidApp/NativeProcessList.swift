@@ -16,6 +16,10 @@ struct NativeProcessList: ProcessListProvider {
 
     func snapshot() -> [ProcessRecord] { agentSnapshot().records }
 
+    /// Another user's process (root's login, daemons) is unreadable but cannot be this user's, and a pid that exited
+    /// meanwhile is gone; only an unreadable process of this user leaves a scan incomplete (trial 8: every scan was).
+    static func unreadableOwnProcess(_ pid: Int32) -> Bool { kernelEntry(pid)?.uid == getuid() }
+
     func agentSnapshot() -> AgentSnapshot {
         let count = proc_listallpids(nil, 0)
         guard count > 0 else { return AgentSnapshot(records: [], complete: false) }
@@ -30,12 +34,7 @@ struct NativeProcessList: ProcessListProvider {
             var info = proc_bsdinfo()
             let size = MemoryLayout<proc_bsdinfo>.size
             let result = withUnsafeMutablePointer(to: &info) { proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, $0, Int32(size)) }
-            guard result == size else {
-                // Another user's process (root's login, daemons) is unreadable but cannot be this user's agent, and a
-                // pid that exited meanwhile is gone; only an unreadable process of this user leaves the scan incomplete.
-                if let owner = Self.kernelEntry(pid)?.uid, owner == getuid() { complete = false }
-                continue
-            }
+            guard result == size else { if Self.unreadableOwnProcess(pid) { complete = false }; continue }
             guard info.pbi_uid == getuid(), info.pbi_ruid == getuid() else { continue }
             let name = Self.agentName(pid: pid, processName: withUnsafeBytes(of: info.pbi_name) { bytes in
                 String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
@@ -75,7 +74,7 @@ struct NativeProcessList: ProcessListProvider {
             let result = withUnsafeMutablePointer(to: &info) {
                 proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, $0, Int32(size))
             }
-            guard result == size else { complete = false; continue }
+            guard result == size else { if Self.unreadableOwnProcess(pid) { complete = false }; continue }
             guard info.pbi_uid == userID, info.pbi_ruid == userID else { continue }
             guard let identity = try? LifetimeProcessIdentity(pid: pid,
                 startTime: Double(info.pbi_start_tvsec) + Double(info.pbi_start_tvusec) / 1_000_000,

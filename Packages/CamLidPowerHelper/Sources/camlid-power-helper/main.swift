@@ -37,6 +37,7 @@ if launchMode == .recovery || launchMode == .release {
             bootID: try NativeHelperEnvironment.bootID(), clock: { NativeHelperEnvironment.now },
             safety: NativeHelperEnvironment.safety)
         service.log = logLine
+        if launchMode == .recovery { service.sleepSystem = NativeHelperEnvironment.sleepNow }   // never while uninstalling
         let outcome = service.recoverOrphanedPolicy(graceSeconds: launchMode == .release ? -.infinity : 10)
         if outcome != .nothingToRecover { logLine("recovery outcome=\(outcome)") }
         print("recovery: \(outcome)")
@@ -68,6 +69,7 @@ do {
             safety: NativeHelperEnvironment.safety)
     }
     controller.log = logLine
+    controller.sleepSystem = NativeHelperEnvironment.sleepNow
     let runtime = PowerHelperRuntime(service: controller, onStartupFailure: exitAfterFailedStart)
     let sleepObserver = bestEffortLidMode ? try RootDomainGeneralInterestObserver { reason in
         runtime.observeSystemEvent(reason: reason)

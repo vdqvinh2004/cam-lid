@@ -95,10 +95,11 @@ import CamLidCLI
         app.receiveOrcaMetadataSnapshot(snapshot([OrcaUIStatus(id: "meta-one", state: .idle), OrcaUIStatus(id: "meta-two", state: .working)]))
         #expect(try badge()["workingCount"] as? Int == 1)
         app.receiveOrcaMetadataSnapshot(snapshot([OrcaUIStatus(id: "meta-one", state: .idle)], age: 16))
+        // A late reply is skipped: it neither reports its stale idle nor drops the last good state (that happens
+        // only after 15 s without a good reply), so one slow poll cannot end an Orca agent's hold.
         let staleBadge = try badge()
-        #expect(staleBadge["workingCount"] as? Int == 0)
-        #expect(staleBadge["unknownCount"] as? Int == 1)
-        #expect(staleBadge["observedState"] as? String == "Unknown")
+        #expect(staleBadge["workingCount"] as? Int == 1)
+        #expect(staleBadge["unknownCount"] as? Int == 0)
         app.receiveOrcaMetadataSnapshot(snapshot([OrcaUIStatus(id: "meta-one", state: .working), OrcaUIStatus(id: "meta-two", state: .working)]))
         #expect(try badge()["workingCount"] as? Int == 2)
         patch.adapterEnrollment = []

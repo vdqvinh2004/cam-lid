@@ -9,6 +9,15 @@ struct AgentActivityIntegrationTests {
         AgentActivityProcess(provider: "codex", pid: 4242, startTime: 1_700_000_000, cpuSeconds: cpu)
     }
 
+    /// An agent inside Orca is Orca's to report: its CPU never holds the Mac through the activity observer.
+    @Test @MainActor func anOrcaHostedAgentIsNotSampled() throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let app = fixture.makeCoordinator()
+        var hosted = codex(cpu: 10); hosted.orcaHosted = true
+        app.receiveActivity([hosted], at: ContinuousTime.now)
+        #expect(app.sleepRelevantTasksForTesting(provider: "codex").isEmpty)
+    }
+
     @Test @MainActor func autoHoldsWhileADirectlyRunAgentWorksAndGivesSleepWhenDoneAfterward() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
@@ -64,5 +73,6 @@ struct AgentActivityIntegrationTests {
     /// Trial 8: root-owned processes made every scan "incomplete", so Auto never trusted a completion.
     @Test func otherUsersProcessesDoNotMakeTheScanIncomplete() {
         #expect(NativeProcessList().agentSnapshot().complete)
+        #expect(NativeProcessList().lifetimeSnapshot()?.complete == true)
     }
 }

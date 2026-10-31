@@ -8,6 +8,8 @@ struct AgentActivityProcess: Sendable, Equatable {
     let pid: Int32
     let startTime: Double
     let cpuSeconds: Double?
+    /// Started under Orca while Orca is observed: Orca reports it, so it is neither sampled nor counted here.
+    var orcaHosted = false
 }
 
 extension NativeProcessList {
@@ -38,8 +40,8 @@ extension NativeProcessList {
     }()
 
     /// Outermost process of each agent (by process name), with the CPU time of it and every descendant. When Orca
-    /// observation is on, processes started under Orca (its terminal host is `orca-terminal-host-…`) are left out:
-    /// Orca reports their state as lifecycle evidence, which takes precedence.
+    /// observation is on, agent processes started under Orca (its terminal host is `orca-terminal-host-…`) are only
+    /// marked `orcaHosted`: Orca reports their state as lifecycle evidence, which takes precedence.
     func activityProcesses(providerByName: [String: String], excludeUnderOrca: Bool) -> [AgentActivityProcess] {
         let count = proc_listallpids(nil, 0)
         guard count > 0 else { return [] }
@@ -93,9 +95,13 @@ extension NativeProcessList {
         for (pid, entry) in entries {
             guard let provider = providerByName[entry.name] else { continue }
             let above = ancestors(pid)
-            guard !above.contains(where: { providerByName[$0] == provider || (excludeUnderOrca && $0.hasPrefix("orca")) }) else { continue }
+            if excludeUnderOrca, above.contains(where: { $0.hasPrefix("orca") }) {
+                result.append(AgentActivityProcess(provider: provider, pid: pid, startTime: entry.start, cpuSeconds: nil, orcaHosted: true))
+                continue
+            }
+            guard !above.contains(where: { providerByName[$0] == provider }) else { continue }
             result.append(AgentActivityProcess(provider: provider, pid: pid, startTime: entry.start, cpuSeconds: subtreeCPU(pid)))
-            if result.count >= 20 { break }
+            if result.count >= 64 { break }
         }
         return result.sorted { ($0.provider, $0.pid) < ($1.provider, $1.pid) }
     }

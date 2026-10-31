@@ -222,6 +222,21 @@ struct PolicyTests {
         #expect(decision.state == .safetyStopped && decision.session.latchedSafetyStop)
     }
 
+    @Test("with the lid closed and nothing held, new work waits instead of asking for a hold")
+    func lidClosedWhileReadyDoesNotStartAHold() throws {
+        let closed = try HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .closed)
+        var decision = PolicyEngine.evaluate(session: try makeSession(), tasks: [try makeTask()], health: closed,
+            config: try config(), armed: true, safety: .clear, recoveryConflict: false, nowMonotonic: 10)
+        #expect(decision.state == .ready && decision.reasons == ["lidClosedNotHeld"])
+        decision = PolicyEngine.evaluate(session: decision.session, tasks: [try makeTask()], health: try healthy(),
+            config: try config(), armed: true, safety: .clear, recoveryConflict: false, nowMonotonic: 15)
+        #expect(decision.state == .protected)
+        // Once held, closing the lid keeps the hold: that is the point of closed lid.
+        decision = PolicyEngine.evaluate(session: decision.session, tasks: [try makeTask()], health: closed,
+            config: try config(), armed: true, safety: .clear, recoveryConflict: false, nowMonotonic: 20)
+        #expect(decision.state == .protected)
+    }
+
     @Test("safety latches and requires explicit re-arm")
     func safetyLatchAndRearm() throws {
         var session = try makeSession()

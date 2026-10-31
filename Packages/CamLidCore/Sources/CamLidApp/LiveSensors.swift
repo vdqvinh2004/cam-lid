@@ -1,7 +1,6 @@
 import Foundation
 import CoreGraphics
 import IOKit.ps
-import IOKit.pwr_mgt
 import CamLidCore
 import Dispatch
 
@@ -187,19 +186,6 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
         var count: UInt32 = 0
         guard CGGetOnlineDisplayList(32, &displays, &count) == .success, count > 0, count < 32 else { return .unknown }
         return displayState(displays.prefix(Int(count)).map { CGDisplayIsAsleep($0) != 0 })
-    }
-    /// Puts the Mac to sleep unless an external display is online (the user may be working in clamshell mode).
-    /// Restoring the sleep setting with the lid already closed does not sleep the Mac by itself: macOS only
-    /// sleeps on the lid-close event (trial 8 stayed awake 4 min after the restore).
-    static func sleepUnlessExternalDisplay() {
-        var displays = [CGDirectDisplayID](repeating: 0, count: 32)
-        var count: UInt32 = 0
-        guard CGGetOnlineDisplayList(32, &displays, &count) == .success,
-              !displays.prefix(Int(count)).contains(where: { CGDisplayIsBuiltin($0) == 0 }) else { return }
-        let port = IOPMFindPowerManagement(mach_port_t(MACH_PORT_NULL))
-        guard port != 0 else { return }
-        _ = IOPMSleepSystem(port)
-        IOServiceClose(port)
     }
     static func displayObservation() -> SleepDisplayObservation {
         let sampledAt = ContinuousTime.now

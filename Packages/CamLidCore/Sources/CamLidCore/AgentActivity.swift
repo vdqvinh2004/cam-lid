@@ -33,7 +33,8 @@ public enum AgentActivityClassifier {
     /// How long an unknown result keeps holding (the policy bounds unknown holds with this).
     public static let unknownHoldSeconds = 15.0
     /// Launching costs CPU without any work (calibration: 0.054–0.34 of a core for about 20 s); owner saw a freshly
-    /// opened Claude Code read as working before any prompt. CPU in this window is not counted as activity.
+    /// opened Claude Code read as working before any prompt. CPU in this window is not counted as activity, and the
+    /// process reads idle (not unknown, which would hold the Mac and make every completion uncertain meanwhile).
     public static let startupSeconds = 25.0
 
     public static func step(_ memory: inout AgentActivityMemory, _ sample: AgentActivitySample) -> (state: TaskState, reason: String) {
@@ -45,13 +46,14 @@ public enum AgentActivityClassifier {
             return (.unknown, "unreadable")
         }
         var busy: Bool?
-        if let lastCPU = memory.lastCPU, let lastAt = memory.lastAt, sample.at > lastAt, cpu >= lastCPU {
-            busy = (cpu - lastCPU) / (sample.at - lastAt) >= busyCPUFraction
+        if let lastCPU = memory.lastCPU, let lastAt = memory.lastAt, sample.at > lastAt {
+            // A drop (a child such as Claude Code's caffeinate exited) has no usable delta: it restarts the baseline
+            // and counts as not busy, so an idle agent stays idle instead of turning unknown.
+            busy = cpu >= lastCPU && (cpu - lastCPU) / (sample.at - lastAt) >= busyCPUFraction
         }
-        // A drop (a child exited, or pid reuse) has no usable delta; it only restarts the baseline.
         memory.lastCPU = cpu
         memory.lastAt = sample.at
-        if let age = sample.processAgeSeconds, age >= 0, age < startupSeconds { return (.unknown, "starting") }
+        if let age = sample.processAgeSeconds, age >= 0, age < startupSeconds { return (.idle, "starting") }
         if busy == true {
             memory.lastActiveAt = sample.at
             return (.working, "cpu")

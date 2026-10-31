@@ -87,6 +87,12 @@ public enum PolicyEngine {
         if updated.requestedMode == .off {
             return transition(.off, reasons: ["modeOff"])
         }
+        // A hold only starts with the lid open (the helper refuses otherwise, which used to latch a safety stop;
+        // trial 8, 13:16). With the lid closed and nothing held, new work waits for the lid to open.
+        if updated.effectiveState == .ready, health.lidState == .closed {
+            updated.graceDeadlineMonotonic = nil
+            return transition(.ready, reasons: ["lidClosedNotHeld"])
+        }
 
         let holding = tasks.filter { holdsSession($0, now: nowMonotonic) }
         updated.taskIDs = Set(holding.map(\.id))

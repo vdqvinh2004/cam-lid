@@ -151,25 +151,28 @@ struct OrcaUIObservationTests {
     @Test func parallelWorkAndFreshWorkCancelGraceWithoutResettingCap() throws {
         var tracker = OrcaUITracker(); var store = RuntimeAgentStore()
         var session = try ProtectionSession(id: "policy", requestedMode: .auto, armedClosedLid: true, startedAtMonotonic: 0, capDeadlineMonotonic: 7200)
-        let health = try HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, cpuPercent: 0,
-            lidState: .closed, internalDisplayState: .asleep, capabilityVerified: true)
+        func health(_ lid: LidState) throws -> HealthSnapshot {
+            try HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, cpuPercent: 0,
+                lidState: lid, internalDisplayState: lid == .closed ? .asleep : .awake, capabilityVerified: true)
+        }
         let config = try Configuration()
-        func update(_ rows: [OrcaUIStatus], now: Double, complete: Bool = true) throws -> PolicyDecision {
+        // The hold starts with the lid open; the rest runs with it closed.
+        func update(_ rows: [OrcaUIStatus], now: Double, complete: Bool = true, lid: LidState = .closed) throws -> PolicyDecision {
             for event in try tracker.consume(OrcaUISnapshot(statuses: rows, complete: complete, observedAt: now), now: now) {
                 _ = try store.ingest(JSONEncoder().encode(event), now: now)
             }
-            let result = PolicyEngine.evaluate(session: session, tasks: store.tasks(now: now), health: health,
+            let result = PolicyEngine.evaluate(session: session, tasks: store.tasks(now: now), health: try health(lid),
                 config: config, armed: true, safety: .clear, recoveryConflict: false, completionUncertain: !complete, nowMonotonic: now)
             session = result.session; return result
         }
-        #expect(try update([OrcaUIStatus(id: "a", state: .working), OrcaUIStatus(id: "b", state: .working)], now: 1).state == .protected)
+        #expect(try update([OrcaUIStatus(id: "a", state: .working), OrcaUIStatus(id: "b", state: .working)], now: 1, lid: .open).state == .protected)
         #expect(try update([OrcaUIStatus(id: "a", state: .idle), OrcaUIStatus(id: "b", state: .working)], now: 2).state == .protected)
         #expect(try update([OrcaUIStatus(id: "a", state: .idle), OrcaUIStatus(id: "b", state: .idle)], now: 3).state == .completionGrace)
         #expect(try update([OrcaUIStatus(id: "a", state: .working), OrcaUIStatus(id: "b", state: .idle)], now: 4).state == .protected)
         #expect(session.graceDeadlineMonotonic == nil && session.capDeadlineMonotonic == 7200)
         let lost = try update([], now: 5, complete: false)
         #expect(!lost.reasons.contains("sleepRequested"))
-        let expired = PolicyEngine.evaluate(session: session, tasks: store.tasks(now: 200), health: health,
+        let expired = PolicyEngine.evaluate(session: session, tasks: store.tasks(now: 200), health: try health(.closed),
             config: config, armed: true, safety: .clear, recoveryConflict: false,
             completionUncertain: true, nowMonotonic: 200)
         #expect(expired.state == .ready && !expired.reasons.contains("sleepRequested"))

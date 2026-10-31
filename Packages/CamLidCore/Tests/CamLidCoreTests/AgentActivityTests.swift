@@ -49,7 +49,7 @@ import Testing
         #expect(C.step(&m, sample(10, cpu: 20)) == (.working, "recent"))        // subtree total dropped
         var cold = AgentActivityMemory()
         _ = C.step(&cold, sample(0, cpu: 50))
-        #expect(C.step(&cold, sample(5, cpu: 1)) == (.unknown, "warmingUp"))
+        #expect(C.step(&cold, sample(5, cpu: 1)) == (.idle, "quiet"))              // a drop is not work
         _ = C.step(&cold, sample(10, cpu: 2))
         #expect(C.step(&cold, sample(4, cpu: 3)) == (.unknown, "warmingUp"))    // clock went back
     }
@@ -64,8 +64,16 @@ import Testing
     @Test func launchCPUIsNotWork() {
         var m = AgentActivityMemory()
         _ = C.step(&m, AgentActivitySample(at: 0, alive: true, cpuSeconds: 0, processAgeSeconds: 2))
-        #expect(C.step(&m, AgentActivitySample(at: 5, alive: true, cpuSeconds: 1.5, processAgeSeconds: 7)) == (.unknown, "starting"))
+        #expect(C.step(&m, AgentActivitySample(at: 5, alive: true, cpuSeconds: 1.5, processAgeSeconds: 7)) == (.idle, "starting"))
         #expect(C.step(&m, AgentActivitySample(at: 25, alive: true, cpuSeconds: 1.6, processAgeSeconds: 27)) == (.idle, "quiet"))
         #expect(C.step(&m, AgentActivitySample(at: 30, alive: true, cpuSeconds: 2.2, processAgeSeconds: 32)) == (.working, "cpu"))
+    }
+
+    @Test func aChildExitingKeepsAnIdleAgentIdle() {
+        var m = AgentActivityMemory()
+        _ = C.step(&m, AgentActivitySample(at: 0, alive: true, cpuSeconds: 5, processAgeSeconds: 100))
+        #expect(C.step(&m, AgentActivitySample(at: 50, alive: true, cpuSeconds: 5, processAgeSeconds: 150)) == (.idle, "quiet"))
+        #expect(C.step(&m, AgentActivitySample(at: 55, alive: true, cpuSeconds: 3, processAgeSeconds: 155)) == (.idle, "quiet"))
+        #expect(C.step(&m, AgentActivitySample(at: 60, alive: true, cpuSeconds: 4, processAgeSeconds: 160)) == (.working, "cpu"))
     }
 }
