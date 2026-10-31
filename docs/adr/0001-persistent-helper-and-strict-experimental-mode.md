@@ -79,3 +79,8 @@ above are unchanged. Known conflicting helpers (LidRun) are detected read-only a
 ## Not decided here
 
 This ADR grants no authority to install anything, run root code, change power state or perform a physical lid episode. Each native action still needs the owner's explicit go-ahead at the time. Passing unit tests or a successful install does not pass any gate.
+
+## Amendment (2026-10-31): Strict on the persistent helper
+Decision 2 is amended by [ADR 0003](0003-strict-mode-lid-only-on-the-persistent-helper.md): Strict keeps its lid-only
+mechanism but runs on the persistent helper installed once, without exclusive-create, no-adoption or one-use
+admission. It stays experimental and opt-in, AC only, on its own qualified rows.
