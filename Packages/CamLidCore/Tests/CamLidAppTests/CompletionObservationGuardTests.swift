@@ -16,7 +16,7 @@ struct CompletionObservationGuardTests {
     }
 
     @Test(arguments: ["working", "waiting", "idle", "unknown", "empty", "legacyOff"])
-    @MainActor func unqualifiedOrcaCoverageCannotAuthorizeCompletion(_ kind: String) throws {
+    @MainActor func freshIdleOrcaMetadataCountsAsCompletion(_ kind: String) throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
         var patch = ConfigPatch()
@@ -30,7 +30,10 @@ struct CompletionObservationGuardTests {
         let rows: [OrcaUIStatus] = kind == "empty" ? []
             : [OrcaUIStatus(id: "meta-fixture", state: kind == "legacyOff" ? .idle : try #require(OrcaUIState(rawValue: kind)))]
         app.receiveOrcaMetadataSnapshot(OrcaMetadataSnapshot(statuses: rows, queryStartedAt: now, receivedAt: now))
-        #expect(try sleepDecision(app).blockers.contains("workUnknown"))
+        let blockers = try sleepDecision(app).blockers
+        // Owner decision (trial 8): fresh idle or empty Orca metadata is completion; an unknown row is not.
+        #expect(blockers.contains("workUnknown") == (kind == "unknown"))
+        if ["working", "waiting"].contains(kind) { #expect(blockers.contains("trackedWorkActive")) }
     }
 
     @Test @MainActor func unselectedOrcaDoesNotOverrideSelectedCompleteAbsence() throws {

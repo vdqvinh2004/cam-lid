@@ -749,8 +749,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     }
 
     private func agentCompletionUncertain() -> Bool {
-        // Orca receipt freshness does not qualify underlying state freshness or completion coverage.
-        config.adapterEnrollment.contains("orca") || badgeStates().contains {
+        // Owner decision (trial 8, option A): Orca's idle report counts as completion while its metadata is fresh;
+        // without metadata consent or with stale metadata, completion stays uncertain.
+        (config.adapterEnrollment.contains("orca")
+            && !(config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= 15)) || badgeStates().contains {
             $0.detectionEnabled && ($0.observedState == "Unknown" || (($0.processCount ?? 0) > 0 && !activityClassified($0.provider)))
         }
     }
