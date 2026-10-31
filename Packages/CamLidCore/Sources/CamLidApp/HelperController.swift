@@ -72,6 +72,9 @@ import CamLidCore
             state = "needsReauthorization"; message = "This build of CamLid changed since the helper was installed. Reinstall to authorize it."
         case .helperIdentityMismatch:
             state = "helperIdentityMismatch"; message = "The installed helper does not match its pin. Remove it and install again."
+        case .partial(let missing) where Set(missing) == ["helper", "daemonPlist", "recoveryPlist"]:
+            // Only an identity file from an earlier install is present; Install keeps it as a backup.
+            state = "notInstalled"; message = "The closed-lid helper is not installed."
         case .partial: state = "partial"; message = "The helper installation is incomplete. Remove it and install again."
         }
         onChange()
@@ -99,6 +102,9 @@ import CamLidCore
         case "cancelled": return "Cancelled."
         case "helperSourceMissing": return "This build of CamLid does not include the helper."
         case "signatureUnreadable": return "CamLid and its helper must be signed before the helper can be installed."
+        case "labelInUse": return "Another helper with CamLid's name is already running (an earlier build). In Terminal run: sudo launchctl bootout system/com.camlid.power-helper, then install again."
+        case "previousPinsBackupExists": return "A backup of an earlier identity file already exists in /Library/Application Support/CamLidPowerHelper. Remove the helper first."
+        case "bootstrapFailed": return "macOS refused to start the helper. Nothing was left installed; try again or restart the Mac."
         case "foreignPinsPresent": return "An earlier CamLid identity file exists. In Terminal run: sudo camlid helper install --replace-pins"
         case "alreadyInstalledDifferently": return "A different helper is already installed. Remove it first."
         case "restoreUnresolved": return "The sleep setting could not be restored, so the helper was kept. Check `pmset -g`."
@@ -138,11 +144,11 @@ import CamLidCore
         return HelperOperationResult(accepted: true, reason: operation == "install" ? "installed" : "uninstalled", detail: nil)
     }
 
-    private nonisolated static func reason(in text: String) -> String? {
-        for line in text.split(separator: "\n") where line.hasPrefix("helper-admin:") {
-            return String(line.dropFirst("helper-admin:".count)).trimmingCharacters(in: .whitespaces)
-        }
-        return nil
+    nonisolated static func reason(in text: String) -> String? {
+        // osascript wraps stderr as "…execution error: helper-admin: <reason> (1)".
+        guard let range = text.range(of: "helper-admin:") else { return nil }
+        let word = text[range.upperBound...].trimmingCharacters(in: .whitespaces).prefix { $0.isLetter || $0.isNumber }
+        return word.isEmpty ? nil : String(word)
     }
 }
 
@@ -153,11 +159,16 @@ public enum HelperAdminCommand {
         let installer = HelperInstaller()
         let result: HelperOperationResult
         switch arguments[index + 1] {
-        case "install": result = installer.install(appBundle: appBundle)
+        // Pressing Install is the explicit choice, so an identity file from an earlier install is moved aside
+        // (kept as identity.json.previous and restored by uninstall), as `camlid helper install --replace-pins` does.
+        case "install": result = installer.install(appBundle: appBundle, replacePins: true)
         case "uninstall": result = installer.uninstall()
         default: print("helper-admin: invalidOperation"); return 2
         }
-        print("helper-admin: \(result.reason)")
+        // stderr too: the administrator prompt reports only stderr when the command fails.
+        let line = "helper-admin: \(result.reason)\n"
+        FileHandle.standardOutput.write(Data(line.utf8))
+        if !result.accepted { FileHandle.standardError.write(Data(line.utf8)) }
         return result.accepted ? 0 : 1
     }
 }

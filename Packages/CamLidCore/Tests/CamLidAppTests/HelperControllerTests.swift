@@ -56,4 +56,25 @@ private final class Flag: @unchecked Sendable {
         await settle { !controller.busy }
         #expect(controller.state == "notInstalled" && controller.message == "Cancelled.")
     }
+
+    @Test @MainActor func anEarlierInstallsIdentityFileAloneReadsAsNotInstalled() async {
+        let onlyPins = HelperController(status: { .partial(missing: ["helper", "daemonPlist", "recoveryPlist"]) },
+                                        runAdmin: { _ in HelperOperationResult(accepted: false, reason: "cancelled", detail: nil) },
+                                        keepAwakeApps: { [] })
+        onlyPins.refresh()
+        await settle { onlyPins.state != "unknown" }
+        #expect(onlyPins.state == "notInstalled")
+        let broken = HelperController(status: { .partial(missing: ["recoveryPlist"]) },
+                                      runAdmin: { _ in HelperOperationResult(accepted: false, reason: "cancelled", detail: nil) },
+                                      keepAwakeApps: { [] })
+        broken.refresh()
+        await settle { broken.state != "unknown" }
+        #expect(broken.state == "partial")
+    }
+
+    @Test func theInstallersReasonIsReadFromTheAdministratorPromptError() {
+        #expect(HelperController.reason(in: "0:120: execution error: helper-admin: labelInUse (1)") == "labelInUse")
+        #expect(HelperController.reason(in: "helper-admin: installed\n") == "installed")
+        #expect(HelperController.reason(in: "User canceled. (-128)") == nil)
+    }
 }
