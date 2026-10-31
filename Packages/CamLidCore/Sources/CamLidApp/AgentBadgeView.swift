@@ -143,15 +143,15 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
     var observationExplanation: String {
         let receipt: String
         if let age = evidenceAgeSeconds, age.isFinite, age >= 0 {
-            receipt = age >= 3_600 ? "Latest source receipt at least 1 hr ago; not task-state age."
-                : "Latest source receipt: \(age.formatted(.number.precision(.fractionLength(0))))s ago; not task-state age."
+            receipt = age >= 3_600 ? "Last update over an hour ago."
+                : "Last update \(age.formatted(.number.precision(.fractionLength(0)))) seconds ago."
         } else {
-            receipt = "Source receipt age unavailable."
+            receipt = "No update yet."
         }
         let qualification = provider == "orca"
-            ? "Orca reports pane state. State freshness is unverified; this does not prove all jobs have finished."
-            : "Process presence alone does not prove activity or completion."
-        return "Reported confidence: \(confidence). \(receipt) \(qualification) Tasks waiting for the user never keep the machine awake."
+            ? "Orca reports the state of its own panes only."
+            : "Estimated from the agent's activity; a running process alone proves nothing."
+        return "Confidence: \(confidence). \(receipt) \(qualification) Tasks waiting for you never keep the Mac awake."
     }
     static func workingSummary(_ agents: [Self]) -> String {
         let count = agents.filter { $0.detectionEnabled && $0.workingCount > 0 }.count

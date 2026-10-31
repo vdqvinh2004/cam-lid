@@ -80,17 +80,38 @@ import CamLidCore
         onChange()
     }
 
+    nonisolated static func pids(named name: String) -> [Int32] {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        process.arguments = ["-x", name]
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return [] }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return String(decoding: data, as: UTF8.self).split(separator: "\n").compactMap { Int32($0) }
+    }
+
+    /// True when an agent process (Claude Code, Codex, OpenCode, …) is among the first four ancestors.
+    nonisolated static func startedByAgent(_ pid: Int32,
+                                            entry: (Int32) -> (parent: Int32, name: String)? = {
+                                                NativeProcessList.kernelEntry($0).map { ($0.parent, $0.name) } }) -> Bool {
+        var current = entry(pid)?.parent ?? 0
+        for _ in 0..<4 where current > 1 {
+            guard let found = entry(current) else { return false }
+            if NativeProcessList.executableNames.contains(NativeProcessList.agentName(pid: current, processName: found.name)) { return true }
+            current = found.parent
+        }
+        return false
+    }
+
     nonisolated static func detectKeepAwakeApps() -> [KeepAwakeApp] {
         let bundleIDs = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        // Claude Code runs `caffeinate` while it works: that is an agent CamLid already observes, not another
+        // keep-awake app, and the notice would show during every agent turn.
         let processes = Set(KeepAwakeApps.processNames.keys.filter { name in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-            process.arguments = ["-x", name]
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-            guard (try? process.run()) != nil else { return false }
-            process.waitUntilExit()
-            return process.terminationStatus == 0
+            pids(named: name).contains { !startedByAgent($0) }
         })
         let installer = HelperInstaller()
         return KeepAwakeApps.detect(runningBundleIDs: bundleIDs, runningProcesses: processes, isLoaded: installer.isServiceLoaded)

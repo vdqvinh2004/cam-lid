@@ -566,28 +566,16 @@ private struct SettingsClosedLidSection: View {
                 .help("Lets sessions keep this Mac awake with the lid closed, within the safety limits")
                 .accessibilityIdentifier("camlid.settings.closedLid.enabled")
             SettingsFieldOutcome(editor: editor, key: "closedLidOptIn")
-            LabeledContent("Mode") {
-                Text(PowerMode.standard.title)
-            }
-            .accessibilityElement(children: .combine)
+            ValueRow(title: "Mode", value: PowerMode.standard.title)
             Text(PowerMode.standard.disclosure)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            LabeledContent("Strict (experimental)") {
-                Text("Unavailable")
-            }
-            .accessibilityElement(children: .combine)
+            ValueRow(title: "Strict (experimental)", value: "Unavailable")
             Text(PowerMode.strict.disclosure)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            LabeledContent("This Mac") {
-                Text(systemText)
-            }
-            .accessibilityElement(children: .combine)
-            LabeledContent("Testing") {
-                Text(testedText)
-            }
-            .accessibilityElement(children: .combine)
+            ValueRow(title: "This Mac", value: systemText)
+            ValueRow(title: "Testing", value: testedText)
             if !editor.closedLidPermit.hasPrefix("qualified:") {
                 Toggle("Allow on this untested Mac", isOn: Binding(
                     get: { editor.closedLidPermit == "untestedAcknowledged" },
@@ -610,10 +598,7 @@ private struct SettingsClosedLidSection: View {
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            LabeledContent("Helper") {
-                Text(editor.helperBusy ? "Working…" : helperLabel)
-            }
-            .accessibilityElement(children: .combine)
+            ValueRow(title: "Helper", value: editor.helperBusy ? "Working…" : helperLabel)
             Text(editor.helperMessage)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -869,5 +854,18 @@ private struct CustomNumberInput: NSViewRepresentable {
             }
             return false
         }
+    }
+}
+
+/// A label/value row VoiceOver reads as both ("This Mac, Mac17,3, macOS 26A434"). Combining a `LabeledContent`
+/// inside a Form kept only the label: VoiceOver read "Testing" without "Tested".
+private struct ValueRow: View {
+    let title: String
+    let value: String
+    var body: some View {
+        LabeledContent(title) { Text(value) }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(title))
+            .accessibilityValue(Text(value))
     }
 }

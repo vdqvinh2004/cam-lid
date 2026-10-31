@@ -511,7 +511,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     var closedLidCapabilityText: String {
         let permit = closedLidPermit()
         if !permit.allowsActuation { return "Can’t keep your Mac awake · this Mac isn’t tested" }
-        if helper.state != "installed" { return "Can’t keep your Mac awake · helper not installed" }
+        switch helper.state {
+        case "installed": break
+        case "notInstalled": return "Can’t keep your Mac awake · helper not installed"
+        case "needsReauthorization": return "Can’t keep your Mac awake · reinstall the helper after this update"
+        default: return "Can’t keep your Mac awake · the helper needs attention in Settings › Safety"
+        }
         if !config.closedLidOptIn { return "Closed lid is off · turn it on in Settings › Safety" }
         if case .qualified = permit { return "Closed lid ready · tested Mac" }
         return "Closed lid ready · untested Mac"
@@ -777,7 +782,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         if session == nil && config.mode == .off { return nil }
         if agents.lastRejection == "enrollmentFull" { return "Agent capacity reached: 20 holding tasks are already tracked." }
         if agents.lastRejection == "retirementHistoryFull" { return "Detection history full; new agent evidence is unavailable." }
-        if session == nil { return "Ready to start a preview" }
+        if session == nil { return Self.noSessionReason }
         if !signal.reasons.isEmpty {
             let labels = ["thermalCritical": "Critical thermal pressure", "thermalSerious": "Sustained serious thermal pressure",
                 "thermalUnknown": "Thermal reading unavailable", "lidUnknown": "Lid reading unavailable",
@@ -788,7 +793,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         if session?.requestedMode == .auto {
             guard let lifetime = latestLifetimeState else {
                 if hasLifetimeRules { return "Watched program status is unavailable." }
-                return "preview — no power actuation"
+                return nil
             }
             if lifetime.hasActiveRule, let label = lifetime.statuses.first(where: { $0.presence == .present })?.label {
                 return "Watched program is running: \(label)."
@@ -800,8 +805,11 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 return "Watched program lifetime does not confirm AI task completion."
             }
         }
-        return "preview — no power actuation"
+        return nil
     }
+
+    /// Shown with "Ready" while no session runs (the menu bar label reads "CamLid: Ready, No session · …").
+    nonisolated static let noSessionReason = "No session · choose Auto or Timed"
 
     func changeMode(_ mode: RequestedMode) {
         var patch = ConfigPatch(); patch.mode = mode

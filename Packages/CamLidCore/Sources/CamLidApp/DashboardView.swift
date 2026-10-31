@@ -42,18 +42,20 @@ public struct DashboardMetric: Codable, Sendable, Equatable, Identifiable {
         var rows: [Self] = [
             Self(id: "battery", symbol: h?.powerSource == .ac ? "powerplug" : "battery.100percent",
                 value: h?.batteryPercent.map { String(format: "%.0f%%", $0) } ?? "Unknown",
-                detail: "Battery: " + (h?.batteryPercent.map { String(format: "%.1f%%", $0) } ?? "Unknown") + ", power: " + (h?.powerSource.rawValue ?? "unknown"), attention: h?.batteryPercent == nil),
+                detail: "Battery: " + (h?.batteryPercent.map { String(format: "%.0f%%", $0) } ?? "Unknown") + ", "
+                    + (h?.powerSource == .ac ? "on charger" : h?.powerSource == .battery ? "on battery" : "power source unknown"),
+                attention: h?.batteryPercent == nil),
             Self(id: "cpu", symbol: "cpu", value: h?.cpuPercent.map { String(format: "%.0f%%", $0) } ?? "Unknown",
                 detail: "CPU: " + (h?.cpuPercent.map { String(format: "%.1f%%", $0) } ?? "Unknown"), attention: h?.cpuPercent == nil),
             Self(id: "thermal", symbol: "flame", value: pressure,
-                detail: "Thermal pressure: " + pressure + ". This is not temperature in degrees.",
+                detail: "Thermal pressure: " + pressure,
                 attention: pressure == "Serious" || pressure == "Critical" || pressure == "Unknown"),
             Self(id: "lid", symbol: "laptopcomputer", value: lid,
-                detail: "Lid: " + lid + ". Display sleep and system continuity are separate observations.", attention: lid == "Unknown")
+                detail: "Lid: " + lid, attention: lid == "Unknown")
         ]
         if let t = h?.temperature, t.availability == "available", let value = t.valueCelsius {
             rows.append(Self(id: "temperature", symbol: "thermometer", value: String(format: "%.1f°C", value),
-                detail: (t.displayName ?? "Temperature") + ": " + String(format: "%.2f°C", value) + ", source: " + (t.source ?? "Unknown"), attention: false))
+                detail: (t.displayName ?? "Temperature") + ": " + String(format: "%.1f°C", value), attention: false))
         }
         return rows
     }
@@ -222,7 +224,8 @@ public struct DashboardView: View {
             HStack(alignment: .center, spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: data.statusSymbol).font(.title3).foregroundStyle(.secondary)
-                    Text(data.presentedState == .off || (!data.stopEnabled && data.presentedState == .ready) ? "Stopped" : data.statusTitle).font(.headline)
+                    // The same word the menu bar reads to VoiceOver ("Stopped" here used to contradict its "Ready").
+                    Text(data.statusTitle).font(.headline)
                         .lineLimit(1).truncationMode(.tail)
                 }.accessibilityElement(children: .combine)
                     .accessibilityIdentifier(CamLidAccessibility.IDs.statusHeader)
@@ -377,7 +380,7 @@ public extension DashboardData {
     }
 
     var displayedReasonText: String {
-        ["Ready to start a preview", "preview — no power actuation"].contains(reasonText) ? "" : reasonText
+        reasonText == AppCoordinator.noSessionReason ? "" : reasonText
     }
     var presentedState: EffectiveState {
         state == .protected && (!leaseVerified || !powerActuationAvailable) ? .unavailable : state

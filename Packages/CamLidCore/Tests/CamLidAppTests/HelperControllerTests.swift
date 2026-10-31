@@ -77,4 +77,24 @@ private final class Flag: @unchecked Sendable {
         #expect(HelperController.reason(in: "helper-admin: installed\n") == "installed")
         #expect(HelperController.reason(in: "User canceled. (-128)") == nil)
     }
+
+    /// Claude Code (and Orca) run `caffeinate` while they work; only one started outside an agent is "another
+    /// keep-awake app".
+    @Test func caffeinateStartedByAnAgentIsNotAnotherKeepAwakeApp() throws {
+        let table: [Int32: (parent: Int32, name: String)] = [
+            100: (90, "caffeinate"), 90: (80, "orca"),                       // Orca's own caffeinate
+            200: (190, "caffeinate"), 190: (180, "claude"), 180: (1, "zsh"),
+            300: (290, "caffeinate"), 290: (280, "zsh"), 280: (270, "login"), 270: (1, "ghostty"),
+            400: (390, "caffeinate"), 390: (380, "a"), 380: (370, "b"), 370: (360, "c"), 360: (350, "d"), 350: (1, "claude")]
+        #expect(HelperController.startedByAgent(100) { table[$0] })
+        #expect(HelperController.startedByAgent(200) { table[$0] })
+        #expect(!HelperController.startedByAgent(300) { table[$0] })
+        #expect(!HelperController.startedByAgent(400) { table[$0] })      // beyond four ancestors
+        // A real caffeinate started here (not by an agent) is found and counted.
+        let plain = Process()
+        plain.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate"); plain.arguments = ["-t", "20"]
+        try plain.run(); defer { plain.terminate() }
+        Thread.sleep(forTimeInterval: 0.3)
+        #expect(HelperController.pids(named: "caffeinate").contains(plain.processIdentifier))
+    }
 }

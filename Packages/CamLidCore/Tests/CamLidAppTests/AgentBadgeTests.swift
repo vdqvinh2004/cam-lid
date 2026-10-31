@@ -18,27 +18,27 @@ struct AgentBadgeTests {
             state: .working, evidenceKind: .lifecycle, confidence: .inferred)
         let active = AgentBadgeState(provider: "orca", enabled: true, tasks: [task], evidenceAgeSeconds: 3)
         #expect(active.workingCount == 1 && active.observedState == "Active")
-        #expect(active.observationExplanation.contains("Reported confidence: inferred"))
-        #expect(active.observationExplanation.contains("source receipt") && active.observationExplanation.contains("not task-state age"))
-        #expect(active.observationExplanation.contains("freshness is unverified") && active.observationExplanation.contains("does not prove all jobs"))
+        #expect(active.observationExplanation.contains("Confidence: inferred"))
+        #expect(active.observationExplanation.contains("Last update 3 seconds ago."))
+        #expect(active.observationExplanation.contains("its own panes only"))
         for rows in [[], [try row("idle", .idle)]] {
             let inactive = AgentBadgeState(provider: "orca", enabled: true, tasks: rows, evidenceAgeSeconds: 0, cliDetected: true)
             #expect(inactive.installationText == "CLI detected" && inactive.workingCount == 0)
-            #expect(inactive.observationExplanation.contains("freshness is unverified") && inactive.observationExplanation.contains("does not prove all jobs"))
+            #expect(inactive.observationExplanation.contains("its own panes only"))
         }
     }
     @Test func receiptExplanationRejectsInvalidAgesAndBoundsOldAgeText() {
         for age in [Double.nan, .infinity, -.infinity, -1] {
             let state = AgentBadgeState(provider: "orca", enabled: true, tasks: [], evidenceAgeSeconds: age)
-            #expect(state.observationExplanation.contains("receipt age unavailable"))
+            #expect(state.observationExplanation.contains("No update yet."))
         }
         let old = AgentBadgeState(provider: "orca", enabled: true, tasks: [], evidenceAgeSeconds: .greatestFiniteMagnitude)
-        #expect(old.observationExplanation.contains("at least 1 hr ago"))
+        #expect(old.observationExplanation.contains("over an hour ago"))
     }
     @Test func processExplanationNeverPromotesInstallationOrPresenceToWork() {
         let state = AgentBadgeState(provider: "codex", enabled: true, tasks: [], processCount: 1, cliDetected: true)
         #expect(state.observedState == "Unknown" && state.workingCount == 0 && state.waitingCount == 0)
-        #expect(state.observationExplanation.contains("confidence: unknown") && state.observationExplanation.contains("Process presence alone does not prove activity or completion"))
+        #expect(state.observationExplanation.contains("Confidence: unknown") && state.observationExplanation.contains("a running process alone proves nothing"))
         #expect(AgentBadgeState.workingSummary([state]).contains("No selected agents reporting work"))
     }
     func row(_ id: String, _ state: TaskState) throws -> AgentTask {
@@ -110,7 +110,7 @@ struct AgentBadgeTests {
         #expect(waiting.waitingCount == 1 && waiting.observedState == "Waiting")
         #expect(waiting.compactDetail == "Waiting for user · 1 task")
         #expect(waiting.detail.contains("Waiting for user"))
-        #expect(waiting.observationExplanation.contains("never keep the machine awake"))
+        #expect(waiting.observationExplanation.contains("never keep the Mac awake"))
         #expect(AgentBadgeState.waitingSummary([waiting]) == "1 selected agent waiting for user")
         #expect(AgentBadgeState.waitingSummary([]) == "No selected agents waiting for user")
         let mixed = AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("w", .working), try row("q", .waiting)])
