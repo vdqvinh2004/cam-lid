@@ -21,14 +21,14 @@ extension NativeProcessList {
         return path.contains("/claude/versions/") ? "claude" : processName
     }
 
-    /// Parent pid and short command name for any process, via `sysctl kern.proc.pid` (readable without privileges).
-    static func kernelEntry(_ pid: Int32) -> (parent: Int32, name: String)? {
+    /// Parent pid, short command name and owner for any process, via `sysctl kern.proc.pid` (readable without privileges).
+    static func kernelEntry(_ pid: Int32) -> (parent: Int32, name: String, uid: uid_t)? {
         var info = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
         guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
         let name = withUnsafeBytes(of: info.kp_proc.p_comm) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }.lowercased()
-        return (info.kp_eproc.e_ppid, name)
+        return (info.kp_eproc.e_ppid, name, info.kp_eproc.e_ucred.cr_uid)
     }
 
     private static let secondsPerTick: Double = {

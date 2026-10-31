@@ -753,7 +753,11 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         // without metadata consent or with stale metadata, completion stays uncertain.
         (config.adapterEnrollment.contains("orca")
             && !(config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= 15)) || badgeStates().contains {
-            $0.detectionEnabled && ($0.observedState == "Unknown" || (($0.processCount ?? 0) > 0 && !activityClassified($0.provider)))
+            // An enabled agent with nothing running has nothing to finish (trial 8: idle Codex and OpenCode read
+            // "Unknown" and blocked every completion). A failed scan (nil count) stays uncertain.
+            guard $0.detectionEnabled, ($0.processCount ?? 1) > 0 else { return false }
+            return $0.observedState == "Unknown"
+                || (Self.activityProviders.contains($0.provider) && !activityClassified($0.provider))
         }
     }
 
@@ -1256,7 +1260,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     /// True when outside activity classifies this provider's running processes (none unknown).
     private func activityClassified(_ provider: String) -> Bool {
-        guard let tasks = activityTasks[provider], !tasks.isEmpty else { return false }
+        // shortcut: with Orca observed, running processes but no activity tasks are taken as Orca-hosted (Orca reports
+        // them); the process count does not separate them yet. Upgrade by excluding Orca-hosted processes from the count.
+        guard let tasks = activityTasks[provider], !tasks.isEmpty else { return config.orcaMetadataAllowed }
         return !tasks.contains { $0.state == .unknown }
     }
 

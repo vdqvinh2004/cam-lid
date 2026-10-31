@@ -30,7 +30,12 @@ struct NativeProcessList: ProcessListProvider {
             var info = proc_bsdinfo()
             let size = MemoryLayout<proc_bsdinfo>.size
             let result = withUnsafeMutablePointer(to: &info) { proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, $0, Int32(size)) }
-            guard result == size else { complete = false; continue }
+            guard result == size else {
+                // Another user's process (root's login, daemons) is unreadable but cannot be this user's agent, and a
+                // pid that exited meanwhile is gone; only an unreadable process of this user leaves the scan incomplete.
+                if let owner = Self.kernelEntry(pid)?.uid, owner == getuid() { complete = false }
+                continue
+            }
             guard info.pbi_uid == getuid(), info.pbi_ruid == getuid() else { continue }
             let name = Self.agentName(pid: pid, processName: withUnsafeBytes(of: info.pbi_name) { bytes in
                 String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)

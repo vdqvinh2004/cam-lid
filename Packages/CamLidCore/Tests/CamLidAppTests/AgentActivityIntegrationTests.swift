@@ -58,5 +58,11 @@ struct AgentActivityIntegrationTests {
     @Test func theKernelTableReadsAnyProcessesParent() {
         #expect(NativeProcessList.kernelEntry(getpid())?.parent == getppid())
         #expect(NativeProcessList.kernelEntry(1)?.name == "launchd")
+        #expect(NativeProcessList.kernelEntry(1)?.uid == 0)
+    }
+
+    /// Trial 8: root-owned processes made every scan "incomplete", so Auto never trusted a completion.
+    @Test func otherUsersProcessesDoNotMakeTheScanIncomplete() {
+        #expect(NativeProcessList().agentSnapshot().complete)
     }
 }

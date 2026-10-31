@@ -59,6 +59,12 @@ public enum PolicyEngine {
         }
 
         // Recovery conflict outranks everything except active safety (safety first).
+        // Sensors read as unknown for a moment after a wake (trial 8). While nothing is held, missing readings
+        // only block holding; they do not latch a stop the owner must clear by hand.
+        if !safety.reasons.isEmpty, updated.effectiveState == .ready, !updated.latchedSafetyStop,
+           safety.reasons.allSatisfy({ $0.hasSuffix("Unknown") }) {
+            return transition(.ready, reasons: safety.reasons)
+        }
         if !safety.reasons.isEmpty {
             updated.latchedSafetyStop = true
             updated.stopReasons = safety.reasons

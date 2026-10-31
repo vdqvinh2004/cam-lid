@@ -206,6 +206,22 @@ struct PolicyTests {
         #expect(decision.state == .expired)
     }
 
+    @Test("unknown readings while nothing is held block holding without latching (wake, trial 8)")
+    func unknownReadingsWhileReadyDoNotLatch() throws {
+        let session = try makeSession()   // ready
+        let unknown = SafetySignal(reasons: ["thermalUnknown", "lidUnknown"])
+        var decision = PolicyEngine.evaluate(session: session, tasks: [try makeTask()], health: try healthy(),
+            config: try config(), armed: true, safety: unknown, recoveryConflict: false, nowMonotonic: 10)
+        #expect(decision.state == .ready && !decision.session.latchedSafetyStop)
+        decision = PolicyEngine.evaluate(session: decision.session, tasks: [try makeTask()], health: try healthy(),
+            config: try config(), armed: true, safety: .clear, recoveryConflict: false, nowMonotonic: 15)
+        #expect(decision.state == .protected)
+        // While held, unknown still stops and latches.
+        decision = PolicyEngine.evaluate(session: decision.session, tasks: [try makeTask()], health: try healthy(),
+            config: try config(), armed: true, safety: unknown, recoveryConflict: false, nowMonotonic: 20)
+        #expect(decision.state == .safetyStopped && decision.session.latchedSafetyStop)
+    }
+
     @Test("safety latches and requires explicit re-arm")
     func safetyLatchAndRearm() throws {
         var session = try makeSession()
