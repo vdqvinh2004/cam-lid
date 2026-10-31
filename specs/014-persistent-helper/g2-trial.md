@@ -61,6 +61,21 @@ Trials run with the LidRun helper booted out.
 
 Owner decision (2026-10-31): the trial set above is sufficient; no re-runs. Trials 1–6 and 9 ran on builds before the
 restore-path fixes made during trial 7 (`7606e1c`, `d2d9170`, `53730cc`); those fixes are covered by unit tests only.
-Trial 8 (Auto with a real agent) remains deferred.
+Trial 8 (Auto with a real agent) ran later the same day, below.
+
+## Trial 8: Auto with Claude Code, lid closed (2026-10-31)
+
+Claude Code 2.1.314/2.1.316 with Haiku 5.5 in Ghostty, outside Orca, observed by the activity observer of spec 015;
+Orca observation on; "Sleep when done" 1 min; AC power.
+
+| Run | Result | Evidence |
+|---|---|---|
+| 1 (13:10) | **FAIL**, fixed | Hold 13:12:53, released 5 s at 13:13:16 (`workUncertain`), released again 13:15:31 with the lid closed and no grace. **The Mac did not sleep**: restoring the setting with the lid already closed does not sleep a Mac. At 13:16:20 a new hold was refused (`safetyRefused`, lid closed) and latched "Stopped — safety", with the reason hidden behind the LidRun notice. |
+| 2 (13:33) | Partial, fixed | Hold 13:33:14, lid closed, released 13:36:32 still `workUncertain` (no grace); **Mac slept 13:36:37** (`Software Sleep`, CamLid). On wake, sensors read unknown and latched "Stopped — safety". Causes: idle Codex/OpenCode read Unknown, every process scan was "incomplete" (root processes unreadable). |
+| 3 (14:13) | **PASS** | Prompt 14:13:40, hold 14:13:43, lid closed 14:13; Claude finished 14:14:09; `completionGrace` 14:14:56 (47 s quiet); `graceExpired, sleepRequested` 14:15:57; helper restored, logged `sleep requested reason=clientRelease`, and **the Mac slept at 14:16:02** (`Software Sleep pid=55009`, the helper). Lid opened 14:19:18: Dashboard "Ready", no safety stop. |
+
+Fixes between runs: `0cdf84e`, `b3157d3` (owner option A: fresh idle Orca metadata is completion), `4aab9e4`,
+`b0e8dfe` (the helper sleeps the Mac after every restore with the lid closed and no external display).
+Not covered by trial 8: app kill and helper kill during an Auto session (014 T706 remainder).
 
 Owner approval (2026-10-31): row `mac17-3-26a434` (Mac17,3, macOS 26A434) added to `QualifiedSupportRows.rows`.

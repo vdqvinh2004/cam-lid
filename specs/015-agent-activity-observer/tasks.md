@@ -21,4 +21,4 @@
 
 ## Phase 4 — Calibration and trial
 - [ ] T401 Calibration script and owner-run timelines for Claude Code, Codex and OpenCode; set constants; record in `calibration.md`. — **Partly done 2026-10-31:** Claude Code (Haiku 5.5) measured by Claude in three runs; `busyCPUFraction` 0.03 and `quietSeconds` 45 confirmed, session-file signal dropped ([calibration.md](calibration.md)). Codex (quota) and OpenCode (no login) not measured; tool-using runs not measured.
-- [ ] T402 Trial 8 of spec 014 (Auto with a real agent, closed lid) using this observer; closes 014 T706.
+- [x] T402 Trial 8 of spec 014 (Auto with a real agent, closed lid) using this observer. — Done 2026-10-31 (run 3, Claude Code Haiku 5.5): see [014 g2-trial.md](../014-persistent-helper/g2-trial.md). 014 T706 still needs app kill and helper kill.
