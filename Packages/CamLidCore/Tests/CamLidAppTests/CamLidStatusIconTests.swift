@@ -3,7 +3,7 @@ import Testing
 import CamLidCore
 @testable import CamLidApp
 
-/// Idle marks adapt to appearance; active marks retain a visible white symbol.
+/// Every menu-bar mark is a template that adapts to the menu bar's appearance.
 struct CamLidStatusIconTests {
     @Test @MainActor func autoStatesHaveDistinctIconsAndTimedUsesText() throws {
         let idle = try #require(CamLidStatusIcon.image(for: .neutral))
@@ -14,29 +14,23 @@ struct CamLidStatusIconTests {
         #expect(CamLidStatusIcon.image(for: .neutral, activeMode: .timed) == nil)
         #expect(CamLidStatusIcon.image(for: .neutral, activeMode: .manual) == nil)
     }
-    @Test @MainActor func activeSymbolsAreWhiteWithoutTemplateRecoloring() throws {
+    /// One laptop family, all templates: a white mark vanished on a light menu bar (owner decision 2026-11-01).
+    @Test @MainActor func activeSymbolsAreTemplatesThatFollowTheMenuBar() throws {
         for working in [false, true] {
-            let image = try #require(CamLidStatusIcon.image(
-                for: .neutral, activeMode: .auto, agentWorking: working))
-            #expect(!image.isTemplate)
-            let data = try #require(image.tiffRepresentation)
-            let bitmap = try #require(NSBitmapImageRep(data: data))
-            var opaquePixels = 0
-            for y in 0..<bitmap.pixelsHigh {
-                for x in 0..<bitmap.pixelsWide {
-                    guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB), color.alphaComponent > 0.5 else { continue }
-                    opaquePixels += 1
-                    #expect(color.redComponent > 0.95 && color.greenComponent > 0.95 && color.blueComponent > 0.95)
-                }
-            }
-            #expect(opaquePixels > 0)
+            let image = try #require(CamLidStatusIcon.image(for: .neutral, activeMode: .auto, agentWorking: working))
+            #expect(image.isTemplate && image.size == NSSize(width: 18, height: 16))
         }
+        #expect(CamLidStatusIcon.image(for: .attention)?.isTemplate == true)
+        #expect(DashboardMetric.batterySymbol(percent: 60, onCharger: false) == "battery.50percent")
+        #expect(DashboardMetric.batterySymbol(percent: 95, onCharger: false) == "battery.100percent")
+        #expect(DashboardMetric.batterySymbol(percent: 5, onCharger: false) == "battery.0percent")
+        #expect(DashboardMetric.batterySymbol(percent: 40, onCharger: true) == "powerplug")
     }
     @Test @MainActor func workingSpinnerFramesRotate() throws {
         let frames = CamLidStatusIcon.autoSpinnerFrames
         #expect(frames.count == 12)
         #expect(Set(try frames.map { try #require($0.tiffRepresentation) }).count == frames.count)
-        #expect(frames.allSatisfy { !$0.isTemplate })
+        #expect(frames.allSatisfy { $0.isTemplate })
     }
     @Test func menuBarCountdownUsesCompactLiveClockText() {
         #expect(MenuBarCountdown.text(remaining: nil) == nil)

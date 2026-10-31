@@ -121,19 +121,19 @@ public enum CamLidAccessibility {
         public static func style(for state: EffectiveState) -> StatusStyle {
             switch state {
             case .protected:
-                return StatusStyle(tone: .ok, symbolName: "shield.fill", text: "Protected")
+                return StatusStyle(tone: .ok, symbolName: "laptopcomputer.badge.checkmark", text: "Protected")
             case .ready:
-                return StatusStyle(tone: .neutral, symbolName: "shield", text: "Ready")
+                return StatusStyle(tone: .neutral, symbolName: "laptopcomputer", text: "Ready")
             case .completionGrace:
-                return StatusStyle(tone: .attention, symbolName: "timer", text: "Waiting after work")
+                return StatusStyle(tone: .attention, symbolName: "moon.zzz", text: "Waiting after work")
             case .safetyStopped, .expired:
-                return StatusStyle(tone: .stopped, symbolName: "xmark.shield.fill", text: state == .safetyStopped ? "Stopped — safety" : "Cap reached")
+                return StatusStyle(tone: .stopped, symbolName: "laptopcomputer.trianglebadge.exclamationmark", text: state == .safetyStopped ? "Stopped — safety" : "Cap reached")
             case .off:
-                return StatusStyle(tone: .neutral, symbolName: "shield.slash", text: "Off")
+                return StatusStyle(tone: .neutral, symbolName: "laptopcomputer.slash", text: "Off")
             case .unavailable:
                 return StatusStyle(tone: .neutral, symbolName: "questionmark.circle", text: "Unknown")
             case .recoveryRequired:
-                return StatusStyle(tone: .stopped, symbolName: "exclamationmark.triangle.fill", text: "Recovery required")
+                return StatusStyle(tone: .stopped, symbolName: "laptopcomputer.trianglebadge.exclamationmark", text: "Recovery required")
             }
         }
     }

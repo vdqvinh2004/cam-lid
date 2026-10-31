@@ -68,12 +68,11 @@ public struct MenuBarStatus: Sendable, Equatable {
 
     public var symbolName: String {
         switch state {
-        case .protected: return leaseVerified ? "shield.fill" : "shield"
-        case .completionGrace: return "timer"
-        case .safetyStopped, .expired: return "xmark.shield.fill"
-        case .recoveryRequired: return "exclamationmark.triangle.fill"
-        case .off: return "shield.slash"
-        case .ready: return "shield"
+        case .protected: return leaseVerified ? "laptopcomputer.badge.checkmark" : "laptopcomputer"
+        case .completionGrace: return "moon.zzz"
+        case .safetyStopped, .expired, .recoveryRequired: return "laptopcomputer.trianglebadge.exclamationmark"
+        case .off: return "laptopcomputer.slash"
+        case .ready: return "laptopcomputer"
         case .unavailable: return "questionmark.circle"
         }
     }
@@ -210,16 +209,14 @@ public final class MenuBarController: NSObject {
             button.title = ""
             button.imagePosition = .imageOnly
             button.font = nil
+            button.contentTintColor = nil   // template marks follow the menu bar's appearance
             if autoWorking {
-                button.contentTintColor = .white
                 startAutoAnimation()
             } else {
                 stopAutoAnimation()
                 let iconMode: RequestedMode? = activeMode == .auto ? .auto : nil
                 button.image = CamLidStatusIcon.image(for: status.tone, activeMode: iconMode,
                                                       agentWorking: false)
-                // Active marks stay white; the glyph and accessible label convey state.
-                button.contentTintColor = iconMode == nil ? nil : .white
             }
         }
 

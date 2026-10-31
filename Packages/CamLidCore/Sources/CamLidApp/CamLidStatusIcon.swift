@@ -1,79 +1,76 @@
 import AppKit
 import CamLidCore
 
-/// Native menu-bar marks. Off/attention use template laptop symbols, Auto uses
-/// an empty ring while waiting and an animated spinner while an agent works,
-/// and Timed sessions render a finite countdown as text or an infinity glyph.
+/// Native menu-bar marks, one laptop family shared with the Dashboard: the laptop alone while idle, with a small
+/// badge for the session (Auto arrows, a rotating arc while an agent works, a moon while waiting to sleep) and the
+/// warning variant when stopped. Timed shows its countdown as text. Every mark is a template image, so it follows
+/// light and dark menu bars (a white mark disappeared on a light menu bar).
 public enum CamLidStatusIcon {
     private static let statusSize = NSSize(width: 18, height: 16)
     private static let spinnerFrameCount = 12
 
-    /// Infinite Timed sessions have no countdown to show. This template glyph
-    /// adapts to the menu-bar appearance like the other idle marks.
+    /// Infinite Timed sessions have no countdown to show.
     public static func infinityImage() -> NSImage? {
-        symbolImage("infinity", active: false)
+        symbolImage("infinity")
     }
 
     public static func image(for tone: CamLidAccessibility.StatusTone, activeMode: RequestedMode? = nil,
                              agentWorking: Bool = false) -> NSImage? {
-        if tone == .stopped {
-            return symbolImage("laptopcomputer.trianglebadge.exclamationmark", active: activeMode != nil)
-        }
+        if tone == .stopped { return symbolImage("laptopcomputer.trianglebadge.exclamationmark") }
         if activeMode == .auto {
-            return agentWorking ? autoSpinnerFrames.first : symbolImage("circle.dashed", active: true)
+            return agentWorking ? autoSpinnerFrames.first : badged(symbol: "arrow.triangle.2.circlepath")
         }
-        if activeMode == .timed || activeMode == .manual {
-            // Timed sessions show the real remaining time as menu-bar text.
-            return nil
-        }
-        let symbol = tone == .attention ? "laptopcomputer.trianglebadge.exclamationmark" : "laptopcomputer"
-        return symbolImage(symbol, active: false)
+        // Timed sessions show the real remaining time as menu-bar text.
+        if activeMode == .timed || activeMode == .manual { return nil }
+        if tone == .attention { return badged(symbol: "moon.zzz.fill") }
+        return symbolImage("laptopcomputer")
     }
 
     /// Rotating frames for an Auto session with at least one working agent.
-    /// The ring is white and non-template because NSStatusBarButton can
-    /// override template tint.
-    public static var autoSpinnerFrames: [NSImage] {
-        spinnerFrames
-    }
+    public static var autoSpinnerFrames: [NSImage] { spinnerFrames }
 
-    private static func symbolImage(_ name: String, active: Bool) -> NSImage? {
-        guard let image = (NSImage(systemSymbolName: name, accessibilityDescription: "CamLid")
-            ?? NSImage(systemSymbolName: "laptopcomputer", accessibilityDescription: "CamLid"))?
+    private static func symbolImage(_ name: String) -> NSImage? {
+        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: "CamLid")?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)) else { return nil }
         image.size = statusSize
-        guard active else {
-            image.isTemplate = true
-            return image
-        }
-        let white = NSImage(size: image.size, flipped: false) { rect in
-            image.draw(in: rect)
-            NSColor.white.setFill()
-            rect.fill(using: .sourceIn)
-            return true
-        }
-        white.accessibilityDescription = image.accessibilityDescription
-        white.isTemplate = false
-        return white
+        image.isTemplate = true
+        return image
     }
 
-    private static let spinnerFrames: [NSImage] = (0..<spinnerFrameCount).map { frame in
-        let phase = CGFloat(frame) / CGFloat(spinnerFrameCount)
+    /// The laptop with a badge in its lower right corner, cut out of the laptop so both stay legible.
+    private static func badged(symbol: String? = nil, arcPhase: CGFloat? = nil) -> NSImage? {
+        guard let laptop = NSImage(systemSymbolName: "laptopcomputer", accessibilityDescription: "CamLid")?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)) else { return nil }
+        let badgeSymbol = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 7, weight: .bold)) }
         let image = NSImage(size: statusSize, flipped: false) { rect in
-            let center = NSPoint(x: rect.midX, y: rect.midY)
-            let radius = max(1, min(rect.width, rect.height) / 2 - 2)
-            let start = -90 + phase * 360
-            let path = NSBezierPath()
-            path.appendArc(withCenter: center, radius: radius,
-                           startAngle: start, endAngle: start + 290)
-            path.lineWidth = 2
-            path.lineCapStyle = .round
-            NSColor.white.setStroke()
-            path.stroke()
+            laptop.draw(in: NSRect(x: 0, y: 2, width: 15, height: 12))
+            let badge = NSRect(x: rect.maxX - 9, y: 0, width: 9, height: 9)
+            NSGraphicsContext.current?.compositingOperation = .clear
+            NSBezierPath(ovalIn: badge.insetBy(dx: -1, dy: -1)).fill()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            NSColor.black.set()
+            if let phase = arcPhase {
+                let path = NSBezierPath()
+                let start = 90 - phase * 360
+                path.appendArc(withCenter: NSPoint(x: badge.midX, y: badge.midY), radius: 3.4,
+                               startAngle: start, endAngle: start - 270, clockwise: true)
+                path.lineWidth = 1.6
+                path.lineCapStyle = .round
+                path.stroke()
+            } else if let badgeSymbol {
+                let size = badgeSymbol.size
+                badgeSymbol.draw(in: NSRect(x: badge.midX - size.width / 2, y: badge.midY - size.height / 2,
+                                            width: size.width, height: size.height))
+            }
             return true
         }
         image.accessibilityDescription = "CamLid"
-        image.isTemplate = false
+        image.isTemplate = true
         return image
+    }
+
+    private static let spinnerFrames: [NSImage] = (0..<spinnerFrameCount).compactMap { frame in
+        badged(arcPhase: CGFloat(frame) / CGFloat(spinnerFrameCount))
     }
 }

@@ -42,7 +42,7 @@ enum AgentProviderCatalog {
             // Observed from outside only (ADR 0002); no bundled artwork, so a neutral symbol.
             id: "claude", title: "Claude Code",
             cliNames: ["claude"], processNames: ["claude"],
-            applicationBundleIDs: [], assetName: nil, symbolName: "asterisk", monogram: nil),
+            applicationBundleIDs: [], assetName: "agent-claude", symbolName: nil, monogram: nil),
         AgentProviderInfo(
             id: "freebuff", title: "Freebuff",
             cliNames: ["freebuff"], processNames: ["freebuff"],

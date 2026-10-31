@@ -11,6 +11,7 @@
 		1542FFBE8E851766FE2AE873 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B400E3C708DB8A58B6A78A8C /* main.swift */; };
 		6C006708F6368D5006CEAA93 /* CamLidApp in Frameworks */ = {isa = PBXBuildFile; productRef = 722ADDB3FC956AB9813C8912 /* CamLidApp */; };
 		779DE731ABACD0FB5442363B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 88BEC5AAD8CA0E48BD090E9B /* Sparkle */; };
+		C2D9C774E5327BAAA1427699 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 68CF5563D41618952DC2F60B /* Assets.xcassets */; };
 		F58968A552C360AA462D5155 /* AppMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C22EA4963A70BEDF898AF67 /* AppMain.swift */; };
 /* End PBXBuildFile section */
 
@@ -18,6 +19,7 @@
 		0C22EA4963A70BEDF898AF67 /* AppMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMain.swift; sourceTree = "<group>"; };
 		0CC1708A4ECEC5EFCA9DD223 /* CamLid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CamLid.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D7D5469152380BE010A0513 /* camlid */ = {isa = PBXFileReference; includeInIndex = 0; path = camlid; sourceTree = BUILT_PRODUCTS_DIR; };
+		68CF5563D41618952DC2F60B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B400E3C708DB8A58B6A78A8C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		EFBC03A506B4149C4107BEA4 /* CamLidCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CamLidCore; path = Packages/CamLidCore; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -47,6 +49,7 @@
 			isa = PBXGroup;
 			children = (
 				0C22EA4963A70BEDF898AF67 /* AppMain.swift */,
+				68CF5563D41618952DC2F60B /* Assets.xcassets */,
 			);
 			path = CamLidApp;
 			sourceTree = "<group>";
@@ -95,6 +98,7 @@
 			buildConfigurationList = 33D314B0C75DA7602CD55BE3 /* Build configuration list for PBXNativeTarget "CamLid" */;
 			buildPhases = (
 				9B1C3EF7ED81FF7B3AA658AE /* Sources */,
+				4BEC0843B4A50479FBDEE14F /* Resources */,
 				FF1DA6845F52B28058059A43 /* Frameworks */,
 				E8A3BD3A2F8E3030414EEC26 /* Embed and sign closed-lid helper */,
 			);
@@ -164,6 +168,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4BEC0843B4A50479FBDEE14F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2D9C774E5327BAAA1427699 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		E8A3BD3A2F8E3030414EEC26 /* Embed and sign closed-lid helper */ = {

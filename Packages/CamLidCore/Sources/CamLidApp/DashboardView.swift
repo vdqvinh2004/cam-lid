@@ -25,6 +25,19 @@ public struct DashboardMetric: Codable, Sendable, Equatable, Identifiable {
     public let detail: String
     public let attention: Bool
 
+    /// The battery glyph follows the real level (it always showed a full battery); the charger shows a plug.
+    static func batterySymbol(percent: Double?, onCharger: Bool) -> String {
+        if onCharger { return "powerplug" }
+        guard let percent else { return "battery.0percent" }
+        switch percent {
+        case ..<13: return "battery.0percent"
+        case ..<38: return "battery.25percent"
+        case ..<63: return "battery.50percent"
+        case ..<88: return "battery.75percent"
+        default: return "battery.100percent"
+        }
+    }
+
     public static func from(_ health: HealthSnapshot?, isStale: Bool = false) -> [Self] {
         let h = isStale ? nil : health
         let pressure: String = switch h?.thermalPressure {
@@ -40,7 +53,7 @@ public struct DashboardMetric: Codable, Sendable, Equatable, Identifiable {
         default: "Unknown"
         }
         var rows: [Self] = [
-            Self(id: "battery", symbol: h?.powerSource == .ac ? "powerplug" : "battery.100percent",
+            Self(id: "battery", symbol: Self.batterySymbol(percent: h?.batteryPercent, onCharger: h?.powerSource == .ac),
                 value: h?.batteryPercent.map { String(format: "%.0f%%", $0) } ?? "Unknown",
                 detail: "Battery: " + (h?.batteryPercent.map { String(format: "%.0f%%", $0) } ?? "Unknown") + ", "
                     + (h?.powerSource == .ac ? "on charger" : h?.powerSource == .battery ? "on battery" : "power source unknown"),

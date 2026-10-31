@@ -16,14 +16,30 @@ struct AgentMarkView: View {
         image.accessibilityDescription = provider
         return image
     }
+    /// Marks that are a bare glyph rather than a tile; they sit centred on a neutral tile.
+    static let glyphMarks: Set<String> = ["opencode", "antigravity", "cline", "vscode-copilot", "copilot-cli", "goose"]
+    /// App-icon artwork that ships with its own transparent margin, enlarged so it fills the tile like the others.
+    static let marginScale: [String: CGFloat] = ["orca": 1.08, "codex": 1.05]
+
+    /// Every agent gets the same rounded tile at the same size: tile-shaped artwork is clipped to it, glyphs are
+    /// centred at about 72% on a neutral tile (four different shapes made marks look unevenly sized).
     var body: some View {
+        let tile = RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+        let glyph = Self.glyphMarks.contains(provider) || Self.image(for: provider) == nil
+        artwork
+            .scaleEffect(glyph ? 0.72 : Self.marginScale[provider] ?? 1)
+            .frame(width: size, height: size)
+            .background(glyph ? AnyShapeStyle(Color.primary.opacity(0.1)) : AnyShapeStyle(Color.clear), in: tile)
+            .clipShape(tile)
+            .overlay(tile.strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder private var artwork: some View {
         Group {
             if provider == "opencode" {
                 OpenCodeMark()
             } else if let image = Self.image(for: provider) {
-                // Fixed maximum box: landscape marks use the width limit,
-                // portrait marks use the height limit, and smaller artwork is
-                // scaled up while oversized artwork is scaled down.
                 Image(nsImage: image)
                     .renderingMode(provider == "cline" ? .template : .original)
                     .resizable().interpolation(.high).scaledToFit()
@@ -41,8 +57,6 @@ struct AgentMarkView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
     }
 }
 

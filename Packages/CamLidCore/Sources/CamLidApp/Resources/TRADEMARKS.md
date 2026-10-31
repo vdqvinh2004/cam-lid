@@ -3,6 +3,7 @@
 Bundled solely to identify each integration in Settings/dashboard (nominative use).
 All marks remain the trademarks of their respective owners; no endorsement implied.
 
+- claude: official Claude app icon (apple-touch-icon) from claude.ai, resized to 256 px, © Anthropic.
 - orca: ORIGINAL black app icon from stablyai/orca (MIT-licensed repo), © Stably AI, unmodified.
 - codex: cloud-terminal glyph flood-extracted from OpenAI's ChatGPT macOS app resources, © OpenAI.
 - opencode: terminal frame redrawn in code from CC0 path data (even-odd), mark © SST.
@@ -20,5 +21,6 @@ All marks remain the trademarks of their respective owners; no endorsement impli
 - amp: official app icon from ampcode.com, © Sourcegraph.
 - goose: official goose favicon from goose-docs.ai, © Agentic AI Foundation / Block.
 
-No white tiles, no recoloring of raster marks; monochrome vector and template marks adapt to appearance.
+No recoloring of raster marks. Every mark is shown in the same rounded tile: tile-shaped artwork is clipped to it,
+bare glyphs sit centred on a neutral tile; monochrome vector and template marks adapt to appearance.
 Never used as app identity.

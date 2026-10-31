@@ -50,9 +50,9 @@ struct AgentActivityIntegrationTests {
         #expect(app.sleepRelevantTasksForTesting(provider: "codex").isEmpty)
     }
 
-    @Test func claudeCodeIsBackWithoutBundledArtwork() {
+    @Test func claudeCodeIsBackWithItsOfficialMark() {
         let info = AgentProviderCatalog.info(for: "claude")
-        #expect(info?.title == "Claude Code" && info?.assetName == nil && info?.processNames == ["claude"])
+        #expect(info?.title == "Claude Code" && info?.assetName == "agent-claude" && info?.processNames == ["claude"])
         #expect(NativeProcessList.agentName(pid: getpid(), processName: "codex") == "codex")
     }
 
