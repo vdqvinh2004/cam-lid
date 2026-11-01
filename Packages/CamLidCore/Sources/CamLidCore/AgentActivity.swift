@@ -20,6 +20,7 @@ public struct AgentActivityMemory: Sendable, Equatable {
     var lastCPU: Double?
     var lastAt: Double?
     var lastActiveAt: Double?
+    var busyStreak = 0
     public init() {}
 }
 
@@ -36,6 +37,8 @@ public enum AgentActivityClassifier {
     /// opened Claude Code read as working before any prompt. CPU in this window is not counted as activity, and the
     /// process reads idle (not unknown, which would hold the Mac and make every completion uncertain meanwhile).
     public static let startupSeconds = 25.0
+    /// A sampling gap longer than this (the Mac slept, or the app stalled) gives no usable rate for the next sample.
+    public static let maximumSampleGapSeconds = 30.0
 
     public static func step(_ memory: inout AgentActivityMemory, _ sample: AgentActivitySample) -> (state: TaskState, reason: String) {
         guard sample.at.isFinite else { return (.unknown, "unreadable") }
@@ -48,17 +51,23 @@ public enum AgentActivityClassifier {
         var busy: Bool?
         if let lastCPU = memory.lastCPU, let lastAt = memory.lastAt, sample.at > lastAt {
             // A drop (a child such as Claude Code's caffeinate exited) has no usable delta: it restarts the baseline
-            // and counts as not busy, so an idle agent stays idle instead of turning unknown.
-            busy = cpu >= lastCPU && (cpu - lastCPU) / (sample.at - lastAt) >= busyCPUFraction
+            // and counts as not busy, so an idle agent stays idle instead of turning unknown. So does a long gap.
+            busy = cpu >= lastCPU && sample.at - lastAt <= maximumSampleGapSeconds
+                && (cpu - lastCPU) / (sample.at - lastAt) >= busyCPUFraction
         }
         memory.lastCPU = cpu
         memory.lastAt = sample.at
         if let age = sample.processAgeSeconds, age >= 0, age < startupSeconds { return (.idle, "starting") }
-        if busy == true {
+        memory.busyStreak = busy == true ? memory.busyStreak + 1 : 0
+        // From idle, one busy sample is a blip (the reconnect after a wake, a session write after a turn: owner saw
+        // "1 working" on an idle Claude Code, 2026-11-01); two in a row (10 s) is work. Answering stays above the
+        // threshold continuously (calibration), so an active agent needs one.
+        let recentlyActive = memory.lastActiveAt.map { sample.at - $0 < quietSeconds } ?? false
+        if busy == true, memory.busyStreak >= 2 || recentlyActive {
             memory.lastActiveAt = sample.at
             return (.working, "cpu")
         }
-        if let lastActive = memory.lastActiveAt, sample.at - lastActive < quietSeconds { return (.working, "recent") }
+        if recentlyActive { return (.working, "recent") }
         return busy == nil ? (.unknown, "warmingUp") : (.idle, "quiet")
     }
 }

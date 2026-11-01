@@ -33,3 +33,12 @@ CPU is the growth of CPU time of the agent's whole process subtree, as a fractio
 ## Not covered
 Long model "thinking" without visible output was not isolated; the answering windows include streaming. Interactive
 runs with tool use, Codex and OpenCode remain to be measured before they are relied on.
+
+## Amendment (2026-11-01): one busy sample is not work
+During Strict trial S1 the owner saw "Claude Code · 1 working" on an idle Claude Code after the Mac woke, and the
+session had already returned from "Sleep when done" to protected once after Claude had finished. Measured afterwards,
+the idle subtree ran at 0.004–0.020 of a core, below the 0.03 threshold; the false "working" came from single
+5-second bursts (the reconnect after a wake, a write after a turn), which the classifier counted as work and then
+held for the 45 s quiet period. Change: from idle, two consecutive busy samples (10 s) are required; an agent that is
+already working needs one, so answering (continuously 0.05–0.21) is unaffected apart from about 5 s more to detect
+its start. A sample gap over 30 s (sleep, stall) gives no rate. Start and end of work are now recorded in Activity.

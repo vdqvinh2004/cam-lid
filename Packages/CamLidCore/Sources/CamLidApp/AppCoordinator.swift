@@ -1287,6 +1287,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     func receiveActivity(_ processes: [AgentActivityProcess], at: Double) {
         var tasks: [String: [AgentTask]] = [:]
         var memory: [String: AgentActivityMemory] = [:]
+        let previous = Dictionary(activityTasks.values.flatMap { $0 }.map { ($0.id, $0.state) }, uniquingKeysWith: { a, _ in a })
         for process in processes where !process.orcaHosted {
             let key = "activity-\(process.provider)-\(process.pid)-\(String(process.startTime.bitPattern, radix: 16))"
             var state = activityMemory[key] ?? AgentActivityMemory()
@@ -1297,6 +1298,11 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 state: result.state, evidenceKind: .activity, confidence: .inferred,
                 unknownUntilMonotonic: result.state == .unknown ? at + AgentActivityClassifier.unknownHoldSeconds : nil) else { continue }
             tasks[process.provider, default: []].append(task)
+            // History keeps the start and end of work only (sampling noise between idle and unknown is not news).
+            if (previous[key] == .working) != (result.state == .working) {
+                record(category: .stateTransition, newState: sessionStateForRecord(),
+                       reasons: ["agentStateChanged", "\(process.provider):\(result.state.rawValue)"])
+            }
         }
         activityMemory = memory
         activityTasks = tasks

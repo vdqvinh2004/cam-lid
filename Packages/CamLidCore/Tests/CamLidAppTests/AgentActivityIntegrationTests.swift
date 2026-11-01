@@ -24,8 +24,9 @@ struct AgentActivityIntegrationTests {
         var patch = ConfigPatch(); patch.mode = .auto; patch.adapterEnrollment = ["codex"]
         guard case .saved = app.applySettingsPatch(patch, expectedRevision: 1) else { Issue.record("not saved"); return }
         let t = ContinuousTime.now
+        app.receiveActivity([codex(cpu: 9.5)], at: t - 10)
         app.receiveActivity([codex(cpu: 10)], at: t - 5)
-        app.receiveActivity([codex(cpu: 10.5)], at: t)                                   // 0.1 core: answering
+        app.receiveActivity([codex(cpu: 10.5)], at: t)                                   // 0.1 core for 10 s: answering
         await app.startPreviewSession()
         app.changeMode(.auto)
         #expect(app.dashboardData().state == .protected)
@@ -79,5 +80,19 @@ struct AgentActivityIntegrationTests {
         let bundle = try! LifetimeRule(selectorKind: .applicationBundleID, selectorValue: "com.example.app", label: "App")
         #expect(NativeProcessList.kernelNames(of: [path]) == ["a-very-long-work"])
         #expect(NativeProcessList.kernelNames(of: [path, bundle]) == nil)
+    }
+
+    /// Activity shows when a terminal agent starts and stops working, as it does for Orca.
+    @Test @MainActor func activityStateChangesReachHistory() async throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let app = fixture.makeCoordinator()
+        let t = ContinuousTime.now
+        for (i, cpu) in [1.0, 1.5, 2.0, 2.0].enumerated() { app.receiveActivity([codex(cpu: cpu)], at: t + Double(i) * 5) }
+        app.receiveActivity([codex(cpu: 2.0)], at: t + 15 + AgentActivityClassifier.quietSeconds)
+        #expect(await app.flushHistory(timeout: 2))
+        let text = try FileManager.default.contentsOfDirectory(at: fixture.root.appendingPathComponent("history"), includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "jsonl" }.map { try String(contentsOf: $0, encoding: .utf8) }.joined()
+        #expect(text.components(separatedBy: "codex:working").count - 1 == 1)
+        #expect(text.components(separatedBy: "codex:idle").count - 1 == 1)
     }
 }
