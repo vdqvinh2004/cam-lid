@@ -95,4 +95,15 @@ struct AgentActivityIntegrationTests {
         #expect(text.components(separatedBy: "codex:working").count - 1 == 1)
         #expect(text.components(separatedBy: "codex:idle").count - 1 == 1)
     }
+
+    /// Script CLIs run under an interpreter; the kernel calls them `node` or `python` (Pi and Freebuff were invisible).
+    @Test func agentsRunByAnInterpreterAreNamedFromTheirArguments() {
+        #expect(NativeProcessList.isInterpreter("node") && NativeProcessList.isInterpreter("python3.12"))
+        #expect(!NativeProcessList.isInterpreter("codex"))
+        #expect(NativeProcessList.agent(fromArguments: ["pi"]) == "pi")                                // process.title
+        #expect(NativeProcessList.agent(fromArguments: ["node", "/Users/x/.nvm/bin/freebuff"]) == "freebuff")
+        #expect(NativeProcessList.agent(fromArguments: ["/usr/bin/python3", "/opt/bin/aider"]) == "aider")
+        #expect(NativeProcessList.agent(fromArguments: ["node", "server.js", "pi"]) == nil)          // a script argument
+        #expect(NativeProcessList.agentName(pid: getpid(), processName: "node") == "node")
+    }
 }

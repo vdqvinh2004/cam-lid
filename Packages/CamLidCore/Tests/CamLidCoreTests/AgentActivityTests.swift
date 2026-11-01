@@ -93,4 +93,18 @@ import Testing
         #expect(C.step(&m, sample(310, cpu: 30)) == (.idle, "quiet"))           // 5 min gap: the Mac slept
         #expect(C.step(&m, sample(315, cpu: 30.05)) == (.idle, "quiet"))
     }
+
+    /// Codex answers at 0.012–0.033 of a core and idles at 0–0.008: its own threshold catches the answer.
+    @Test func codexHasItsOwnThreshold() {
+        let threshold = C.busyThreshold(for: "codex")
+        #expect(threshold == 0.01 && C.busyThreshold(for: "claude") == C.busyCPUFraction)
+        var m = AgentActivityMemory()
+        _ = C.step(&m, sample(0, cpu: 1), threshold: threshold)
+        _ = C.step(&m, sample(5, cpu: 1 + 0.015 * 5), threshold: threshold)
+        #expect(C.step(&m, sample(10, cpu: 1 + 0.015 * 10), threshold: threshold) == (.working, "cpu"))
+        var idle = AgentActivityMemory()
+        _ = C.step(&idle, sample(0, cpu: 1), threshold: threshold)
+        _ = C.step(&idle, sample(5, cpu: 1 + 0.008 * 5), threshold: threshold)
+        #expect(C.step(&idle, sample(10, cpu: 1 + 0.008 * 10), threshold: threshold) == (.idle, "quiet"))
+    }
 }

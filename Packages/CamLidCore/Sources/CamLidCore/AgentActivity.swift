@@ -31,6 +31,12 @@ public enum AgentActivityClassifier {
     public static let quietSeconds = 45.0
     /// CPU-time growth per wall second (fraction of one core) that counts as activity.
     public static let busyCPUFraction = 0.03
+    /// Agents whose levels sit elsewhere (measured 2026-11-01). Codex streams from the server with very little local
+    /// work: 0.012–0.033 of a core while answering, 0–0.008 idle, so the shared 0.03 would miss its answers.
+    public static let busyCPUFractionByProvider: [String: Double] = ["codex": 0.01]
+    public static func busyThreshold(for provider: String) -> Double {
+        busyCPUFractionByProvider[provider] ?? busyCPUFraction
+    }
     /// How long an unknown result keeps holding (the policy bounds unknown holds with this).
     public static let unknownHoldSeconds = 15.0
     /// Launching costs CPU without any work (calibration: 0.054–0.34 of a core for about 20 s); owner saw a freshly
@@ -40,7 +46,8 @@ public enum AgentActivityClassifier {
     /// A sampling gap longer than this (the Mac slept, or the app stalled) gives no usable rate for the next sample.
     public static let maximumSampleGapSeconds = 30.0
 
-    public static func step(_ memory: inout AgentActivityMemory, _ sample: AgentActivitySample) -> (state: TaskState, reason: String) {
+    public static func step(_ memory: inout AgentActivityMemory, _ sample: AgentActivitySample,
+                            threshold: Double = busyCPUFraction) -> (state: TaskState, reason: String) {
         guard sample.at.isFinite else { return (.unknown, "unreadable") }
         guard sample.alive else { return (.completed, "exited") }
         if let lastAt = memory.lastAt, sample.at < lastAt { memory = AgentActivityMemory() }   // clock went back
@@ -53,7 +60,7 @@ public enum AgentActivityClassifier {
             // A drop (a child such as Claude Code's caffeinate exited) has no usable delta: it restarts the baseline
             // and counts as not busy, so an idle agent stays idle instead of turning unknown. So does a long gap.
             busy = cpu >= lastCPU && sample.at - lastAt <= maximumSampleGapSeconds
-                && (cpu - lastCPU) / (sample.at - lastAt) >= busyCPUFraction
+                && (cpu - lastCPU) / (sample.at - lastAt) >= threshold
         }
         memory.lastCPU = cpu
         memory.lastAt = sample.at

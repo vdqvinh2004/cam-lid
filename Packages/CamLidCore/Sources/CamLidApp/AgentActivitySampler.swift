@@ -16,11 +16,36 @@ extension NativeProcessList {
     /// Process name used for agent matching. Claude Code's installer runs a binary named after its version
     /// (`~/.local/share/claude/versions/2.1.314`), so a version-like name is resolved from the executable path.
     static func agentName(pid: Int32, processName: String) -> String {
+        if isInterpreter(processName) { return scriptName(pid) ?? processName }
         guard !processName.isEmpty, processName.allSatisfy({ $0.isNumber || $0 == "." }) else { return processName }
         var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
         guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return processName }
         let path = String(cString: buffer)
         return path.contains("/claude/versions/") ? "claude" : processName
+    }
+
+    /// Script CLIs run under an interpreter, so the kernel names them `node` (Pi, Freebuff, Gemini, Copilot, Amp) or
+    /// `python` (Aider).
+    static func isInterpreter(_ name: String) -> Bool {
+        ["node", "bun", "deno"].contains(name) || name.hasPrefix("python")
+    }
+
+    /// The agent an interpreter runs: the file name of argv[0] (Pi rewrites it to `pi`) or argv[1] (`node …/bin/freebuff`)
+    /// when it is a known agent name. Later arguments belong to the script and are ignored.
+    static func scriptName(_ pid: Int32) -> String? {
+        var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
+        var size = 0
+        guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > MemoryLayout<Int32>.size, size <= 1 << 20 else { return nil }
+        var buffer = [UInt8](repeating: 0, count: size)
+        guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0, size > MemoryLayout<Int32>.size else { return nil }
+        let argc = Int(buffer.withUnsafeBytes { $0.load(as: Int32.self) })
+        // Layout: argc, the executable path, padding NULs, then argv.
+        let strings = buffer[MemoryLayout<Int32>.size..<size].split(separator: 0, omittingEmptySubsequences: true)
+        return agent(fromArguments: strings.dropFirst().prefix(min(max(argc, 0), 2)).map { String(decoding: $0, as: UTF8.self) })
+    }
+
+    static func agent(fromArguments argv: [String]) -> String? {
+        argv.prefix(2).map { ($0 as NSString).lastPathComponent.lowercased() }.first(where: executableNames.contains)
     }
 
     /// Parent pid, short command name and owner for any process, via `sysctl kern.proc.pid` (readable without privileges).

@@ -1270,8 +1270,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
     }
 
-    /// Agents observed for activity: directly run terminal agents (spec 015).
-    nonisolated static let activityProviders: Set<String> = ["claude", "codex", "opencode"]
+    /// Agents observed for activity: the terminal agents (spec 015). IDE-hosted agents (Antigravity, Cursor) are
+    /// recognised by their app process, whose own CPU would read as work, so they stay presence-only.
+    /// Idle levels measured 2026-11-01, all under the 0.03-core threshold: Claude Code 0.004–0.020, Codex 0–0.003,
+    /// OpenCode 0.006–0.018, Freebuff 0.004–0.024, Pi 0.002–0.020.
+    nonisolated static let activityProviders: Set<String> = ["claude", "codex", "opencode", "freebuff", "pi",
+                                                             "copilot-cli", "aider", "gemini-cli", "amp", "goose"]
 
     nonisolated static func sampleActivity(_ list: NativeProcessList, excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double) {
         let observed = activityProviders
@@ -1292,7 +1296,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             let key = "activity-\(process.provider)-\(process.pid)-\(String(process.startTime.bitPattern, radix: 16))"
             var state = activityMemory[key] ?? AgentActivityMemory()
             let result = AgentActivityClassifier.step(&state, AgentActivitySample(at: at, alive: true, cpuSeconds: process.cpuSeconds,
-                processAgeSeconds: Date().timeIntervalSince1970 - process.startTime))
+                processAgeSeconds: Date().timeIntervalSince1970 - process.startTime),
+                threshold: AgentActivityClassifier.busyThreshold(for: process.provider))
             memory[key] = state
             guard let task = try? AgentTask(id: key, sessionID: "activity-\(process.provider)", runID: key,
                 state: result.state, evidenceKind: .activity, confidence: .inferred,
