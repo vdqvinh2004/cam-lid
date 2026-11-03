@@ -361,6 +361,7 @@ private struct SettingsAgentsPane: View {
                     Button(editor.allProvidersEnabled ? "Disable All" : "Enable All") {
                         editor.allProvidersEnabled ? editor.disableAllProviders() : editor.enableAllProviders()
                     }
+                    .disabled(editor.selectableProviders.isEmpty)
                     .help(editor.allProvidersEnabled ? "Ignore every agent for sleep decisions" : "Include all agents in sleep decisions")
                     .accessibilityIdentifier("camlid.agents.enableAll")
                 }

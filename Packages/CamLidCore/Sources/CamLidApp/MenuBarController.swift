@@ -249,6 +249,8 @@ public final class MenuBarController: NSObject {
         let frames = CamLidStatusIcon.autoSpinnerFrames
         autoAnimationIndex = 0
         button.image = frames.first
+        // Reduce Motion: a still mark; the accessible label already says an agent is working.
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
         let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.advanceAutoAnimation() }
         }

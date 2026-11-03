@@ -29,7 +29,7 @@ final class SettingsToolbar: NSObject, NSToolbarDelegate {
         guard abs(delta) > 1 else { return }
         var frame = window.frame
         frame.origin.y -= delta; frame.size.height += delta   // keep the top edge in place
-        window.setFrame(frame, display: true, animate: window.isVisible)
+        window.setFrame(frame, display: true, animate: window.isVisible && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {

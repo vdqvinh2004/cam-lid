@@ -129,6 +129,7 @@ struct CamLidMetricChip: View {
     let systemImage: String
     let detail: String
     var attention = false
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         Label(value, systemImage: systemImage)
@@ -138,6 +139,7 @@ struct CamLidMetricChip: View {
             .padding(.horizontal, 6).padding(.vertical, 6)
             .frame(maxWidth: .infinity)
             .background(.quaternary, in: Capsule())   // the same capsule as the mode buttons and agent badges
+            .overlay { if contrast == .increased { Capsule().strokeBorder(Color.primary.opacity(0.55), lineWidth: 1) } }
             .help(detail)
             .accessibilityLabel(detail)
     }
@@ -206,11 +208,14 @@ enum CamLidPillTone: Equatable {
 
 private struct CamLidPillSurface: ViewModifier {
     let tone: CamLidPillTone
+    @Environment(\.colorSchemeContrast) private var contrast
 
     func body(content: Content) -> some View {
         content
             .background(tone.fill, in: Capsule())
-            .overlay(Capsule().strokeBorder(tone.stroke, lineWidth: tone.strokeWidth))
+            // Increase Contrast: the hairline outline becomes a clear one.
+            .overlay(Capsule().strokeBorder(contrast == .increased ? Color.primary.opacity(tone == .selected ? 0.9 : 0.55) : tone.stroke,
+                                            lineWidth: contrast == .increased ? max(tone.strokeWidth, 1.5) : tone.strokeWidth))
             .contentShape(Capsule())
     }
 }

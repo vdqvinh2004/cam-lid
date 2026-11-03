@@ -218,6 +218,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         host.sizingOptions = []
         let window = NSWindow(contentViewController: host)
         window.isReleasedWhenClosed = false; window.title = "Settings"
+        window.contentMinSize = NSSize(width: 500, height: 240)   // SettingsView lays out from 500 pt
         window.setContentSize(NSSize(width: 580, height: editor.section.preferredHeight)); window.center()
         settingsWindow = window
         closeGuard = SettingsCloseGuard(editor: editor,
@@ -250,7 +251,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
             onDeleteAll: { [weak self] in self?.send(.deleteHistory(nil)) }, onDeleteResult: { _ in })
         let height = ActivityLogView.preferredHeight(recordCount: activity.records.count, hasError: activity.error != nil)
         let needsInitialSize = activityWindow == nil || !historyInitiallySized
-        present(view, title: "Activity", window: &activityWindow, width: 640, height: height, show: show)
+        present(view, title: "Activity", window: &activityWindow, width: 640, height: height, minWidth: 560, show: show)
         if needsInitialSize, !activity.isLoading, let activityWindow {
             activityWindow.setContentSize(NSSize(width: 640, height: height))
             historyInitiallySized = true
@@ -278,7 +279,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
             if completed { self.onboardingWindow?.close() }
             return completed
         }, onCancel: { [weak self] in self?.send(.cancelOnboarding); self?.onboardingWindow?.close() })
-        present(view, title: "Welcome to CamLid", window: &onboardingWindow, width: 520, height: OnboardingPage.welcome.preferredHeight, show: show)
+        present(view, title: "Welcome to CamLid", window: &onboardingWindow, width: 520, height: OnboardingPage.welcome.preferredHeight, minWidth: 440, show: show)
     }
     private func completeOnboarding() async -> Bool {
         guard onboardingRequest == nil else { return false }
@@ -308,13 +309,13 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         }
     }
     private func showSleepDiagnostics() {
-        present(SleepDiagnosticsView(read: { [weak self] in await self?.readDiagnostics() ?? DiagnosticSnapshot(errors: ["appUnavailable"]) }), title: "Why Is My Mac Awake?", window: &sleepDiagnosticsWindow, width: 600, height: 420)
+        present(SleepDiagnosticsView(read: { [weak self] in await self?.readDiagnostics() ?? DiagnosticSnapshot(errors: ["appUnavailable"]) }), title: "Why Is My Mac Awake?", window: &sleepDiagnosticsWindow, width: 600, height: 420, minWidth: 520)
     }
     private func showUpdates(show: Bool = true) {
         guard let state else { return }
         let view = UpdatesView(snapshot: state.updates, canCheck: state.canCheckUpdates,
                               onCheck: { [weak self] in self?.send(.checkUpdates) })
-        present(view, title: "Updates", window: &updatesWindow, width: 460, height: view.preferredHeight, show: show)
+        present(view, title: "Updates", window: &updatesWindow, width: 460, height: view.preferredHeight, minWidth: 360, show: show)
     }
     /// Opens a window in front of every other app's windows, also when it was already open behind them.
     static func bringToFront(_ window: NSWindow) {
@@ -322,7 +323,10 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
     }
-    private func present<Content: View>(_ view: Content, title: String, window: inout NSWindow?, width: CGFloat, height: CGFloat, show: Bool = true) {
+    /// `minWidth` is the narrowest the content lays out in; a window must not be dragged (or scripted) below it, or the
+    /// content clips at the left edge.
+    private func present<Content: View>(_ view: Content, title: String, window: inout NSWindow?, width: CGFloat, height: CGFloat,
+                                        minWidth: CGFloat, show: Bool = true) {
         if let existing = window {
             if let host = existing.contentViewController as? NSHostingController<Content> { host.rootView = view }
             if show { Self.bringToFront(existing) }; return
@@ -332,6 +336,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         host.sizingOptions = []
         let created = NSWindow(contentViewController: host)
         created.isReleasedWhenClosed = false; created.title = title; created.delegate = self
+        created.contentMinSize = NSSize(width: minWidth, height: 200)
         created.setContentSize(NSSize(width: width, height: height)); created.center(); window = created
         Self.bringToFront(created)
     }

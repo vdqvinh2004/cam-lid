@@ -10,7 +10,7 @@ public enum OnboardingPage: Int, Sendable, CaseIterable {
         }
     }
     var preferredHeight: CGFloat {
-        424 // Keep the agent list and its note visible above the pinned footer.
+        372 // One height for every page (no jump); step 1 is the tallest static page, the agent list scrolls.
     }
 }
 
@@ -95,6 +95,22 @@ public struct OnboardingView: View {
     }
 }
 
+private struct OnboardingModeRow: View {
+    let symbol: String
+    let title: String
+    let text: String
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: symbol).frame(width: 22).foregroundStyle(Color.accentColor).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.callout.weight(.semibold))
+                Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct OnboardingContent: View {
     let page: OnboardingPage
     let agents: [AgentBadgeState]
@@ -107,6 +123,12 @@ private struct OnboardingContent: View {
             switch page {
             case .welcome:
                 Text("Follow your local coding agents from the menu bar.")
+                VStack(alignment: .leading, spacing: 10) {
+                    OnboardingModeRow(symbol: "arrow.triangle.2.circlepath", title: "Auto",
+                                      text: "Keeps the Mac awake while your agents work, then lets it sleep.")
+                    OnboardingModeRow(symbol: "timer", title: "Timed",
+                                      text: "Keeps it awake for a time you choose, or until you stop it.")
+                }
                 CamLidNoticeCard(
                     tone: .info, systemImage: "info.circle", title: "Closed lid",
                     message: "Keeping the Mac awake with the lid closed needs the CamLid helper, and works on tested Macs or on this Mac after you allow it in Settings › Closed Lid. Until then you can explore sessions, agents and safety limits."
