@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the closed-lid helper, embeds it in the app bundle and signs app and helper ad hoc with distinct
+# Builds the closed-lid helper and the camlid command-line tool, embeds both in the app bundle and signs app and helper ad hoc with distinct
 # identities. Hardened runtime is required: the helper identity check rejects a signature without it. The installer pins each CDHash, so the two must differ. Local development signing only.
 set -eu
 APP="${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}"
@@ -8,10 +8,18 @@ CONFIG=release
 [ "${CONFIGURATION:-Debug}" = "Debug" ] && CONFIG=debug
 env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "${SRCROOT}/Packages/CamLidPowerHelper" \
   --product camlid-power-helper --scratch-path "$SCRATCH"
+CLI_SCRATCH="${DERIVED_FILE_DIR}/cli-build"
+env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "${SRCROOT}/Packages/CamLidCore" \
+  --product camlid --scratch-path "$CLI_SCRATCH"
 DEST="${APP}/Contents/Library/LaunchServices"
 mkdir -p "$DEST"
 cp "$SCRATCH/$CONFIG/camlid-power-helper" "$DEST/camlid-power-helper"
 codesign --force --sign - --options runtime --identifier com.camlid.power-helper "$DEST/camlid-power-helper"
+# The command-line tool ships inside the app, sealed by the app's signature. Not in Contents/MacOS: the filesystem is
+# case-insensitive, so `camlid` there would overwrite the app's own `CamLid` executable.
+mkdir -p "${APP}/Contents/Helpers"
+cp "$CLI_SCRATCH/$CONFIG/camlid" "${APP}/Contents/Helpers/camlid"
+codesign --force --sign - --options runtime --identifier com.camlid.cli "${APP}/Contents/Helpers/camlid"
 # Only a Debug build needs the library-validation exception (Xcode's debug dylib carries another ad-hoc signature);
 # a Release app has no nested code, so it is signed with no entitlements at all.
 if [ "${CONFIGURATION:-Debug}" = "Debug" ]; then

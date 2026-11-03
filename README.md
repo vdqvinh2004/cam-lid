@@ -92,7 +92,9 @@ the sleep setting first), click **Remove helper…** or run `sudo camlid helper 
 
 ## Command line
 
-The `camlid` tool talks to the running app over a same-user local socket.
+The `camlid` tool talks to the running app over a same-user local socket. It ships inside the app; put it on your
+PATH with `sudo ln -s /Applications/CamLid.app/Contents/Helpers/camlid /usr/local/bin/camlid` (the quarantine flag must
+be cleared first, see Download).
 
 ```sh
 camlid status --json            # state, agents, health, helper lease
@@ -133,5 +135,5 @@ account, cookies or system profile).
 - Qualified on one Mac model and macOS build; other combinations are untested.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
 - Unsigned: macOS asks you to approve the first launch, and the app cannot update itself.
-- Apple silicon only; the `camlid` command-line tool is not in the release zip yet (build it from source).
+- Apple silicon only.
 - No fan or charging control.

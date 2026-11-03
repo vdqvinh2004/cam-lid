@@ -35,6 +35,9 @@ verify() {
   [ -z "$(codesign -d --entitlements - "$1" 2>/dev/null | grep -i 'key' || true)" ] || fail "the app carries entitlements"
   [ ! -d "$1/Contents/Frameworks" ] || fail "unexpected nested frameworks"
   [ -x "$1/Contents/Library/LaunchServices/camlid-power-helper" ] || fail "helper missing"
+  [ -x "$1/Contents/Helpers/camlid" ] || fail "command-line tool missing"
+  [ "$(lipo -archs "$1/Contents/Helpers/camlid")" = "arm64" ] || fail "command-line tool is not arm64 only"
+  codesign -dvvv "$1/Contents/Helpers/camlid" 2>&1 | grep -q 'Identifier=com.camlid.cli' || fail "command-line tool identifier"
   [ "$(lipo -archs "$1/Contents/MacOS/CamLid")" = "arm64" ] || fail "not arm64 only"
   [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$1/Contents/Info.plist")" = "$VERSION" ] || fail "bundle version"
   [ "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$1/Contents/Info.plist")" = "14.0" ] || fail "minimum macOS"
@@ -82,8 +85,13 @@ You can always build it yourself instead: see the README.
 ### Remove
 *Settings › Closed Lid › Remove helper…* restores the sleep setting and removes the helper, then delete the app.
 
-Built from commit \`$COMMIT\`. Requires macOS 14 or later, Apple silicon. The \`camlid\` command-line tool is not in
-the zip yet: build it from source.
+### Command line (optional)
+The \`camlid\` tool is inside the app. Put it on your PATH with
+\`sudo ln -s /Applications/CamLid.app/Contents/Helpers/camlid /usr/local/bin/camlid\`. It needs the quarantine flag
+cleared (the \`xattr\` command above) to run from Terminal. \`camlid status\`, \`start\`, \`stop\`, \`config\` talk to
+the running app; \`sudo camlid helper install|uninstall|status\` manage the helper.
+
+Built from commit \`$COMMIT\`. Requires macOS 14 or later, Apple silicon.
 NOTES
 
 echo

@@ -236,4 +236,17 @@ private struct Rig {
         let bootouts = rig.runner.calls.filter { $0.hasPrefix("/bin/launchctl bootout") }
         #expect(bootouts == ["/bin/launchctl bootout system/\(HelperInstallPaths.helperLabel)"])
     }
+
+    /// The release ships `camlid` inside the app, so `camlid helper install` acts on that app without `--app`.
+    @Test func aToolInsideAnAppBundleActsOnThatBundle() {
+        #expect(HelperInstaller.appBundle(containingExecutable: "/Applications/CamLid.app/Contents/Helpers/camlid")?.path
+                == "/Applications/CamLid.app")
+        #expect(HelperInstaller.appBundle(containingExecutable: "/Users/x/Downloads/CamLid.app/Contents/Helpers/camlid")?.path
+                == "/Users/x/Downloads/CamLid.app")
+        for outside in ["/usr/local/bin/camlid", "/Applications/CamLid.app/Contents/MacOS/camlid",
+                        "/Users/x/build/.build/debug/camlid", "camlid", ""] {
+            #expect(HelperInstaller.appBundle(containingExecutable: outside) == nil, "\(outside)")
+        }
+        #expect(HelperInstaller.appBundle(containingExecutable: nil) == nil)
+    }
 }

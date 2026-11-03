@@ -42,5 +42,6 @@ release:
   pinning model.
 
 ## Not decided here
-Intel Macs (the support rows are Apple silicon), a Homebrew cask, shipping the `camlid` command-line tool in the zip,
-and CI builds (a GitHub runner with Xcode 27 is needed first).
+Intel Macs (the support rows are Apple silicon), a Homebrew cask, and CI builds (a GitHub runner with Xcode 27 is
+needed first). The `camlid` command-line tool ships inside the app bundle (Contents/Helpers/camlid), sealed by the
+app's signature.

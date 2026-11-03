@@ -62,7 +62,19 @@ public struct HelperOperationResult: Equatable, Sendable {
 /// Installs, removes and re-pins the Standard-mode LaunchDaemons. It needs administrator rights, accepts
 /// no arbitrary command or path from a caller beyond the two bundle locations, and rolls back on failure.
 public struct HelperInstaller: Sendable {
-    public static let defaultAppBundle = URL(fileURLWithPath: "/Applications/CamLid.app")
+    /// The app a command acts on when `--app` is not given: the bundle this tool is shipped inside (the release puts
+    /// `camlid` in `CamLid.app/Contents/Helpers`), otherwise `/Applications/CamLid.app`.
+    public static var defaultAppBundle: URL {
+        appBundle(containingExecutable: CommandLine.arguments.first.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path })
+            ?? URL(fileURLWithPath: "/Applications/CamLid.app")
+    }
+    public static func appBundle(containingExecutable path: String?) -> URL? {
+        guard let path else { return nil }
+        let parts = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
+        guard parts.count > 4, parts[parts.count - 2] == "Helpers", parts[parts.count - 3] == "Contents",
+              parts[parts.count - 4].hasSuffix(".app") else { return nil }
+        return URL(fileURLWithPath: parts.dropLast(3).joined(separator: "/").replacingOccurrences(of: "//", with: "/"))
+    }
     public static let bundledHelperPath = "Contents/Library/LaunchServices/camlid-power-helper"
 
     private let paths: HelperInstallPaths
