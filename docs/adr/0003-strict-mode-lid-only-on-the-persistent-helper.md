@@ -78,7 +78,35 @@ observation unless the spec makes it a gate.
 
 ## Amendment (2026-11-01): battery sessions
 Owner decision: decision 6 no longer requires AC power for either mode. When the user allows battery sessions
-(Settings › Safety: "Require charger" off, "Allow battery sessions" on), the app names the battery stop level in the
+(Settings › Closed Lid: "Allow on battery"; Settings was reorganised on 2026-11-01 and the two switches became one), the app names the battery stop level in the
 acquire request and the helper holds on battery while the battery stays at or above it (10–50%), stopping by itself
 below it. Without that request the helper still requires the charger. The app keeps the battery entry level and the
-battery session limit. Physical trials on battery are still needed for both modes.
+battery session limit.
+
+## Outcome (2026-11-03): attended trials of the implementation
+Strict was implemented per [spec 016](../../specs/016-strict-lid-only/spec.md) and tried on Mac17,3 / macOS 26A434
+(trials S1–S4, owner attended; details and timestamps in the spec's tasks). The decisions above stand; nothing in the
+results called for changing them.
+
+| Trial | Result |
+|---|---|
+| S1 Auto with Claude Code, lid closed, on battery (48%) | Held with the lid closed, `SleepDisabled` 0 throughout, released after "Sleep when done", the kernel slept the Mac 5 s later (`Clamshell Sleep`). |
+| S2 app killed (SIGKILL) with the lid closed | Helper saw the disconnect and cleared the bit within 1 s; the Mac slept 5 s later. |
+| S3 helper killed (SIGKILL) with the lid closed, on battery (78%) | launchd restarted the helper within about 1 s; it cleared the bit as `helperRestart`; the Mac slept 5 s later. |
+| S4 restart during a session, on battery | The dying helper could not clear the bit (IOKit was going away) and ended `recoveryRequired`; the restart cleared the kernel bit anyway and the new helper acknowledged the previous boot's record as restored. Nothing to clear by hand. |
+
+Consequences confirmed or revised by the trials:
+- **Recovery without read-back works as designed.** Every ending, clean or not, ended with the Mac asleep through the
+  kernel's own clamshell path, and the helper never needed its own sleep request for Strict.
+- **Shutdown is the one place a Strict restore fails.** The restore returns `backend` while IOKit shuts down. It is
+  harmless because the bit lives in kernel memory and a restart clears it; it is the reason a record from another
+  boot is acknowledged without a write.
+- **The recovery job's Strict branch was not exercised.** In S3 launchd brought the helper back before the job's
+  15 s interval, so the helper's own restart did the clearing. That branch is covered by unit tests only.
+- **Battery:** Strict on battery passed in S1, S3 and S4. Standard on battery with the lid closed, and a session ending
+  at the battery stop level, were not tried.
+- **E5 (powerd interference) is still not run** and remains a post-release observation. No trial saw powerd clear the
+  bit during a hold (the longest was about 4.5 minutes with the lid closed).
+- **Support row:** Mac17,3 / 26A434 stays the only Strict row; it now rests on E1–E4, E6 and S1–S4.
+- Trials also found two defects outside the mechanism, both fixed: a single CPU burst made an idle agent read as
+  working (spec 015), and a plugin's headless `claude` process was counted as an agent.

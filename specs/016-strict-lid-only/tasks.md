@@ -1,6 +1,6 @@
 # Tasks: Strict mode, lid-only
 
-**Feature context:** `016-strict-lid-only` · **Status:** 13/16 checked (T306 partly). Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `016-strict-lid-only` · **Status:** 14/16 checked (T306 partly; T305 optional). Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decision
 - [x] T001 ADR 0003 accepted; ADR 0001 amended. — `85bae08`.
@@ -26,4 +26,4 @@
 - [ ] T305 E5 observation (optional): display plug/unplug and a 15-minute hold; record whether powerd clears the bit.
 
 ## Phase 4 — Close
-- [ ] T401 Record results, update ADR 0003 consequences if trials change them, update spec 014 cross-references.
+- [x] T401 Record results, update ADR 0003 consequences if trials change them, update spec 014 cross-references. — Results are in each task above and in the ADR 0003 "Outcome" section; no decision changed. Open: T305 (E5, optional) and T306 (Standard on battery).
