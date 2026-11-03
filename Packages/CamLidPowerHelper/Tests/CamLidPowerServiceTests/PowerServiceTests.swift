@@ -305,6 +305,22 @@ final class Fixture {
         #expect(f.backend.writes == [true, false])
     }
 
+    /// S3 Standard (2026-11-03): the helper was killed under a session with the lid closed; its replacement restored
+    /// the setting but did not sleep the Mac, which stayed awake in the bag. After a boot there is nothing to sleep.
+    @Test(arguments: [("boot-a", 1), ("boot-b", 0)])
+    func aRestartedHelperSleepsAClosedMacOnlyInTheSameBoot(_ boot: String, _ sleeps: Int) {
+        let f = Fixture()
+        #expect(f.acquire().accepted)
+        f.safety = HelperSafety(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501,
+                                lidClosed: true, externalDisplays: 0)
+        var requested = 0
+        let replacement = f.makeService(bootID: boot)
+        replacement.sleepSystem = { requested += 1 }
+        replacement.start()
+        #expect(replacement.state == "restored" && f.backend.disabled == false)
+        #expect(requested == sleeps)
+    }
+
     @Test func otherBootRestoresAcknowledgedOverrideForPersistentGlobalPolicy() {
         let f = Fixture()
         #expect(f.acquire().accepted)

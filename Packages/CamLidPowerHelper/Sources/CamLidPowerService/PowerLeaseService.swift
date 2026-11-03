@@ -157,7 +157,9 @@ public final class PowerLeaseService {
                     case .unreadable:
                         try restore(reason: "foreignPolicyUnreadable")
                     case .clear:
-                        try restore(reason: "helperRestart")
+                        // Same boot: the helper was killed or crashed under a session, so a closed lid still needs the
+                        // Mac put to sleep (S3 Standard, 2026-11-03: it stayed awake). After a boot there is nothing to sleep.
+                        try restore(reason: record.bootID == bootID ? "helperRestart" : "helperRestartAfterBoot")
                     }
                 } else {
                     reason = "uncertainPreviousMutation"
@@ -514,7 +516,7 @@ public final class PowerLeaseService {
     }
 
     /// Not after shutdown, boot recovery, another app's override, or a sleep/wake the system is already doing.
-    private static let reasonsWithoutSleep: Set<String> = ["helperStopping", "helperRestart", "foreignGlobalSleepDisabled",
+    private static let reasonsWithoutSleep: Set<String> = ["helperStopping", "helperRestartAfterBoot", "foreignGlobalSleepDisabled",
                                                             "foreignPolicyUnreadable", "sleepObserved", "wakeObserved"]
 
     private func sleepIfLidClosed(after stopReason: String) {
