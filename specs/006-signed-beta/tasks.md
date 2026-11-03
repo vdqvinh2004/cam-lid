@@ -16,13 +16,13 @@ Shared constitution, product requirements and limitation register apply; depende
 
 **Independent Test**: Current/available/offline/error states; active protection defers update installation.
 
-- [ ] T001 [US1] Implement update status and safe deferral via Sparkle in Packages/CamLidCore/Sources/CamLidApp/UpdateController.swift; pin dependency in CamLid.xcodeproj/project.pbxproj (FR-019).
+- [~] T001 [US1] Implement update status and safe deferral via Sparkle in Packages/CamLidCore/Sources/CamLidApp/UpdateController.swift; pin dependency in CamLid.xcodeproj/project.pbxproj (FR-019). — **2026-11-03 cleanup:** Superseded by [ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md): Sparkle was removed; Check for Updates asks the GitHub releases API when clicked.
 
 ## Phase 4: User Story 2 — Install and remove safely
 
 **Independent Test**: Fresh signed/notarized install, denial, migration, helper mismatch, OS build change, tampered update rejection and uninstall cleanup verified.
 
-- [ ] T002 [US2] Configure signed/notarized beta and optional helper install/remove/migration; document tampered update rejection and fresh install/denial/upgrade/uninstall in docs/qa/packaging-report.md (FR-013, FR-019).
+- [~] T002 [US2] Configure signed/notarized beta and optional helper install/remove/migration; document tampered update rejection and fresh install/denial/upgrade/uninstall in docs/qa/packaging-report.md (FR-013, FR-019). — **2026-11-03 cleanup:** Superseded by ADR 0004: ad-hoc signed GitHub releases, no Developer ID or notarization; the helper installs and removes from Settings.
 
 ## Dependencies & Execution Order
 

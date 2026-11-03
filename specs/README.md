@@ -4,17 +4,24 @@ One scoped Spec Kit feature folder per milestone; requested project convention. 
 feature folders and one selected feature context; it does not itself require milestones as folders.
 [Shared roadmap](../docs/planning/roadmap.md) defines cross-feature gates and detailed procedures.
 
+
+> **2026-11-03 reconciliation.** The milestone folders 002-011 were written before the design changed (observer-only
+> agents, one persistent helper, GitHub releases). Their task lists now mark tasks `[x]` when evidence exists, `[~]`
+> when [ADR 0002](../docs/adr/0002-observer-only-agent-activity.md), [0003](../docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md)
+> or [0004](../docs/adr/0004-distribution-through-github-releases.md) replaced them (the reason is on the line), and
+> leave `[ ]` only for work that is still valid. Current work is specs 014, 015 and 016.
+
 - [M0: Project Planning](001-project-planning/spec.md) — Complete: documentation only.
-- [M1: Power and Detection Feasibility](002-power-feasibility/spec.md) — Blocked; historical R0 accepted, but G2 qualification and support rows remain unpassed. **Review 2026-10-31:** Standard backend qualified on one Mac by the 014 G2 trial; only T002 (agent lifecycle, now an M3 concern) remains.
-- [M2: Native Foundation and Safety](003-native-foundation/spec.md) — Preview components implemented; live backend gate awaits M1. **Review 2026-10-31:** helper backend, lease, journal and recovery done through spec 014; open: T009 qualification, T014, T019 storage faults, T022 (Quit, manual Sleep, external assertions), T023 `camlid start`, T024 recovery CLI.
-- [M3: Agents and Orca Integration](004-agent-integration/spec.md) — Third-person external observation; source accuracy/freshness/coverage qualification open. Legacy hook/bridge/wrapper ingress is disabled, not a product prerequisite.
-- [M4: Native UX and Activity History](005-native-ux/spec.md) — Hosted preview/history implemented; native walkthrough/integration workflow pending.
-- [M4a: Apple HIG UI/UX Refinement](009-apple-hig-ux/spec.md) — Preview refinement implemented; complete native acceptance remains open before M5/M6 approval.
-- [M4b: QA-driven UX and truthful telemetry](010-qa-ux-sensors/spec.md) — Preview increments implemented; 54-task backlog, latest [diagnostics QA](../docs/qa/sleep-diagnostics-2026-10-08.md); native/physical/full-quality gates remain open.
+- [M1: Power and Detection Feasibility](002-power-feasibility/spec.md) — **Closed for this design:** the backend question was answered by the persistent helper (014) and Strict (016), qualified on one Mac by attended trials.
+- [M2: Native Foundation and Safety](003-native-foundation/spec.md) — **Implemented:** helper, lease, journal, recovery and telemetry run and were tried on hardware (014, 016). Open: integrated flood tests (T014).
+- [M3: Agents and Orca Integration](004-agent-integration/spec.md) — **Closed:** agents are observed from outside only ([ADR 0002](../docs/adr/0002-observer-only-agent-activity.md)); Orca by its CLI, terminal agents by CPU activity (015).
+- [M4: Native UX and Activity History](005-native-ux/spec.md) — **Implemented:** menu bar, Dashboard, three Settings panes, Activity. Open: a walkthrough of the notch and left/right placements (T006).
+- [M4a: Apple HIG UI/UX Refinement](009-apple-hig-ux/spec.md) — Mostly closed by direct inspection (2026-11); open: keyboard and VoiceOver walkthrough (T011).
+- [M4b: QA-driven UX and truthful telemetry](010-qa-ux-sensors/spec.md) — Mostly closed; 9 tasks remain open (dismissal timing matrix, sensor and contrast matrices, performance measurement).
 - [M5: Signed Beta and Updates](006-signed-beta/spec.md) — **Superseded** by [ADR 0004](../docs/adr/0004-distribution-through-github-releases.md): GitHub releases, ad-hoc signed, no notarization, no Sparkle.
-- [M6: AI Quality Gate](007-ai-quality-gate/spec.md) — Preview QA in progress; full gate not passed.
-- [M7: Supervised Real User Testing](008-user-testing/spec.md) — Planned; blocked on M6 PASS.
-- [M8: Awake Automation & Diagnostics](011-awake-automation/spec.md) — Partial implementation: 33/43 tasks checked (not gate acceptance); shared diagnostics, alert/login adapters and Preview guards, [LidRun gap comparison](011-awake-automation/lidrun-comparison.md); live extensions consume qualified M1/M2 backend.
+- [M6: AI Quality Gate](007-ai-quality-gate/spec.md) — **Superseded** by owner-attended trials and a public pre-release ([ADR 0004](../docs/adr/0004-distribution-through-github-releases.md)).
+- [M7: Supervised Real User Testing](008-user-testing/spec.md) — **Superseded:** early adopters report through the "Qualify my Mac" issue template.
+- [M8: Awake Automation & Diagnostics](011-awake-automation/spec.md) — Diagnostics ("Why is my Mac awake?"), notifications and login adapters done; the wrapper and display-sleep parts are not planned; open: the `camlid sleep` command with revalidated admission (T030, T031).
 
 Experimental feature spec (not a milestone; no gate change):
 

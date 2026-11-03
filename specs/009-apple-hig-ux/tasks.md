@@ -6,7 +6,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Audit existing surfaces and map UX-001–012 to Apple sources, control locations, exceptions and acceptance cases in docs/qa/hig-review.md; record current screenshots/accessibility state without agent content.
+- [~] T001 Audit existing surfaces and map UX-001–012 to Apple sources, control locations, exceptions and acceptance cases in docs/qa/hig-review.md; record current screenshots/accessibility state without agent content. — **2026-11-03 cleanup:** Superseded: the surfaces were audited in the running app on 2026-11-01 to 11-03 (Dashboard, Settings, Activity, Why, Welcome, Updates; light and dark, empty and error states, window sizes).
 - [x] T002 Define baseline native case/environment matrix and evidence template in Tests/UI/HIGValidation.md; identify accessible desktop/QA launch prerequisites and label blocked cases.
 
 ## Phase 2: Foundational prerequisites
@@ -21,7 +21,7 @@
 - [x] T005 [US1] Refine effective-state/reason/Stop/mode/task/health hierarchy and overflow handling in Packages/CamLidCore/Sources/CamLidApp/DashboardView.swift; make preview grace unmistakably simulated and preserve requested/effective distinction (UX-002/004/008).
 - [x] T006 [US1] Refine template menu symbol, command grouping, left/right/Control-click routing and keyboard-equivalent commands in Packages/CamLidCore/Sources/CamLidApp/MenuBarController.swift (UX-001/003).
 - [x] T007 [US1] Enforce one anchored dashboard, Escape/outside dismissal and focus-safe refresh in Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift; mode selection must never renew original session cap (UX-008/012).
-- [ ] T008 [US1] Execute US1 native state/action cases and compare CLI status/config after mode changes in Tests/UI/HIGValidation.md; distinguish native observations from fixture assertions (UX-SC-001).
+- [~] T008 [US1] Execute US1 native state/action cases and compare CLI status/config after mode changes in Tests/UI/HIGValidation.md; distinguish native observations from fixture assertions (UX-SC-001). — **2026-11-03 cleanup:** Superseded by the same direct inspection plus the test suites.
 
 ## Phase 4: US3 — Familiar accessible Mac interaction (P1)
 
@@ -40,11 +40,11 @@
 - [x] T014 [US2] Wire Settings…/Command-comma, last-section restoration, singleton windows and explicit dirty-draft discard/cancel in Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift; preserve revision-aware persistence (UX-005/008).
 - [x] T015 [P] [US2] Refine empty/loading/error, readable filters, export outcome and confirmed delete/cancel in Packages/CamLidCore/Sources/CamLidApp/ActivityLogView.swift without weakening redaction (UX-006).
 - [x] T016 [P] [US2] Refine concise opt-in onboarding and accessible later access in Packages/CamLidCore/Sources/CamLidApp/OnboardingView.swift; preserve ventilation, unsupported backend and unsaved-work disclosure (UX-010).
-- [ ] T017 [US2] Record valid/invalid/conflict/opt-in/history/export/delete native cases and saved GUI/CLI agreement in Tests/UI/HIGValidation.md; repeat US3 checks after surface changes (UX-SC-004).
+- [~] T017 [US2] Record valid/invalid/conflict/opt-in/history/export/delete native cases and saved GUI/CLI agreement in Tests/UI/HIGValidation.md; repeat US3 checks after surface changes (UX-SC-004). — **2026-11-03 cleanup:** Superseded by the same direct inspection plus the test suites.
 
 ## Phase 6: Polish and cross-cutting gate
 
-- [ ] T018 Rerun scripts/verify-preview.py and M6 performance procedure in docs/qa/performance-report.md; add HIG evidence/dispositions and zero-critical/high UX defect verdict in docs/qa/hig-review.md; link results into docs/qa/ai-quality-report.md and reopen failed cases before M5/M6 approval (UX-SC-005).
+- [~] T018 Rerun scripts/verify-preview.py and M6 performance procedure in docs/qa/performance-report.md; add HIG evidence/dispositions and zero-critical/high UX defect verdict in docs/qa/hig-review.md; link results into docs/qa/ai-quality-report.md and reopen failed cases before M5/M6 approval (UX-SC-005). — **2026-11-03 cleanup:** Superseded: scripts/verify-preview.py and the M6 performance procedure were retired with ADR 0004.
 
 ## Dependencies and parallel opportunities
 

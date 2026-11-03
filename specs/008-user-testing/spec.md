@@ -2,7 +2,7 @@
 
 **Feature Branch**: None; numbered folder is feature identity, not Git branch.
 **Created**: 2026-10-04
-**Status**: Planned; blocked on M6 PASS
+**Status**: Superseded 2026-11-03: user testing happens through GitHub issues on the pre-release ([ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md)). History below is kept.
 **Input**: CamLid milestone M7: Anonymized trial protocol, participants including Orca workflow, findings and release recommendation. One scoped feature folder per user instruction.
 **Prerequisites**: M6. [Roadmap](../../docs/planning/roadmap.md).
 **Scope**: Anonymized trial protocol, participants including Orca workflow, findings and release recommendation.

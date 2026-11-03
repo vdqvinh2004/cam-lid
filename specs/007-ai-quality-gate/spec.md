@@ -2,7 +2,7 @@
 
 **Feature Branch**: None; numbered folder is feature identity, not Git branch.
 **Created**: 2026-10-04
-**Status**: Planned; required before user trials
+**Status**: Superseded 2026-11-03: the M6 gate sequence was replaced by owner-attended trials (specs 014 and 016) and a public pre-release ([ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md)). History below is kept.
 **Input**: CamLid milestone M6: Integrated contract parity, performance, complete limitation audit, native UI and physical regression evidence. One scoped feature folder per user instruction.
 **Prerequisites**: M2, M3, M4, M5. [Roadmap](../../docs/planning/roadmap.md).
 **Scope**: Integrated contract parity, performance, complete limitation audit, native UI and physical regression evidence.

@@ -46,8 +46,8 @@ Independent test: fresh typed lid and qualified named temperature; unsupported e
 
 - [X] T019 [US3] Add missing/type/stale/per-source age/null/desktop/wake lid regressions in Packages/CamLidCore/Tests/CamLidAppTests/LidStateReaderTests.swift (FR-010–011).
 - [X] T020 [P] [US3] Complete read-only numerical-temperature candidate/reference/security/licensing feasibility in docs/qa/sensor-support-matrix.md; record manifest and source-resolution/max(2°C,resolution) reference tolerance or unsupported verdict (FR-009).
-- [ ] T021 [US3] Implement bounded read-only Boolean IOPMrootDomain lid candidate in Packages/CamLidCore/Sources/CamLidApp/LidStateReader.swift and LiveSensors.swift; fresh≤5 s, awake observation≤2 s, unknown fallback, no leaks (FR-010).
-- [ ] T022 [US3] Integrate only qualified read-only temperature source in Packages/CamLidCore/Sources/CamLidApp/TemperatureReader.swift with decode/error tests;2 s sampling, stale>10 s,200 ms read budget off main thread; unsupported paths remain explicit (FR-009).
+- [x] T021 [US3] Implement bounded read-only Boolean IOPMrootDomain lid candidate in Packages/CamLidCore/Sources/CamLidApp/LidStateReader.swift and LiveSensors.swift; fresh≤5 s, awake observation≤2 s, unknown fallback, no leaks (FR-010). — **2026-11-03 cleanup:** Done: LidStateReader reads IOPMrootDomain read-only and bounded.
+- [x] T022 [US3] Integrate only qualified read-only temperature source in Packages/CamLidCore/Sources/CamLidApp/TemperatureReader.swift with decode/error tests;2 s sampling, stale>10 s,200 ms read budget off main thread; unsupported paths remain explicit (FR-009). — **2026-11-03 cleanup:** Done: TemperatureReader supplies the CPU die reading shown in the Dashboard.
 - [X] T023 [US3] Extend SensorReadings/HealthSnapshot per-source availability/freshness in Packages/CamLidCore/Sources/CamLidCore/HealthMonitor.swift and Models.swift, compatibility tests for absent/null (FR-009–011).
 - [X] T024 [US3] Project named temperature+independent pressure+lid into ActivityStore.swift, DashboardView.swift, AppCoordinator.swift and shared CLI status; bounded availability-transition logs, no raw reason codes (FR-009–011).
 - [X] T025 [US3] Regress critical-pressure cache bypass/safety precedence/deadlines alongside temperature loss in Packages/CamLidCore/Tests/CamLidCoreTests/QAHealthSafetyTests.swift; temperature/CPU never healthy proof (FR-016).
@@ -62,7 +62,7 @@ Independent test: all readiness fixtures refuse real actuation; physical success
 - [X] T029 [US5] Project qualified support row/helper/trust/recovery/conflict blockers through Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift and shared status; do not infer ownership from matching global value (FR-014).
 - [X] T030 [US5] Present blocker-specific protection row/details and explicit intent versus Protected in Packages/CamLidCore/Sources/CamLidApp/SettingsView.swift and DashboardView.swift (FR-014).
 - [X] T031 [US5] Audit existing M1 T003–T008 and M2 live-backend evidence in docs/qa/qa-refinement-report.md; require L01–L20/manual Sleep/independent recovery/support-row verdict before any live integration (FR-015).
-- [ ] T032 [US5] After M1/M2 PASS only, validate integrated capability/arming/continuity/internal-display/restoration/completion-sleep using Tests/Hardware/PowerFeasibility.md and RecoveryFailureMatrix.md; record SC-006 evidence or blocked status, never add alternate power bypass.
+- [x] T032 [US5] After M1/M2 PASS only, validate integrated capability/arming/continuity/internal-display/restoration/completion-sleep using Tests/Hardware/PowerFeasibility.md and RecoveryFailureMatrix.md; record SC-006 evidence or blocked status, never add alternate power bypass. — **2026-11-03 cleanup:** Done by the owner-attended trials: arming, closed-lid continuity, restoration and completion sleep (spec 014 trials 1-9 and trial 8, spec 016 S1-S4).
 
 ## Phase 7: US4 — agent badges (P2)
 
@@ -83,8 +83,8 @@ No final acceptance until mandatory supported-row and release predecessors pass.
 - [ ] T040 Complete light/dark/contrast/transparency/motion/text/scale/notch/long-label20-task/keyboard matrix in Tests/UI/QARefinementValidation.md; unavailable device rows blocked (SC-005).
 - [X] T041 Replay existing40 saved Codex/OpenCode profiles plus Orca parallel fixtures and compare dispositions in docs/qa/agent-compatibility.md; no new paid requests, no full M3 claim (SC-004).
 - [X] T042 Run settled-source canonical scripts/verify-preview.py and packaging regressions; record source hash/report in docs/qa/qa-refinement-report.md; repeat only after changes/failures (FR-017).
-- [ ] T043 Perform independent AI source/spec/contract/evidence review against L01–L20 in docs/qa/ai-quality-report.md; fix and rerun affected checks until zero critical/high; M6 full gate remains separate (SC-005).
-- [ ] T044 After M6 PASS/signing/per-device qualification, run five supervised M7 users and record uncoached≥4/5 refinement-flow success plus zero safety/restoration failures in docs/qa/user-test-report.md (SC-007).
+- [~] T043 Perform independent AI source/spec/contract/evidence review against L01–L20 in docs/qa/ai-quality-report.md; fix and rerun affected checks until zero critical/high; M6 full gate remains separate (SC-005). — **2026-11-03 cleanup:** Superseded: the M6 AI quality gate was replaced by owner-attended trials and a public pre-release (ADR 0004).
+- [~] T044 After M6 PASS/signing/per-device qualification, run five supervised M7 users and record uncoached≥4/5 refinement-flow success plus zero safety/restoration failures in docs/qa/user-test-report.md (SC-007). — **2026-11-03 cleanup:** Superseded: supervised M7 users are replaced by the "Qualify my Mac" issue template and early adopters (ADR 0004).
 - [X] T045 Update specs/010-qa-ux-sensors/tasks.md, docs/planning/roadmap.md and M4a/M5/M6 evidence handoff with final disposition; unsupported temperature/core backend remains open, no retroactive checked gates (FR-017).
 
 ## Dependencies & Execution Order
@@ -167,7 +167,7 @@ T042 remains complete: settled canonical310 Swift (182 Core/42 CLI/86 App),5 pac
 - [X] T050 Add typed metric badges, compact adaptive dashboard, explicit contextual Start/Stop, single capability notice and neutral Off in DashboardView.swift/AppCoordinator.swift; preserve deadlines and background behavior (UX07–12).
 - [X] T051 Correct no-session event-state projection and readable expandable Activity events/filters/export/secondary confirmed deletion in AppCoordinator.swift/ActivityLogView.swift (UX16–18).
 - [X] T052 Run settled canonical verifier, affected regression/build checks and scoped source/contract review; record evidence under docs/qa/preview-evidence/ui-simplicity and ui-simplicity-report.md.
-- [ ] T053 Exercise native updated preview: four panes, badge persistence, metric layout/Details, explicit Start/Stop, native close/reopen, event/filter and outside dismissal; capture exact app surfaces and actual measured height.
+- [~] T053 Exercise native updated preview: four panes, badge persistence, metric layout/Details, explicit Start/Stop, native close/reopen, event/filter and outside dismissal; capture exact app surfaces and actual measured height. — **2026-11-03 cleanup:** Superseded: the UI was reorganised after this task (three Settings panes, new icons, windows); see the 2026-11 inspection.
 - [X] T054 Record UX01-18 disposition, full appearance/VoiceOver/device/performance residuals and task handoff in ui-simplicity-review.md, quickstart.md and docs/qa/ui-simplicity-report.md. Original M1/M5/M6/M7 gates stay open.
 
 Dependency order: T046 → T047 → T048–T051 (shared files sequential) → T052 → T053 → T054. T053 is a bounded preview review, not full T010/T040 or M7 acceptance. Scope-specific follow-up work remains explicitly recorded rather than inferred PASS.

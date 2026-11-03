@@ -17,8 +17,8 @@ Shared constitution, product requirements and limitation register apply; depende
 **Independent Test**: Five consenting users; at least 4/5 identify reason/change mode unaided within 60s; all complete supported-agent/Orca session; faults triaged.
 
 - [x] T001 [US1] Prepare five-user anonymized script, supported per-device checks and emergency Stop/rollback procedure in docs/qa/user-test-plan.md (FR-021, SC-007). Plan draft only; execution awaits M6 PASS.
-- [ ] T002 [US1] Run supervised supported-agent/Orca trials; measure unaided reason/mode comprehension within 60s and end-to-end completion in docs/qa/user-test-report.md (SC-007).
-- [ ] T003 [US1] Triage findings, stop on safety/recovery faults and require relevant M6 regression rerun before wider release; record release recommendation in docs/qa/user-test-report.md (SC-006, SC-007).
+- [~] T002 [US1] Run supervised supported-agent/Orca trials; measure unaided reason/mode comprehension within 60s and end-to-end completion in docs/qa/user-test-report.md (SC-007). — **2026-11-03 cleanup:** Superseded: user testing happens through GitHub issues on the pre-release (ADR 0004).
+- [~] T003 [US1] Triage findings, stop on safety/recovery faults and require relevant M6 regression rerun before wider release; record release recommendation in docs/qa/user-test-report.md (SC-006, SC-007). — **2026-11-03 cleanup:** Superseded (see T002).
 
 ## Dependencies & Execution Order
 

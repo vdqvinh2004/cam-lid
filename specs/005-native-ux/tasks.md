@@ -18,7 +18,7 @@ Shared constitution, product requirements and limitation register apply; depende
 
 - [x] T001 [US1] Implement AppKit left/right routing and keyboard Options/Esc behavior in CamLidApp/MenuBarController.swift (FR-001, FR-018).
 - [x] T002 [US1] Implement compact state/reason/tasks/health/countdowns/Stop panel in CamLidApp/DashboardView.swift following design-system/camlid/MASTER.md; unknown telemetry explicit (FR-002, FR-014).
-- [ ] T003 [US1] Implement single native General/Agents/Safety/Advanced settings in CamLidApp/SettingsView.swift with bounds/errors/integration diff/removal (FR-015).
+- [x] T003 [US1] Implement single native General/Agents/Safety/Advanced settings in CamLidApp/SettingsView.swift with bounds/errors/integration diff/removal (FR-015). — **2026-11-03 cleanup:** Done: Settings has three panes (General, Agents, Closed Lid) with bounds and error handling; integration diff and removal no longer exist (ADR 0002).
 - [x] T004 [US1] Implement opt-in/permissions/ventilation/rollback onboarding in CamLidApp/OnboardingView.swift (FR-021).
 - [x] T005 [US1] Implement status/options accessibility IDs/labels, native focus, dark/light/contrast/reduced-motion support in CamLidApp/Accessibility.swift (FR-018).
 - [ ] T006 [US1] Verify unsupported/stale/grace/safety/recovery/long-label/notch states and left/right/settings with native walkthrough in Tests/UI/MenuBarValidation.md (FR-001, FR-014, FR-018).

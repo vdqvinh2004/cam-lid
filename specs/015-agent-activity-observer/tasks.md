@@ -1,6 +1,6 @@
 # Tasks: Agent Activity Observer
 
-**Feature context:** `015-agent-activity-observer` · **Status:** 10/11 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `015-agent-activity-observer` · **Status:** 11/11 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [x] T001 Record the owner decisions (observer only; Claude Code back) in ADR 0002 and mark the hook/plugin tasks in spec 004 (T003–T005, T007, T011) as closed by that decision. — ADR 0002 written; spec 004 T003, T004, T005, T007, T011 closed by it.
@@ -20,5 +20,5 @@
 - [x] T302 "(estimated)" labels for activity evidence in the Dashboard, Settings, status and history. — Badges append "(estimated)" when only activity evidence backs them; `camlid status` lists tasks with `evidenceKind: activity` and `confidence: inferred`.
 
 ## Phase 4 — Calibration and trial
-- [ ] T401 Calibration script and owner-run timelines for Claude Code, Codex and OpenCode; set constants; record in `calibration.md`. — **Partly done 2026-10-31:** Claude Code (Haiku 5.5) measured by Claude in three runs; `busyCPUFraction` 0.03 and `quietSeconds` 45 confirmed, session-file signal dropped ([calibration.md](calibration.md)). Codex (quota) and OpenCode (no login) not measured; tool-using runs not measured.
+- [x] T401 Calibration script and owner-run timelines for Claude Code, Codex and OpenCode; set constants; record in `calibration.md`. — **Partly done 2026-10-31:** Claude Code (Haiku 5.5) measured by Claude in three runs; `busyCPUFraction` 0.03 and `quietSeconds` 45 confirmed, session-file signal dropped ([calibration.md](calibration.md)). Codex (quota) and OpenCode (no login) not measured; tool-using runs not measured. — **Done 2026-11-01:** Codex and OpenCode were measured too (and Freebuff and Pi idle); see the amendment in [calibration.md](calibration.md). Copilot CLI, Aider, Gemini CLI, Amp and Goose are not installed here and stay unmeasured.
 - [x] T402 Trial 8 of spec 014 (Auto with a real agent, closed lid) using this observer. — Done 2026-10-31 (run 3, Claude Code Haiku 5.5): see [014 g2-trial.md](../014-persistent-helper/g2-trial.md). 014 T706 still needs app kill and helper kill.
