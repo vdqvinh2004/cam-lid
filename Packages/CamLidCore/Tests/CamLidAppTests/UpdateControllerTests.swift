@@ -15,36 +15,13 @@ import Testing
 }
 @MainActor private final class UpdateContextBox { var value = UpdateSafetyContext() }
 
-@Suite("M5 information-only updates") @MainActor
+@Suite("Information-only updates") @MainActor
 struct UpdateControllerTests {
-    private var eligible: UpdateEligibility {
-        UpdateEligibility(feedURL: "https://updates.example.invalid/appcast.xml",
-                          publicKey: Data(repeating: 1, count: 32).base64EncodedString(), developerIDSigned: true)
-    }
-    @Test func missingTrustNeverConstructsDriver() {
-        var constructions = 0
-        let controller = UpdateController(eligibility: .init(feedURL: nil, publicKey: nil, developerIDSigned: false),
-            safety: { UpdateSafetyContext() }, makeDriver: { constructions += 1; return ProbeStub() })
-        controller.check(); controller.refreshSafety()
-        #expect(constructions == 0)
-        #expect(controller.snapshot.phase == .unavailable)
-        #expect(!controller.snapshot.installationAvailable)
-        #expect(!UpdateEligibility.bundle(.main).permitsCheck)
-    }
-    @Test func invalidDistributionConfigurationRejects() {
-        let key = Data(repeating: 1, count: 32).base64EncodedString()
-        for feed in [nil, "http://example.invalid/feed", "https://user:secret@example.invalid/feed", "https://example.invalid/feed#fragment"] {
-            #expect(!UpdateEligibility(feedURL: feed, publicKey: key, developerIDSigned: true).permitsCheck)
-        }
-        for value in [nil, "bad", Data(repeating: 1, count: 31).base64EncodedString()] {
-            #expect(!UpdateEligibility(feedURL: "https://example.invalid/feed", publicKey: value, developerIDSigned: true).permitsCheck)
-        }
-    }
     @Test func blockersDeferOneExplicitRequest() {
         for key in [\UpdateSafetyContext.sessionActive, \.agentWorkActive, \.recoveryRequired, \.unsavedSettings] {
             let box = UpdateContextBox(); box.value[keyPath: key] = true
             let driver = ProbeStub()
-            let controller = UpdateController(eligibility: eligible, safety: { box.value }, makeDriver: { driver })
+            let controller = UpdateController(safety: { box.value }, makeDriver: { driver })
             controller.check(); controller.refreshSafety()
             #expect(controller.snapshot.phase == .deferred)
             #expect(driver.checks == 0)
@@ -57,7 +34,7 @@ struct UpdateControllerTests {
     }
     @Test func activityAppearingDuringCheckDefersResult() {
         let box = UpdateContextBox(); let driver = ProbeStub()
-        let controller = UpdateController(eligibility: eligible, safety: { box.value }, makeDriver: { driver })
+        let controller = UpdateController(safety: { box.value }, makeDriver: { driver })
         controller.check(); box.value.agentWorkActive = true; controller.refreshSafety()
         driver.finish(.available("2.0"))
         #expect(controller.snapshot.phase == .deferred)
@@ -69,7 +46,7 @@ struct UpdateControllerTests {
     }
     @Test func repeatedClicksDoNotQueueChecks() {
         let driver = ProbeStub()
-        let controller = UpdateController(eligibility: eligible, safety: { UpdateSafetyContext() }, makeDriver: { driver })
+        let controller = UpdateController(safety: { UpdateSafetyContext() }, makeDriver: { driver })
         controller.check(); controller.check(); controller.check(); driver.finish(.current); controller.refreshSafety()
         #expect(driver.checks == 1)
     }
@@ -77,7 +54,7 @@ struct UpdateControllerTests {
         for (outcome, phase) in [(UpdateProbeOutcome.current, UpdatePhase.current), (.available("2"), .available),
                                   (.noCompatibleUpdate, .unavailable), (.offline, .offline), (.failed, .error)] {
             let driver = ProbeStub()
-            let controller = UpdateController(eligibility: eligible, safety: { UpdateSafetyContext() }, makeDriver: { driver })
+            let controller = UpdateController(safety: { UpdateSafetyContext() }, makeDriver: { driver })
             controller.check(); driver.finish(outcome)
             #expect(controller.snapshot.phase == phase)
             #expect(!controller.snapshot.installationAvailable)
@@ -87,9 +64,59 @@ struct UpdateControllerTests {
     }
     @Test func failedStartCanBeRetried() {
         let driver = ProbeStub(); driver.failToStart = true
-        let controller = UpdateController(eligibility: eligible, safety: { UpdateSafetyContext() }, makeDriver: { driver })
+        let controller = UpdateController(safety: { UpdateSafetyContext() }, makeDriver: { driver })
         controller.check(); #expect(controller.snapshot.phase == .error)
         driver.failToStart = false; controller.check(); driver.finish(.current)
         #expect(controller.snapshot.phase == .current)
+    }
+
+    @Test func theControllerStartsReadyAndNeverInstalls() {
+        let controller = UpdateController(safety: { UpdateSafetyContext() }, makeDriver: { ProbeStub() })
+        #expect(controller.snapshot.phase == .ready && controller.canCheck && !controller.snapshot.installationAvailable)
+    }
+}
+
+@Suite("GitHub release check") @MainActor
+struct GitHubReleaseCheckTests {
+    private func body(_ releases: [[String: Any]]) -> Data { try! JSONSerialization.data(withJSONObject: releases) }
+    private let current = ReleaseVersion("0.1.0")!
+
+    @Test func versionsCompareNumerically() {
+        #expect(ReleaseVersion("v0.1.0") == ReleaseVersion("0.1"))
+        #expect(ReleaseVersion("0.10.0")! > ReleaseVersion("0.9.9")!)
+        #expect(ReleaseVersion("1.0")! > ReleaseVersion("0.99.99")!)
+        for bad in ["", "v", "1", "1.x", "0.1.0-rc1", "1.2.3.4.5", "1..2", "1.-2", "1.9999999", "latest", "+1.2"] {
+            #expect(ReleaseVersion(bad) == nil, "\(bad)")
+        }
+    }
+
+    @Test func theNewestPublishedReleaseDecidesAndPreReleasesCount() {
+        let newer = body([["tag_name": "v0.2.0", "draft": false, "prerelease": true], ["tag_name": "v0.1.0", "draft": false]])
+        #expect(GitHubReleaseDriver.outcome(status: 200, body: newer, current: current) == .available("0.2.0"))
+        let same = body([["tag_name": "v0.1.0", "draft": false, "prerelease": true]])
+        #expect(GitHubReleaseDriver.outcome(status: 200, body: same, current: current) == .current)
+        let older = body([["tag_name": "v0.0.9", "draft": false]])
+        #expect(GitHubReleaseDriver.outcome(status: 200, body: older, current: current) == .current)
+    }
+
+    @Test func draftsAndUnreadableTagsAreSkipped() {
+        let mixed = body([["tag_name": "v9.0.0", "draft": true], ["tag_name": "nightly"], ["tag_name": "v0.3.0", "draft": false]])
+        #expect(GitHubReleaseDriver.outcome(status: 200, body: mixed, current: current) == .available("0.3.0"))
+        #expect(GitHubReleaseDriver.outcome(status: 200, body: body([["tag_name": "v9.0.0", "draft": true]]), current: current) == .noCompatibleUpdate)
+    }
+
+    @Test func errorsNeverInventAnUpdate() {
+        #expect(GitHubReleaseDriver.outcome(status: 404, body: Data(), current: current) == .noCompatibleUpdate)
+        #expect(GitHubReleaseDriver.outcome(status: 403, body: Data("{}".utf8), current: current) == .failed)   // rate limit
+        #expect(GitHubReleaseDriver.outcome(status: 200, body: Data("not json".utf8), current: current) == .failed)
+        #expect(GitHubReleaseDriver.outcome(status: 200, body: Data(repeating: 0x20, count: 300_000), current: current) == .failed)
+        #expect(GitHubReleaseDriver.isOffline(URLError(.notConnectedToInternet)))
+        #expect(!GitHubReleaseDriver.isOffline(URLError(.badServerResponse)))
+    }
+
+    @Test func theCheckOnlyEverAsksTheProjectsPublicApi() {
+        #expect(GitHubReleaseDriver.releasesAPI.host == "api.github.com" && GitHubReleaseDriver.releasesAPI.scheme == "https")
+        #expect(GitHubReleaseDriver.releasesAPI.path == "/repos/vdqvinh2004/cam-lid/releases")
+        #expect(GitHubReleaseDriver.releasesPage.absoluteString == "https://github.com/vdqvinh2004/cam-lid/releases")
     }
 }

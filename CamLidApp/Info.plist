@@ -19,21 +19,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>CamLid (unreleased development shell)</string>
-	<key>SUFeedURL</key>
-	<string>$(CAMLID_UPDATE_FEED_URL)</string>
-	<key>SUPublicEDKey</key>
-	<string>$(CAMLID_UPDATE_PUBLIC_KEY)</string>
-	<key>CamLidUpdateTeamID</key>
-	<string>$(DEVELOPMENT_TEAM)</string>
-	<key>SUEnableAutomaticChecks</key>
-	<false/>
-	<key>SUAutomaticallyUpdate</key>
-	<false/>
-	<key>SUAllowsAutomaticUpdates</key>
-	<false/>
-	<key>SUSendProfileInfo</key>
-	<false/>
+	<string>Copyright © 2026 vdqvinh2004. MIT License.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

@@ -2,7 +2,7 @@
 
 **Feature Branch**: None; numbered folder is feature identity, not Git branch.
 **Created**: 2026-10-04
-**Status**: Preparation implemented; final signed candidate remains gated
+**Status**: Superseded 2026-11-03 by [ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md): no Developer ID, no notarization and no Sparkle; releases are ad-hoc signed zips on GitHub built by `scripts/release.sh`. History below is kept.
 **Input**: CamLid milestone M5: Sparkle update integration, signing/notarization, helper lifecycle, migrations and supported build revalidation. One scoped feature folder per user instruction.
 **Prerequisites**: M2, M3, M4, M4a. [Roadmap](../../docs/planning/roadmap.md).
 **Scope**: Sparkle update integration, signing/notarization, helper lifecycle, migrations and supported build revalidation.

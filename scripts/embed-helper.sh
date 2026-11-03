@@ -12,5 +12,11 @@ DEST="${APP}/Contents/Library/LaunchServices"
 mkdir -p "$DEST"
 cp "$SCRATCH/$CONFIG/camlid-power-helper" "$DEST/camlid-power-helper"
 codesign --force --sign - --options runtime --identifier com.camlid.power-helper "$DEST/camlid-power-helper"
-codesign --force --sign - --options runtime --entitlements "${SRCROOT}/Config/CamLid.dev-signing.entitlements" \
-  --identifier com.camlid.CamLid "$APP"
+# Only a Debug build needs the library-validation exception (Xcode's debug dylib carries another ad-hoc signature);
+# a Release app has no nested code, so it is signed with no entitlements at all.
+if [ "${CONFIGURATION:-Debug}" = "Debug" ]; then
+  codesign --force --sign - --options runtime --entitlements "${SRCROOT}/Config/CamLid.dev-signing.entitlements" \
+    --identifier com.camlid.CamLid "$APP"
+else
+  codesign --force --sign - --options runtime --identifier com.camlid.CamLid "$APP"
+fi

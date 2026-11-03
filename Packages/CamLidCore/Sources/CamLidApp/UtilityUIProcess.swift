@@ -14,8 +14,8 @@ struct UtilityUIState: Codable, Sendable {
     var anchorFrame: NSRect
     var installationPending: Bool
     var observationReady: Bool = false
-    var updates = UpdateSnapshot(phase: .unavailable, reason: "developerIDRequired")
-    var canCheckUpdates = false
+    var updates = UpdateSnapshot(phase: .ready, reason: "manualCheckReady")
+    var canCheckUpdates = true
     var loginState = "notRegistered"
     var loginMessage = "Login registration has not been checked."
     var notificationPermission = "notDetermined"

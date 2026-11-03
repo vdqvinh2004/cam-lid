@@ -10,7 +10,6 @@
 		0755EBE48DA89547576D793E /* CamLidCLI in Frameworks */ = {isa = PBXBuildFile; productRef = DE2EF5FA2893A95D392EFEF5 /* CamLidCLI */; };
 		1542FFBE8E851766FE2AE873 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B400E3C708DB8A58B6A78A8C /* main.swift */; };
 		6C006708F6368D5006CEAA93 /* CamLidApp in Frameworks */ = {isa = PBXBuildFile; productRef = 722ADDB3FC956AB9813C8912 /* CamLidApp */; };
-		779DE731ABACD0FB5442363B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 88BEC5AAD8CA0E48BD090E9B /* Sparkle */; };
 		C2D9C774E5327BAAA1427699 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 68CF5563D41618952DC2F60B /* Assets.xcassets */; };
 		F58968A552C360AA462D5155 /* AppMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C22EA4963A70BEDF898AF67 /* AppMain.swift */; };
 /* End PBXBuildFile section */
@@ -38,7 +37,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				6C006708F6368D5006CEAA93 /* CamLidApp in Frameworks */,
-				779DE731ABACD0FB5442363B /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -109,7 +107,6 @@
 			name = CamLid;
 			packageProductDependencies = (
 				722ADDB3FC956AB9813C8912 /* CamLidApp */,
-				88BEC5AAD8CA0E48BD090E9B /* Sparkle */,
 			);
 			productName = CamLid;
 			productReference = 0CC1708A4ECEC5EFCA9DD223 /* CamLid.app */;
@@ -155,7 +152,6 @@
 			mainGroup = 9D5EF474C405CEB044C5BAB2;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				26FCB4AEB32A5343A5924CEA /* XCRemoteSwiftPackageReference "Sparkle" */,
 				288E4C1F858395206B0C9734 /* XCLocalSwiftPackageReference "Packages/CamLidCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -458,26 +454,10 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		26FCB4AEB32A5343A5924CEA /* XCRemoteSwiftPackageReference "Sparkle" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sparkle-project/Sparkle";
-			requirement = {
-				kind = exactVersion;
-				version = 2.10.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		722ADDB3FC956AB9813C8912 /* CamLidApp */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CamLidApp;
-		};
-		88BEC5AAD8CA0E48BD090E9B /* Sparkle */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 26FCB4AEB32A5343A5924CEA /* XCRemoteSwiftPackageReference "Sparkle" */;
-			productName = Sparkle;
 		};
 		DE2EF5FA2893A95D392EFEF5 /* CamLidCLI */ = {
 			isa = XCSwiftPackageProductDependency;

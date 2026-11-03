@@ -58,3 +58,6 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+
+# Release builds (scripts/release.sh)
+dist/

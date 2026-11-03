@@ -6,9 +6,6 @@ options:
 packages:
   CamLidCore:
     path: Packages/CamLidCore
-  Sparkle:
-    url: https://github.com/sparkle-project/Sparkle
-    exactVersion: 2.10.0
 targets:
   CamLid:
     type: application
@@ -20,8 +17,6 @@ targets:
     dependencies:
       - package: CamLidCore
         product: CamLidApp
-      - package: Sparkle
-        product: Sparkle
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.camlid.CamLid
       INFOPLIST_FILE: CamLidApp/Info.plist

@@ -3,10 +3,24 @@
 A native macOS menu bar app that keeps a Mac awake with the lid closed while AI coding agents work, and lets it
 sleep when they are done.
 
-**Status (2026-10-31): early, unsigned, tested on one Mac.** Closed-lid operation has passed attended trials on
+**Status: pre-release, unsigned, tested on one Mac.** Closed-lid operation has passed attended trials on
 Mac17,3 with macOS 26A434 only ([trial record](specs/014-persistent-helper/g2-trial.md)). On any other model or
 macOS build it stays off unless you explicitly accept "untested configuration" in Settings › Closed Lid. Builds are
-ad-hoc signed and not notarized.
+ad-hoc signed and not notarized by Apple ([why](docs/adr/0004-distribution-through-github-releases.md)).
+
+## Download
+
+Get `CamLid-<version>-macos-arm64.zip` from the [Releases](https://github.com/vdqvinh2004/cam-lid/releases) page
+(Apple silicon, macOS 14 or later). Each release lists the SHA-256 of the zip and the code hashes of the app and its
+root helper; check them before you run it.
+
+1. Unzip it and move **CamLid.app** to `/Applications`.
+2. macOS refuses the first launch because the app is not notarized. Open it once, then *System Settings › Privacy &
+   Security › Open Anyway*, or run `xattr -dr com.apple.quarantine /Applications/CamLid.app`.
+3. Continue with [Install and use](#install-and-use).
+
+Updating: *Check for Updates…* asks GitHub for the newest release when you click it and opens the Releases page; it
+never downloads or installs anything. After installing a new version, click **Reinstall helper…** once.
 
 ## What it does
 
@@ -42,8 +56,8 @@ Known conflict: LidRun's helper resets the sleep setting and interrupts closed l
 
 ## Requirements
 
-- macOS 14 or later; tested on macOS 26 (Apple silicon).
-- Xcode 27 (Swift 6.4, macOS 27 SDK) to build.
+- macOS 14 or later on Apple silicon; tested on macOS 26.
+- Xcode 27 (Swift 6.4, macOS 27 SDK) to build it yourself.
 
 ## Build
 
@@ -73,7 +87,7 @@ swift test --package-path Packages/CamLidPowerWire
 3. Settings › Agents: select the agents that may keep the Mac awake.
 4. In the menu bar Dashboard, click **Auto** or **Timed**. Click the active mode again to stop.
 
-Every rebuild changes the app's code hash: click **Reinstall helper…** afterwards. To remove the helper (restoring
+Every new build or release changes the app's code hash: click **Reinstall helper…** afterwards. To remove the helper (restoring
 the sleep setting first), click **Remove helper…** or run `sudo camlid helper uninstall`.
 
 ## Command line
@@ -96,24 +110,28 @@ Full contract: [CLI](specs/003-native-foundation/contracts/cli.md).
 
 MIT, see [LICENSE](LICENSE). The agent marks bundled for identification remain the trademarks of their owners
 ([TRADEMARKS.md](Packages/CamLidCore/Sources/CamLidApp/Resources/TRADEMARKS.md)); the license does not cover them.
-CamLid uses [Sparkle](https://github.com/sparkle-project/Sparkle) (MIT).
+CamLid has no third-party code dependencies.
 
 ## Privacy
 
 History stays on the Mac (14 days or 20 MiB) and records mode changes, safety stops and agent states, never prompts,
-code or transcripts. Exports hide identifiers. No network service is used except an optional manual update check.
+code or transcripts. Exports hide identifiers. The only network use is the update check you start yourself (one request to GitHub's public releases API, with no
+account, cookies or system profile).
 
 ## Project documents
 
 - [Specs by milestone](specs/README.md) with tasks and status.
 - Decisions: [ADR 0001](docs/adr/0001-persistent-helper-and-strict-experimental-mode.md),
   [ADR 0002](docs/adr/0002-observer-only-agent-activity.md),
-  [ADR 0003](docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md).
+  [ADR 0003](docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md),
+  [ADR 0004](docs/adr/0004-distribution-through-github-releases.md).
+- [Security policy](SECURITY.md) and [contributing](CONTRIBUTING.md); `scripts/release.sh` builds a release.
 - [Constitution](.specify/memory/constitution.md).
 
 ## Limits
 
 - Qualified on one Mac model and macOS build; other combinations are untested.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
-- Unsigned: Gatekeeper blocks downloaded builds; build from source.
+- Unsigned: macOS asks you to approve the first launch, and the app cannot update itself.
+- Apple silicon only; the `camlid` command-line tool is not in the release zip yet (build it from source).
 - No fan or charging control.

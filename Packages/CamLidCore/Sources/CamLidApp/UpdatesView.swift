@@ -10,6 +10,9 @@ public struct UpdatesView: View {
     public init(snapshot: UpdateSnapshot, canCheck: Bool, onCheck: @escaping () -> Void) {
         self.snapshot = snapshot; self.canCheck = canCheck; self.onCheck = onCheck
     }
+    private var installedVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    }
     public var body: some View {
         ScrollView {
             content
@@ -26,9 +29,9 @@ public struct UpdatesView: View {
             }
             .help(title)
             Text(detail).fixedSize(horizontal: false, vertical: true)
+            Text("Installed version: \(installedVersion)").font(.callout).foregroundStyle(.secondary)
             if snapshot.phase == .available, let version = snapshot.version {
-                Text("Available version: \(version)")
-                    .font(.callout).foregroundStyle(.secondary)
+                Text("Available version: \(version)").font(.callout).foregroundStyle(.secondary)
             }
             if snapshot.phase == .checking {
                 ProgressView("Checking update information…").controlSize(.small)
@@ -36,11 +39,16 @@ public struct UpdatesView: View {
             } else if snapshot.phase != .unavailable {
                 HStack {
                     Spacer()
+                    if snapshot.phase == .available {
+                        Button("Open Releases") { NSWorkspace.shared.open(GitHubReleaseDriver.releasesPage) }
+                            .help("Opens the project's GitHub releases page in your browser")
+                            .accessibilityIdentifier("camlid.updates.open")
+                    }
                     Button("Check for Updates", action: onCheck)
-                        .disabled(!canCheck).help(canCheck ? "Check the signed update feed" : detail)
+                        .disabled(!canCheck).help(canCheck ? "Ask GitHub for the newest release" : detail)
                         .accessibilityIdentifier("camlid.updates.check")
                 }
-                Text("CamLid only checks; it won’t download or install updates.")
+                Text("CamLid only checks when you ask; it never downloads or installs updates.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }.padding(20).frame(maxWidth: .infinity, alignment: .topLeading)
@@ -78,20 +86,17 @@ public struct UpdatesView: View {
     }
     var detail: String {
         switch snapshot.reason {
-        case "developerIDRequired": "This build was made from source, so it can’t check for updates. Pull the latest source and rebuild to update."
-        case "trustedFeedRequired": "This build has no update feed. Update checks work in the release app."
-        case "updateSigningKeyRequired": "This build can’t verify updates. Use the release version of CamLid."
-        case "noCompatibleUpdate": "No compatible update was found. This doesn’t confirm the latest version."
+        case "noCompatibleUpdate": "No published release was found. This doesn’t confirm that your version is the latest."
         case "sessionActive": "CamLid will check after the current session ends."
         case "agentWorkActive": "CamLid will check when agents are no longer active."
         case "recoveryRequired": "Finish recovery first, then check for updates."
         case "unsavedSettings": "Finish the pending Settings change, then check for updates."
         case "networkUnavailable": "Reconnect to the internet, then try again. Your installed version hasn’t changed."
         case "updateCheckFailed": "The check didn’t complete. Your installed version hasn’t changed. Try again later."
-        case "latestCompatibleVersion": "The latest compatible version is installed."
-        case "updateAvailable": "A newer compatible version is available. This preview can check but not install updates."
-        case "checkingSignedFeed": "Checking for a compatible update. No download or installation."
-        default: "CamLid checks only when you ask, and sends no system profile."
+        case "latestCompatibleVersion": "This is the newest published version."
+        case "updateAvailable": "A newer version is available. Download it from the releases page, then reinstall the helper once."
+        case "checkingReleases": "Asking GitHub for the newest release. Nothing is downloaded or installed."
+        default: "CamLid checks only when you ask. It sends no account, no cookies and no system profile."
         }
     }
 }

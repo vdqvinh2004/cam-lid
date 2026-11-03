@@ -2,8 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Ad-hoc development signing only: hardened runtime would otherwise refuse the Xcode debug dylib and
-         Sparkle, which carry other signatures. A Developer ID build loads them under normal library validation. -->
+    <!-- Debug builds only: hardened runtime would otherwise refuse Xcode's debug dylib, which carries another ad-hoc
+         signature. Release builds are signed without entitlements. -->
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
 </dict>

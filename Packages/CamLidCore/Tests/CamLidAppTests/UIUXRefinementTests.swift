@@ -121,13 +121,13 @@ struct UIUXRefinementTests {
         #expect(ActivityPresentation.readableReason("appQuitNoOwnedPower") == "CamLid quit without a session")
     }
 
-    @Test @MainActor func updatesUnavailableExplainsThePreviewWithoutImplyingInstallation() throws {
-        let snapshot = UpdateSnapshot(phase: .unavailable, reason: "developerIDRequired")
-        let view = UpdatesView(snapshot: snapshot, canCheck: false, onCheck: {})
-        #expect(view.title == "Updates unavailable")
-        #expect(view.detail.contains("rebuild") && !view.detail.contains("preview"))
-        #expect(!view.detail.lowercased().contains("install"))
-        #expect(view.preferredHeight < 185)
+    @Test @MainActor func updatesNeverImplyTheAppInstallsAnything() throws {
+        let none = UpdatesView(snapshot: UpdateSnapshot(phase: .unavailable, reason: "noCompatibleUpdate"), canCheck: true, onCheck: {})
+        #expect(none.title == "Updates unavailable" && none.detail.contains("No published release"))
+        let found = UpdatesView(snapshot: UpdateSnapshot(phase: .available, reason: "updateAvailable", version: "0.2.0"),
+                                canCheck: true, onCheck: {})
+        #expect(found.title == "Update available" && found.detail.contains("Download it from the releases page"))
+        #expect(none.preferredHeight < 185)
     }
 
     @Test func updateProjectionCannotEnableInstallation() throws {

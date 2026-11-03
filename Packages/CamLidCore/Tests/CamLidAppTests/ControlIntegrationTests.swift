@@ -97,7 +97,7 @@ struct ControlIntegrationTests {
         #expect(get.exitCode == 0 && get.json.contains("\"runCapMinutes\":30"))
         let status = await Task.detached { Commands.runWithRealIO(argv: ["status"], channel: channel) }.value
         #expect(status.exitCode == 0 && status.json.contains("\"powerActuation\":false"))
-        #expect(status.json.contains("\"updates\"") && status.json.contains("developerIDRequired"))
+        #expect(status.json.contains("\"updates\"") && status.json.contains("manualCheckReady"))
         #expect(status.json.contains("\"installationAvailable\":false"))
         if let executable = ProcessInfo.processInfo.environment["CAMLID_CLI_PATH"] {
             let binary = await Task.detached { () -> (Int32, String) in

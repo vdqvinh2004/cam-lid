@@ -11,7 +11,7 @@ feature folders and one selected feature context; it does not itself require mil
 - [M4: Native UX and Activity History](005-native-ux/spec.md) — Hosted preview/history implemented; native walkthrough/integration workflow pending.
 - [M4a: Apple HIG UI/UX Refinement](009-apple-hig-ux/spec.md) — Preview refinement implemented; complete native acceptance remains open before M5/M6 approval.
 - [M4b: QA-driven UX and truthful telemetry](010-qa-ux-sensors/spec.md) — Preview increments implemented; 54-task backlog, latest [diagnostics QA](../docs/qa/sleep-diagnostics-2026-10-08.md); native/physical/full-quality gates remain open.
-- [M5: Signed Beta and Updates](006-signed-beta/spec.md) — Planned; blocked on integrated candidate.
+- [M5: Signed Beta and Updates](006-signed-beta/spec.md) — **Superseded** by [ADR 0004](../docs/adr/0004-distribution-through-github-releases.md): GitHub releases, ad-hoc signed, no notarization, no Sparkle.
 - [M6: AI Quality Gate](007-ai-quality-gate/spec.md) — Preview QA in progress; full gate not passed.
 - [M7: Supervised Real User Testing](008-user-testing/spec.md) — Planned; blocked on M6 PASS.
 - [M8: Awake Automation & Diagnostics](011-awake-automation/spec.md) — Partial implementation: 33/43 tasks checked (not gate acceptance); shared diagnostics, alert/login adapters and Preview guards, [LidRun gap comparison](011-awake-automation/lidrun-comparison.md); live extensions consume qualified M1/M2 backend.
