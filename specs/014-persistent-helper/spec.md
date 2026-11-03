@@ -2,7 +2,7 @@
 
 **Feature context:** `014-persistent-helper`; planned, no code yet.
 **Created:** 2026-10-30
-**Status:** Draft. Decision: [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md).
+**Status:** Implemented and signed off by the owner on 2026-11-03 for Mac17,3 / macOS 26A434 (see tasks T601). Decision: [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md).
 **Amended 2026-10-31/11-01 by [ADR 0003](../../docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md) and [spec 016](../016-strict-lid-only/spec.md):** Strict no longer needs its own helper, journal or storage directory (FR-010) and is no longer "unavailable until admitted" (story 2.2): it runs on this helper with its own mechanism, so one helper serves both modes and only one lease exists at a time. Settings also became three panes, so "Settings › Safety" now reads Settings › Closed Lid.
 **Supersedes for product deployment:** the admission / one-use sections of specs 012 and 013. Their evidence stays as history. This spec grants no authority to install, run root code, change power state or perform a physical episode; each native action still needs the owner's go-ahead at the time.
 

@@ -1,6 +1,6 @@
 # Tasks: Persistent Helper (Standard Mode)
 
-**Feature context:** `014-persistent-helper` · **Status:** 29/31 checked. Sources: [spec.md](spec.md), [plan.md](plan.md), [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md).
+**Feature context:** `014-persistent-helper` · **Status:** 31/31 checked (T601 signed by the owner 2026-11-03). Sources: [spec.md](spec.md), [plan.md](plan.md), [ADR 0001](../../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md).
 
 ## Phase 0 — Alignment
 - [x] T001 Mark admission / one-use sections of specs 012 and 013 as superseded by 014 (keep evidence). — done 2026-10-30 (notice added to 012/013 spec, plan, tasks).
@@ -49,4 +49,4 @@ Open owner decisions, recommended defaults used until changed: (1) closed lid st
 - [x] T805 Read-only detection of known conflicting helpers (`com.lidrun.app.helper`) with a warning in Settings and Dashboard; `overrideChanged` stop explained as another app changing the sleep setting. — `ConflictingSleepHelpers` (LidRun label) via `launchctl print`, refreshed with helper status and at session start; Settings warning and Dashboard banner; `overrideChanged` explained. A registered but idle LidRun helper also warns. Extended 2026-10-31: general keep-awake detection (`KeepAwakeApps`: Amphetamine, KeepingYouAwake, Lungo, Caffeine, `caffeinate`, LidRun, LidWalk) by running bundle id, launchd label or process; apps that reset the sleep setting get a warning, others a general notice; the fixed "Preview build" line now states whether this Mac can keep awake; helper reason codes are mapped to plain text and unknown codes show "Closed lid stopped."
 - [x] T806 Update README, ADR 0001 and `g2-trial.md` result rules for the two permission kinds. — README status, ADR 0001 amendment, g2-trial result rules.
 
-- [ ] T601 App/CLI integration sign-off after T501 and T706; replaces the blocked 013 T502 path.
+- [x] T601 App/CLI integration sign-off after T501 and T706; replaces the blocked 013 T502 path. — **Signed by the owner 2026-11-03** for Mac17,3 / macOS 26A434 (Standard mode), on this evidence: G2 trials 1–7 and 9 (2026-10-31), trial 8 runs 1–3 (Auto with Claude Code, lid closed), and the Standard app-kill and helper-kill trials on battery ([g2-trial.md](g2-trial.md)); the CLI `start`, `stop`, `status` and `helper` commands drive the same paths and are covered by the test suites. **Limits of the sign-off:** one Mac and one macOS build; the recovery job's own restore branch (helper not restarted by launchd) is covered by unit tests only; a session ending at the battery stop level and powerd interference (Strict E5) were not tried; the build is ad-hoc signed, so M5–M7 (signed, notarised distribution) are untouched.
