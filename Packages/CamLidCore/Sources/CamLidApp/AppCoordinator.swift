@@ -1033,12 +1033,21 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         return .saved(revision: revision)
     }
 
+    /// Why a patch was refused. A stop level at or above the start level is the one refusal a user can cause from a
+    /// menu (the stop menu offers up to 50 percent), so it names the other setting instead of a generic message.
+    func settingsRefusal(for patch: ConfigPatch) -> String {
+        do { _ = try config.applying(patch) } catch ConfigError.outOfRange(let field, _, _) where field == "batteryEntryPercent" {
+            return "Not applied — the stop level must stay below “Start on battery at or above” (Advanced). Raise that first."
+        } catch {}
+        return "Invalid setting. Last applied value retained."
+    }
+
     func applySettingsPatch(_ patch: ConfigPatch, expectedRevision: Int) -> SettingsCommitResult {
         guard revision == expectedRevision else {
             return .conflict(configuration: config, revision: revision)
         }
         if let refusal = powerModeRefusal(patch) { return .failed(refusal) }
-        guard let candidate = try? config.applying(patch) else { return .failed("Invalid setting. Last applied value retained.") }
+        guard let candidate = try? config.applying(patch) else { return .failed(settingsRefusal(for: patch)) }
         return applySettings(candidate, expectedRevision: expectedRevision)
     }
 
@@ -1055,7 +1064,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         if let refusal = powerModeRefusal(patch) { return .failed(refusal) }
         guard revision < Int.max, let candidate = try? config.applying(patch),
               let data = try? JSONEncoder().encode(PersistedSettings(schemaVersion: 1, revision: revision + 1, configuration: candidate)) else {
-            return .failed("Invalid setting. Last applied value retained.")
+            return .failed(settingsRefusal(for: patch))
         }
         let expires = min(deadline ?? (uptime() + 0.7), uptime() + 0.7)
         settingsPreparationCount += 1

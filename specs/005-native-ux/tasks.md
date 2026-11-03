@@ -21,7 +21,7 @@ Shared constitution, product requirements and limitation register apply; depende
 - [x] T003 [US1] Implement single native General/Agents/Safety/Advanced settings in CamLidApp/SettingsView.swift with bounds/errors/integration diff/removal (FR-015). — **2026-11-03 cleanup:** Done: Settings has three panes (General, Agents, Closed Lid) with bounds and error handling; integration diff and removal no longer exist (ADR 0002).
 - [x] T004 [US1] Implement opt-in/permissions/ventilation/rollback onboarding in CamLidApp/OnboardingView.swift (FR-021).
 - [x] T005 [US1] Implement status/options accessibility IDs/labels, native focus, dark/light/contrast/reduced-motion support in CamLidApp/Accessibility.swift (FR-018).
-- [ ] T006 [US1] Verify unsupported/stale/grace/safety/recovery/long-label/notch states and left/right/settings with native walkthrough in Tests/UI/MenuBarValidation.md (FR-001, FR-014, FR-018).
+- [ ] T006 [US1] Verify unsupported/stale/grace/safety/recovery/long-label/notch states and left/right/settings with native walkthrough in Tests/UI/MenuBarValidation.md (FR-001, FR-014, FR-018). — **2026-11-03 progress:** the status item placement (right of centre, clear of the notch), the "Can't keep your Mac awake" notice, Orca working and the Updates deferral were observed on the installed build ([native matrix](../../docs/qa/native-matrix-2026-11-03.md)). Still open: grace, safety-stop and recovery states (need a real session, the helper reinstalled and an owner-run stop), long labels, notch overflow, left and right placement.
 
 ## Phase 4: User Story 2 — Understand session decisions
 

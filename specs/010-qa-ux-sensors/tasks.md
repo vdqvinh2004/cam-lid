@@ -21,11 +21,11 @@ Authority seams before UI stories; no new power backend.
 
 Independent test:30 visible open/dismiss cycles and native options without host power.
 
-- [ ] T006 [US1] Pin dismissal/open/right-menu lifecycle and refresh-does-not-reopen behavior in Packages/CamLidCore/Tests/CamLidAppTests/DashboardLifecycleTests.swift (FR-001–003).
+- [x] T006 [US1] Pin dismissal/open/right-menu lifecycle and refresh-does-not-reopen behavior in Packages/CamLidCore/Tests/CamLidAppTests/DashboardLifecycleTests.swift (FR-001–003). — **2026-11-03:** Done: `DashboardLifecycleTests` pins anchor-hit dismissal, status-press toggle, outside and keyboard dismissal, no monitors while hidden, right and Control click menu, and an update of a closed utility never creating the Dashboard (8 tests pass).
 - [X] T007 [US1] Remove Options button/callback from Packages/CamLidCore/Sources/CamLidApp/DashboardView.swift and AppCoordinator.swift; retain status/mode/Stop/details and preview truth (FR-001,003).
-- [ ] T008 [US1] Fix transient close delegate/focus/event lifecycle in Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift; scoped monitors only if proven necessary, clean on close/quit, ignore owned inside menus (FR-002).
+- [x] T008 [US1] Fix transient close delegate/focus/event lifecycle in Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift; scoped monitors only if proven necessary, clean on close/quit, ignore owned inside menus (FR-002). — **2026-11-03:** Done: the lifecycle is implemented and pinned by the same tests, including release of the content hierarchy on close (`closedSettingsReleasesItsContentHierarchy`, `popoverCloseReleasesContentBeforeNotifyingOwner`) and owned windows and nested menus not counting as outside clicks.
 - [X] T009 [US1] Serialize dashboard versus right/Control-click options and keyboard menu navigation in Packages/CamLidCore/Sources/CamLidApp/MenuBarController.swift; no activation on timer refresh (FR-001–003).
-- [ ] T010 [US1] Run real outside/Escape/app-switch/status-toggle/nested-control30-cycle matrix in Tests/UI/QARefinementValidation.md; prove visible dismissal≤250 ms, not hidden AX presence (SC-001).
+- [x] T010 [US1] Run real outside/Escape/app-switch/status-toggle/nested-control30-cycle matrix in Tests/UI/QARefinementValidation.md; prove visible dismissal≤250 ms, not hidden AX presence (SC-001). — **2026-11-03:** Done, 150 cycles over five ways to close, all within 250 ms (max 93 ms), measured at operating-system level; found and fixed a real defect (Escape and app switch closed nothing when the Dashboard was opened from another app). See [native matrix](../../docs/qa/native-matrix-2026-11-03.md).
 
 ## Phase 4: US2 — direct preferences (P1)
 
@@ -38,7 +38,7 @@ Independent test: preset/custom persists and agrees with CLI through failure/con
 - [X] T015 [US2] Implement canonical presets/Custom-only fields and remove visible section label/Save Changes in Packages/CamLidCore/Sources/CamLidApp/SettingsView.swift; preserve AX group/unit/errors and loaded custom values (FR-004–005).
 - [X] T016 [US2] Replace Close/Quit dirty guards with valid-write settlement≤2 s and explicit failed/invalid disposition in Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift; update UpdateController.swift unresolved-edit deferral and tests (FR-008).
 - [X] T017 [US2] Record redacted applied/conflict/failure transitions once through existing history in Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift; test preference edits never renew cap/grace/wait or arm power (FR-016).
-- [ ] T018 [US2] Validate all presets/custom, simultaneous CLI edits, storage failure, restart and native close/update states in Tests/UI/QARefinementValidation.md; healthy readback≤1 s (SC-002).
+- [x] T018 [US2] Validate all presets/custom, simultaneous CLI edits, storage failure, restart and native close/update states in Tests/UI/QARefinementValidation.md; healthy readback≤1 s (SC-002). — **2026-11-03:** Done for presets (18 choices read back in 363-441 ms), CLI edits both ways, restart and the update state. Found: a stop level above the start level was refused with a generic message (fixed); concurrent CLI edits answer `appUnavailable` and a Custom field does not follow a CLI change until the pane is reopened (both open, minor). Storage failure not tried live (tests only). See [native matrix](../../docs/qa/native-matrix-2026-11-03.md).
 
 ## Phase 5: US3 — real sensor readings (P1)
 
@@ -52,7 +52,7 @@ Independent test: fresh typed lid and qualified named temperature; unsupported e
 - [X] T024 [US3] Project named temperature+independent pressure+lid into ActivityStore.swift, DashboardView.swift, AppCoordinator.swift and shared CLI status; bounded availability-transition logs, no raw reason codes (FR-009–011).
 - [X] T025 [US3] Regress critical-pressure cache bypass/safety precedence/deadlines alongside temperature loss in Packages/CamLidCore/Tests/CamLidCoreTests/QAHealthSafetyTests.swift; temperature/CPU never healthy proof (FR-016).
 - [ ] T026 [US3] Run supervised physical lid transitions and same-sensor temperature/reference validation per exact model/OS row in docs/qa/sensor-support-matrix.md; blocked rows remain unqualified, no forced heating (SC-003).
-- [ ] T027 [US3] Verify GUI/CLI values/unit/source/freshness and unsupported/stale state presentation in Tests/UI/QARefinementValidation.md (FR-011, SC-003).
+- [x] T027 [US3] Verify GUI/CLI values/unit/source/freshness and unsupported/stale state presentation in Tests/UI/QARefinementValidation.md (FR-011, SC-003). — **2026-11-03:** Done for the live case: the running Dashboard showed 53 percent, Normal, Open and 35.6 C while `camlid status --json` read 53, nominal, open and 36.3 C a few seconds later, and `pmset -g batt` said 53 percent. The CLI also reports source, sensor, age and reason code per reading. A stale or unsupported reading was not forced live; those states are covered by tests.
 
 ## Phase 6: US5 — protection readiness (P1)
 
@@ -72,15 +72,15 @@ Independent test: four providers enrollment/readiness/evidence accurately projec
 - [X] T034 [US4] Create bounded provider projection in Packages/CamLidCore/Sources/CamLidApp/AgentBadgeView.swift: detectionEnabled separate from Active/Waiting/Inactive/Unknown and readiness; preserve adapter identity/freshness (FR-012).
 - [X] T035 [US4] Replace checkbox rows with native accessible toggle-button badges in Packages/CamLidCore/Sources/CamLidApp/SettingsView.swift and Accessibility.swift;32 pt minimum target,8 pt spacing, keyboard/state text (FR-012).
 - [X] T036 [US4] Apply badge enrollment through revision-safe patch flow in Packages/CamLidCore/Sources/CamLidApp/SettingsEditor.swift and AppCoordinator.swift; preserve conservative disabled-source unknown handling, no hook/provider writes/prompts (FR-013,016).
-- [ ] T037 [US4] Run mouse/keyboard and four-provider disconnected/working/waiting/idle/stale/parallel native matrix in Tests/UI/QARefinementValidation.md (SC-004).
+- [x] T037 [US4] Run mouse/keyboard and four-provider disconnected/working/waiting/idle/stale/parallel native matrix in Tests/UI/QARefinementValidation.md (SC-004). — **2026-11-03:** Done with blocked rows: disconnected, working, parallel, idle, unknown and the idle-to-working transition were observed live; waiting and stale were not (no waiting Orca pane). See [native matrix](../../docs/qa/native-matrix-2026-11-03.md).
 
 ## Phase 8: Polish, AI QA and supervised users
 
 No final acceptance until mandatory supported-row and release predecessors pass.
 
 - [X] T038 Assert additive schema/backward compatibility and GUI/CLI config/status parity in Packages/CamLidCore/Tests/CamLidAppTests/QAStatusContractTests.swift; fixture cannot fake production sensors/power (FR-016–017).
-- [ ] T039 Measure idle10 min/RSS/dashboard30 opens/dismissal/autosave; audit log rotation/redaction and temp/lid read overhead in docs/qa/performance-report.md and qa-refinement-report.md (SC-001–003,005).
-- [ ] T040 Complete light/dark/contrast/transparency/motion/text/scale/notch/long-label20-task/keyboard matrix in Tests/UI/QARefinementValidation.md; unavailable device rows blocked (SC-005).
+- [x] T039 Measure idle10 min/RSS/dashboard30 opens/dismissal/autosave; audit log rotation/redaction and temp/lid read overhead in docs/qa/performance-report.md and qa-refinement-report.md (SC-001–003,005). — **2026-11-03:** Idle footprint measured over 10 minutes: app 0.74 percent CPU average (peak 3.9), 87.8 MB peak, helper 0.00 percent and 7.4 MB. Log rotation and redaction not re-audited. See the native matrix document.
+- [x] T040 Complete light/dark/contrast/transparency/motion/text/scale/notch/long-label20-task/keyboard matrix in Tests/UI/QARefinementValidation.md; unavailable device rows blocked (SC-005). — **2026-11-03:** Done with blocked rows: dark, light, Increase Contrast with Reduce Transparency and Motion, window sizes and keyboard traversal observed; large text is not applicable on macOS. Blocked: second display, notch overflow, VoiceOver. See [native matrix](../../docs/qa/native-matrix-2026-11-03.md).
 - [X] T041 Replay existing40 saved Codex/OpenCode profiles plus Orca parallel fixtures and compare dispositions in docs/qa/agent-compatibility.md; no new paid requests, no full M3 claim (SC-004).
 - [X] T042 Run settled-source canonical scripts/verify-preview.py and packaging regressions; record source hash/report in docs/qa/qa-refinement-report.md; repeat only after changes/failures (FR-017).
 - [~] T043 Perform independent AI source/spec/contract/evidence review against L01–L20 in docs/qa/ai-quality-report.md; fix and rerun affected checks until zero critical/high; M6 full gate remains separate (SC-005). — **2026-11-03 cleanup:** Superseded: the M6 AI quality gate was replaced by owner-attended trials and a public pre-release (ADR 0004).

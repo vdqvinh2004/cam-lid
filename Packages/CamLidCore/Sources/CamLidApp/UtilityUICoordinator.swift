@@ -158,7 +158,9 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         if popover?.contentViewController !== dashboardHost { popover?.contentViewController = dashboardHost }
         resizeDashboard()
         if show, let anchor = anchorWindow?.contentView {
-            NSApp.activate()
+            // Cooperative `activate()` is refused while another app is frontmost (checked on macOS 26: only
+            // ignoringOtherApps activates), and an inactive app never gets Escape or notices an app switch.
+            NSApp.activate(ignoringOtherApps: true)
             popover?.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
             // The transparent, non-key anchor cannot transfer keyboard focus.
             // Explicitly focus the presented surface, never a timer refresh.

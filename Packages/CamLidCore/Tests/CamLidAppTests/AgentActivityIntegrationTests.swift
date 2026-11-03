@@ -18,6 +18,20 @@ struct AgentActivityIntegrationTests {
         #expect(app.sleepRelevantTasksForTesting(provider: "codex").isEmpty)
     }
 
+    /// The stop menu offers up to 50 percent; with a lower start level the refusal must say what to change.
+    @Test @MainActor func aStopLevelAtOrAboveTheStartLevelIsRefusedWithAnExplanation() throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let app = fixture.makeCoordinator()
+        var start = ConfigPatch(); start.batteryEntryPercent = 30
+        guard case .saved = app.applySettingsPatch(start, expectedRevision: 1) else { Issue.record("not saved"); return }
+        var stop = ConfigPatch(); stop.batteryFloorPercent = 40
+        guard case .failed(let message) = app.applySettingsPatch(stop, expectedRevision: 2) else {
+            Issue.record("a stop level above the start level was accepted"); return
+        }
+        #expect(message.contains("Start on battery at or above"))
+        #expect(app.settingsRefusal(for: ConfigPatch()) == "Invalid setting. Last applied value retained.")
+    }
+
     @Test @MainActor func autoHoldsWhileADirectlyRunAgentWorksAndGivesSleepWhenDoneAfterward() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
