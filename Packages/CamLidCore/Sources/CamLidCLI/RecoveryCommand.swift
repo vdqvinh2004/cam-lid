@@ -115,7 +115,7 @@ public struct RecoveryCommand: Sendable {
                     switch ipc {
                     case .unauthorized:
                         return Diagnosis(outcome: .conflict, evidence: ["reason": "authDenied"], exitCode: 3)
-                    case .unavailable:
+                    case .unavailable, .busy:
                         return Diagnosis(
                             outcome: .unresolved,
                             evidence: ["reason": "serviceUnavailable", "owner": ownerIdentity],

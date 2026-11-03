@@ -28,4 +28,14 @@ struct NumericChoiceTests {
         let custom = SettingsEditor(configuration: try Configuration(completionDelayMinutes: 7, waitRetentionMinutes: 3, batteryFloorPercent: 23, runCapMinutes: 17), revision: 1)
         #expect(custom.customFields.count == 5 && custom.customFields.contains(.timer))
     }
+
+    @Test @MainActor func outsideChangeTogglesCustomField() throws {
+        let editor = SettingsEditor(configuration: try Configuration(completionDelayMinutes: 7), revision: 1)
+        #expect(editor.customFields.contains(.completionDelay))
+        let preset = NumericChoice.presets(.completionDelay)[0]
+        editor.receive(configuration: try Configuration(completionDelayMinutes: preset), revision: 2)
+        #expect(!editor.customFields.contains(.completionDelay) && editor.numbers[.completionDelay] == String(preset))
+        editor.receive(configuration: try Configuration(completionDelayMinutes: 7), revision: 3)
+        #expect(editor.customFields.contains(.completionDelay))
+    }
 }

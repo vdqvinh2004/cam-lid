@@ -734,7 +734,7 @@ public enum Commands {
 
     static func exitFor(_ error: IPCError) -> Int {
         switch error {
-        case .unavailable: return 4
+        case .unavailable, .busy: return 4
         case .unauthorized: return 3
         case .invalidInput: return 2
         case .policyDenied: return 3
@@ -746,6 +746,7 @@ public enum Commands {
     static func ipcFail(_ error: IPCError, command: String) -> CLIResult {
         switch error {
         case .unavailable: return fail(4, command: command, reason: "appUnavailable")
+        case .busy: return fail(4, command: command, reason: "appBusy")
         case .unauthorized: return fail(3, command: command, reason: "unauthorized")
         case .invalidInput(let detail): return fail(2, command: command, reason: "invalidInput", detail: detail)
         case .policyDenied(let detail): return fail(3, command: command, reason: "policyDenied", detail: detail)

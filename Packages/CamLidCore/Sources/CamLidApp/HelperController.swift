@@ -114,7 +114,7 @@ import CamLidCore
             pids(named: name).contains { !startedByAgent($0) }
         })
         let installer = HelperInstaller()
-        return KeepAwakeApps.detect(runningBundleIDs: bundleIDs, runningProcesses: processes, isLoaded: installer.isServiceLoaded)
+        return KeepAwakeApps.detect(runningBundleIDs: bundleIDs, runningProcesses: processes, isRunning: installer.isServiceRunning)
     }
 
     nonisolated static func describe(_ result: HelperOperationResult) -> String {

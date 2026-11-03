@@ -25,6 +25,8 @@ public enum AllowlistedCommand: String, Sendable, Codable, CaseIterable {
 
 public enum IPCError: Error, Equatable, Sendable {
     case unavailable
+    /// The app is running but every worker slot is taken; retrying shortly succeeds.
+    case busy
     case unauthorized
     case invalidInput(String)
     case policyDenied(String)

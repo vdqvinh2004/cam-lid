@@ -110,9 +110,9 @@ public enum KeepAwakeApps {
 
     /// One entry per app name, sorted; an app is marked as resetting if any of its sources is.
     public static func detect(runningBundleIDs: Set<String>, runningProcesses: Set<String>,
-                              isLoaded: (String) -> Bool) -> [KeepAwakeApp] {
+                              isRunning: (String) -> Bool) -> [KeepAwakeApp] {
         let found = bundleIDs.filter { runningBundleIDs.contains($0.key) }.map(\.value)
-            + helperLabels.filter { isLoaded($0.key) }.map(\.value)
+            + helperLabels.filter { isRunning($0.key) }.map(\.value)
             + processNames.filter { runningProcesses.contains($0.key) }.map(\.value)
         let byName = Dictionary(grouping: found, by: \.name)
         return byName.map { KeepAwakeApp(name: $0.key, resetsSleepSetting: $0.value.contains { $0.resetsSleepSetting }) }

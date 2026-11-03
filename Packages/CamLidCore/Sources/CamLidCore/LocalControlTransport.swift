@@ -24,6 +24,7 @@ public struct LocalControlChannel: IPCChannel {
         case "unauthorized": throw IPCError.unauthorized
         case "invalidInput": throw IPCError.invalidInput("invalidControlRequest")
         case "policyDenied": throw IPCError.policyDenied("controlDenied")
+        case "busy": throw IPCError.busy
         case .some: throw IPCError.unavailable
         case .none: return response.payload ?? Data()
         }
@@ -206,7 +207,7 @@ public final class LocalControlServer: @unchecked Sendable {
         let slots = priority ? controlSlots : (bulk ? exportSlots : workerSlots)
         let queue = priority ? controlQueue : (bulk ? exportQueue : workerQueue)
         guard slots.wait(timeout: .now()) == .success else {
-            respond(connection, payload: nil, error: "unavailable", priority: priority)
+            respond(connection, payload: nil, error: "busy", priority: priority)
             return
         }
         queue.async { [weak self] in

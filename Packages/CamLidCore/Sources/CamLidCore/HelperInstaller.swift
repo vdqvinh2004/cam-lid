@@ -243,6 +243,12 @@ public struct HelperInstaller: Sendable {
     /// Whether launchd currently has a service under the helper label, whoever installed it.
     public func serviceLoaded() -> Bool { isServiceLoaded(HelperInstallPaths.helperLabel) }
 
+    /// Registered is not running: a quit app can leave its daemon registered but idle, and an idle one resets nothing.
+    public func isServiceRunning(_ label: String) -> Bool {
+        let result = runner.run("/bin/launchctl", ["print", "system/\(label)"])
+        return result.status == 0 && result.output.contains("state = running")
+    }
+
     public func isServiceLoaded(_ label: String) -> Bool {
         runner.run("/bin/launchctl", ["print", "system/\(label)"]).status == 0
     }

@@ -59,16 +59,16 @@ import Testing
     @Test func keepAwakeAppsAreFoundFromAppsHelpersAndProcesses() {
         let found = KeepAwakeApps.detect(runningBundleIDs: ["com.if.Amphetamine", "com.apple.Safari"],
                                          runningProcesses: ["caffeinate", "zsh"],
-                                         isLoaded: { $0 == "com.lidrun.app.helper" })
+                                         isRunning: { $0 == "com.lidrun.app.helper" })
         #expect(found == [KeepAwakeApp(name: "Amphetamine", resetsSleepSetting: false),
                           KeepAwakeApp(name: "LidRun", resetsSleepSetting: true),
                           KeepAwakeApp(name: "caffeinate", resetsSleepSetting: false)])
-        #expect(KeepAwakeApps.detect(runningBundleIDs: [], runningProcesses: [], isLoaded: { _ in false }).isEmpty)
+        #expect(KeepAwakeApps.detect(runningBundleIDs: [], runningProcesses: [], isRunning: { _ in false }).isEmpty)
     }
 
     @Test func anAppSeenThroughTwoSourcesIsListedOnceAndKeepsTheResetFlag() {
         let found = KeepAwakeApps.detect(runningBundleIDs: ["com.lidrun.app"], runningProcesses: [],
-                                         isLoaded: { $0 == "com.lidrun.app.helper" })
+                                         isRunning: { $0 == "com.lidrun.app.helper" })
         #expect(found == [KeepAwakeApp(name: "LidRun", resetsSleepSetting: true)])
     }
 }

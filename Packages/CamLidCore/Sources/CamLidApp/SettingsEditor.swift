@@ -161,9 +161,11 @@ public final class SettingsEditor: ObservableObject {
                   value(desired, key: key) == value(persisted, key: key) else { continue }
             clearApplied(key); message = "Applied"
         }
+        let previous = originalNumbers
         reconcile()
         for field in Self.numericFields where !editingNumbers.contains(field) {
             if !NumericChoice.presets(field).contains(Self.numberValue(original, field: field)) { customFields.insert(field) }
+            else if previous[field] != originalNumbers[field] { customFields.remove(field) }
         }
     }
     public func installationFinished(success: Bool) {
