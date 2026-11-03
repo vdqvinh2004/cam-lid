@@ -1,6 +1,6 @@
 # Tasks: Strict mode, lid-only
 
-**Feature context:** `016-strict-lid-only` · **Status:** 11/16 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `016-strict-lid-only` · **Status:** 12/16 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decision
 - [x] T001 ADR 0003 accepted; ADR 0001 amended. — `85bae08`.
@@ -20,7 +20,7 @@
 ## Phase 3 — Attended trials (owner go-ahead each time)
 - [x] T301 Strict trial S1: Auto with Claude Code, lid closed, Sleep when done (as trial 8); `SleepDisabled` stays 0; Mac sleeps at the end. — **PASS 2026-11-01 on battery (48%).** Hold 16:14:16, lid closed, Mac awake until the grace ended; helper `clientRelease` 16:18:55; `Clamshell Sleep` 16:19:00; `SleepDisabled` 0 throughout. Side finding fixed after it: a single CPU burst made an idle Claude Code read "working" (d3c0585).
 - [x] T302 S2: app kill during a Strict session with the lid closed; helper clears the bit; Mac sleeps. — **PASS 2026-11-03 (on the charger: it charged 60→68%, so S2 did not exercise battery).** Timed session, Timed hold 10:22:44, lid closed 10:23, app killed with SIGKILL; helper `restore … clientDisconnected` 10:24:10–11; **`Clamshell Sleep` 10:24:15**; `SleepDisabled` 0; lid opened 10:29 with no safety stop to clear.
-- [ ] T303 S3: helper kill during a Strict session; recovery job clears the bit.
+- [x] T303 S3: helper kill during a Strict session; recovery job clears the bit. — **PASS 2026-11-03 on battery (78%).** First attempt invalid (the kill pattern `camlid-power-helper` matched nothing; the binary is `com.camlid.power-helper`). Second run: Timed hold 10:41:01, lid closed, helper SIGKILLed 10:42:21; launchd restarted it within about 1 s and the new helper logged `restore … helperRestart`; **`Clamshell Sleep` 10:42:26**; `SleepDisabled` 0. The recovery job was not the actor (the helper came back first); that branch is covered by unit tests only.
 - [ ] T304 S4: restart during a Strict session; nothing to recover after boot.
 - [ ] T306 S5 (both modes): battery session with the lid closed, battery sessions allowed; unplugging mid-session continues; the session stops at the stop level (or a raised test level) and the Mac sleeps.
 - [ ] T305 E5 observation (optional): display plug/unplug and a 15-minute hold; record whether powerd clears the bit.
