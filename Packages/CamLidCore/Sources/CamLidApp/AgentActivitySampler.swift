@@ -74,7 +74,7 @@ extension NativeProcessList {
         var pids = [Int32](repeating: 0, count: capacity)
         let loaded = pids.withUnsafeMutableBytes { proc_listallpids($0.baseAddress, Int32($0.count)) }
         guard loaded > 0 else { return [] }
-        struct Entry { let parent: Int32; let name: String; let start: Double }
+        struct Entry { let parent: Int32; let name: String; let start: Double; var hasTerminal = true }
         var entries: [Int32: Entry] = [:]
         var children: [Int32: [Int32]] = [:]
         for pid in pids.prefix(min(Int(loaded), capacity)) where pid > 0 {
@@ -86,7 +86,8 @@ extension NativeProcessList {
             let name = Self.agentName(pid: pid, processName: raw)
             let parent = Int32(bitPattern: info.pbi_ppid)
             entries[pid] = Entry(parent: parent, name: name,
-                                 start: Double(info.pbi_start_tvsec) + Double(info.pbi_start_tvusec) / 1_000_000)
+                                 start: Double(info.pbi_start_tvsec) + Double(info.pbi_start_tvusec) / 1_000_000,
+                                 hasTerminal: info.e_tdev != UInt32.max)   // NODEV: no controlling terminal
             children[parent, default: []].append(pid)
         }
         func ancestors(_ pid: Int32) -> [String] {
@@ -118,7 +119,9 @@ extension NativeProcessList {
         }
         var result: [AgentActivityProcess] = []
         for (pid, entry) in entries {
-            guard let provider = providerByName[entry.name] else { continue }
+            // Agents someone opened run in a terminal; a headless agent started by a daemon or plugin (a memory
+            // plugin's `claude --output-format stream-json`, 2026-11-03) is not the owner's work and holds nothing.
+            guard let provider = providerByName[entry.name], entry.hasTerminal else { continue }
             let above = ancestors(pid)
             if excludeUnderOrca, above.contains(where: { $0.hasPrefix("orca") }) {
                 result.append(AgentActivityProcess(provider: provider, pid: pid, startTime: entry.start, cpuSeconds: nil, orcaHosted: true))
