@@ -5,6 +5,26 @@ import CamLidPowerService
 // Exit callbacks are plain functions, not closure literals: closures written in top-level code are inferred to be
 // main-actor isolated, and these run on the runtime's queue (that mismatch was logged as a data race at shutdown).
 func exitAfterShutdown() { exit(0) }
+
+/// What SIGTERM/SIGINT must stop. A signal handler written as a closure in top-level code is inferred to be
+/// main-actor isolated, and the runtime logged "data race detected … was not called on the main thread" at every
+/// helper stop; a plain function on a private queue has no isolation to check.
+final class ShutdownTargets: @unchecked Sendable {
+    let observer: RootDomainGeneralInterestObserver?
+    let listener: NSXPCListener
+    let runtime: PowerHelperRuntime
+    init(observer: RootDomainGeneralInterestObserver?, listener: NSXPCListener, runtime: PowerHelperRuntime) {
+        self.observer = observer; self.listener = listener; self.runtime = runtime
+    }
+}
+nonisolated(unsafe) var shutdownTargets: ShutdownTargets?
+func handleTermination() {
+    guard let targets = shutdownTargets else { exit(0) }
+    // The sleep observer's port lives on the main queue; the process exits right after the restore, so it is not
+    // torn down from this queue (a callback racing the teardown must never be able to skip the restore).
+    targets.listener.invalidate()
+    targets.runtime.shutdown(completion: { @Sendable in exitAfterShutdown() })
+}
 func exitAfterFailedStart() {
     logLine("exiting after a failed start so launchd restarts the helper with a fresh pmset runner")
     exit(75)
@@ -89,13 +109,11 @@ do {
 
     signal(SIGTERM, SIG_IGN)
     signal(SIGINT, SIG_IGN)
+    shutdownTargets = ShutdownTargets(observer: sleepObserver, listener: listener, runtime: runtime)
+    let signalQueue = DispatchQueue(label: "dev.camlid.helper.signals")
     let signals = [SIGTERM, SIGINT].map { number -> DispatchSourceSignal in
-        let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
-        source.setEventHandler {
-            sleepObserver?.invalidate()
-            listener.invalidate()
-            runtime.shutdown(completion: { @Sendable in exitAfterShutdown() })
-        }
+        let source = DispatchSource.makeSignalSource(signal: number, queue: signalQueue)
+        source.setEventHandler(handler: handleTermination)
         source.resume()
         return source
     }
