@@ -216,8 +216,11 @@ private struct CauseRow: View {
                         Spacer(minLength: 8)
                         if cause.activeNow { ActiveNowLabel() }
                     }
-                    Text(cause.subtitle).font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    // The page already answers "what keeps it awake", so the plain systemIdle line is not repeated per row.
+                    if cause.subtitle != "Keeps your Mac awake" {
+                        Text(cause.subtitle).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }

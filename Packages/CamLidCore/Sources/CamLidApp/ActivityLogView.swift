@@ -130,8 +130,8 @@ public struct ActivityLogView: View {
             } else if filtered.isEmpty && !isLoading {
                 filteredEmptyState
             } else if !filtered.isEmpty {
-                List(filtered, id: \.id) { record in
-                    row(record)
+                List(ActivityPresentation.collapsed(filtered), id: \.record.id) { run in
+                    row(run.record, repeats: run.count)
                 }
                 .listStyle(.plain)
                 .frame(minHeight: 120, maxHeight: .infinity)
@@ -306,7 +306,7 @@ public struct ActivityLogView: View {
         return rows
     }
 
-    private func row(_ record: StoredTransition) -> some View {
+    private func row(_ record: StoredTransition, repeats: Int = 1) -> some View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 4) {
                 if [ActivityCategory.configuration, .enrollment].contains(record.category), !record.reasonCodes.isEmpty {
@@ -337,6 +337,11 @@ public struct ActivityLogView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .firstTextBaseline) {
                         Text(ActivityPresentation.title(record)).font(.body)
+                        if repeats > 1 {
+                            Text("×\(repeats)").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                                .help("\(repeats) identical events in a row; the newest is shown")
+                                .accessibilityLabel("\(repeats) times")
+                        }
                         Spacer()
                         Text(relativeTimestamp(record.timestamp))
                             .font(.caption).foregroundStyle(.secondary).monospacedDigit()
@@ -361,6 +366,19 @@ public struct ActivityLogView: View {
 
 /// Labels are a presentation layer; stored categories, reasons and states stay intact.
 enum ActivityPresentation {
+    /// Consecutive identical events (same title, state, agent, session and reasons) shown once with a count.
+    /// `rows` is newest first; the newest of each run represents it.
+    static func collapsed(_ rows: [StoredTransition]) -> [(record: StoredTransition, count: Int)] {
+        var runs: [(record: StoredTransition, count: Int)] = []
+        for row in rows {
+            if let last = runs.last?.record, last.category == row.category, last.newState == row.newState,
+               last.providerKind == row.providerKind, last.sessionID == row.sessionID,
+               last.reasonCodes == row.reasonCodes, title(last) == title(row) {
+                runs[runs.count - 1].count += 1
+            } else { runs.append((row, 1)) }
+        }
+        return runs
+    }
     static func categoryName(_ category: ActivityCategory) -> String {
         switch category {
         case .stateTransition: "Session state"
@@ -390,6 +408,15 @@ enum ActivityPresentation {
         record.category == .safetyStop || record.category == .capExpiry || record.category == .recovery
     }
     static func symbol(_ record: StoredTransition) -> String {
+        if record.reasonCodes.first == "agentStateChanged", record.reasonCodes.count > 1 {
+            switch record.reasonCodes[1].split(separator: ":").last?.lowercased() {
+            case "working": return "play.circle"
+            case "idle": return "pause.circle"
+            case "waiting": return "hourglass"
+            case "unknown": return "questionmark.circle"
+            default: break
+            }
+        }
         if record.reasonCodes.contains("temperatureAvailabilityChanged") { return "thermometer" }
         if record.reasonCodes.contains("lidAvailabilityChanged") { return "laptopcomputer" }
         switch record.category {
@@ -434,6 +461,21 @@ enum ActivityPresentation {
         case "batteryFloor": return "Battery below minimum"
         case "notCharging": return "AC power required"
         case "thermalCritical": return "Critical thermal pressure"
+        case "cliQuit": return "Quit from the command line"
+        case "appQuit": return "CamLid quit"
+        case "releaseComplete": return "Sleep setting restored"
+        case "graceExpired": return "Sleep when done finished"
+        case "sleepRequested": return "Sleep requested"
+        case "capReached": return "Time limit reached"
+        case "cpuSustained", "cpuStop": return "CPU stayed busy"
+        case "configWriteFailed": return "Settings could not be saved"
+        case "configConflict": return "Settings changed elsewhere"
+        case "configCommitUnconfirmed": return "Settings write unconfirmed"
+        case "untestedConfigurationAccepted": return "Untested Mac allowed"
+        case "untestedConfigurationWithdrawn": return "Untested Mac no longer allowed"
+        case "safetyLatched": return "Stopped by safety"
+        case "lastTaskStopped": return "Last agent task stopped"
+        case "gracePending": return "Waiting to sleep"
         default: return code.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression).capitalized
         }
     }

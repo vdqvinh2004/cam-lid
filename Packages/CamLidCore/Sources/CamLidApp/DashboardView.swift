@@ -253,39 +253,25 @@ public struct DashboardView: View {
     private var timerSelection: Int {
         durationMinutes == 0 ? 0 : max(0, min(durationMinutes, maximumDurationMinutes))
     }
+    /// Order is by urgency: what holds the Mac awake and the countdown first, then the controls, then telemetry,
+    /// and notices last.
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
-                // While waiting to sleep, the menu bar icon and the countdown below already say so.
-                if data.presentedState != .completionGrace {
-                    HStack(spacing: 8) {
-                        Image(systemName: data.statusSymbol).font(.title3).foregroundStyle(.secondary)
-                        // The same word the menu bar reads to VoiceOver ("Stopped" here used to contradict its "Ready").
-                        Text(data.statusTitle).font(.headline)
-                            .lineLimit(1).truncationMode(.tail)
-                    }.accessibilityElement(children: .combine)
-                        .accessibilityIdentifier(CamLidAccessibility.IDs.statusHeader)
-                        .help(data.statusTitle + (data.displayedReasonText.isEmpty ? "" : ": " + data.displayedReasonText))
-                }
-                Spacer(minLength: 4)
-                Button(action: onOpenLog) { Label("Activity", systemImage: "clock.arrow.circlepath") }
-                    .labelStyle(.iconOnly).buttonStyle(.borderless).help("Open Activity Log")
-                    .accessibilityIdentifier(CamLidAccessibility.IDs.viewLogButton)
-            }
+            header
             if !data.displayedReasonText.isEmpty {
                 Text(data.displayedReasonText).font(.callout).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.tail).help(data.displayedReasonText)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier(CamLidAccessibility.IDs.reasonText)
             }
-            if !data.powerActuationAvailable {
-                PreviewBuildNotice(text: data.capabilityText, font: .caption)
-                if let action = data.capabilityAction, let onCapabilityAction {
-                    Button(action.title) { onCapabilityAction(action) }
-                        .buttonStyle(.link).font(.caption)
-                        .help(action.help)
-                        .accessibilityIdentifier("camlid.dashboard.capabilityAction")
+            if !data.listedAgents.isEmpty {
+                BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
+                    ForEach(data.listedAgents) { agent in
+                        DashboardAgentBadge(agent: agent)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier(CamLidAccessibility.IDs.taskList)
             }
             HStack {
                 if let onModeChange {
@@ -306,79 +292,114 @@ public struct DashboardView: View {
                 }
                 .font(.caption)
             }
-            if let onDurationChange, data.stopEnabled, data.mode == .timed || data.mode == .manual {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Label("Timer", systemImage: "timer").foregroundStyle(.secondary)
-                            .help("Timed duration; Infinite runs until stopped or a safety limit, including the battery time limit")
-                        Picker("Duration", selection: Binding(get: { timerSelection }, set: onDurationChange)) {
-                            Text("∞ Infinite").tag(0)
-                            ForEach(NumericChoice.presets(.timer).filter { $0 > 0 && $0 <= maximumDurationMinutes }, id: \.self) { value in
-                                Text(NumericChoice.label(value, field: .runCap)).tag(value)
-                            }
-                            if timerSelection != 0, !NumericChoice.presets(.timer).contains(timerSelection) {
-                                Text(NumericChoice.label(timerSelection, field: .runCap)).tag(timerSelection)
-                            }
-                        }.labelsHidden().accessibilityLabel("Session duration")
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                            .help("Changing the duration restarts the timer now; battery exposure keeps its original deadline")
-                            .disabled(data.state == .safetyStopped || data.state == .expired)
-                            .accessibilityIdentifier("camlid.dashboard.timer")
-                    }
-                    if let limit = data.timerLimitText {
-                        Text(limit).font(.caption2).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("camlid.dashboard.timerLimit")
-                    }
-                }
-            }
-            if let onSleepDelayChange, data.stopEnabled, data.mode == .auto {
-                HStack(spacing: 8) {
-                    Label("Sleep when done", systemImage: "moon.zzz").foregroundStyle(.secondary)
-                        .help("Auto waits after selected work ends; macOS sleep rules apply")
-                    Picker("Sleep when done", selection: Binding(get: { sleepDelayMinutes }, set: onSleepDelayChange)) {
-                        ForEach(NumericChoice.presets(.completionDelay), id: \.self) { minutes in
-                            Text(minutes == 0 ? "Immediately" : "After \(minutes) min").tag(minutes)
-                        }
-                        if !NumericChoice.presets(.completionDelay).contains(sleepDelayMinutes) {
-                            Text("After \(sleepDelayMinutes) min").tag(sleepDelayMinutes)
-                        }
-                    }.labelsHidden().accessibilityLabel("Auto sleep delay")
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .help("Wait this long after selected agents finish, then let the Mac sleep")
-                        .disabled(data.state == .safetyStopped || data.state == .expired)
-                        .accessibilityIdentifier("camlid.dashboard.sleepDelay")
-                }
-            }
-            if let grace = data.graceRemainingSeconds {
-                VStack(spacing: 2) {
-                    healthRow(data.graceLabel, formatCountdown(grace))
-                }.accessibilityIdentifier("camlid.dashboard.next")
-            }
+            durationRow
+            sleepDelayRow
             DashboardMetrics(metrics: data.metrics)
-            if data.bannerMessage != nil || !data.listedAgents.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    if !data.listedAgents.isEmpty {
-                        BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
-                            ForEach(data.listedAgents) { agent in
-                                DashboardAgentBadge(agent: agent)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityIdentifier(CamLidAccessibility.IDs.taskList)
-                    }
-                    // Notices go last so the working agents stay at the top.
-                    if let message = data.bannerMessage {
-                        CamLidStatusLabel(message, systemImage: "exclamationmark.triangle",
-                                          tone: .warning, help: message)
-                    }
-                }.padding(.top, 4)
-            }
+            notices
         }.padding(10).frame(minWidth: 232, maxWidth: .infinity, alignment: .topLeading)
     }
-    private func healthRow(_ label: String, _ value: String) -> some View {
-        HStack { Text(label).foregroundStyle(.secondary); Spacer(); Text(value).monospacedDigit() }
-            .font(.caption).accessibilityElement(children: .combine)
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 8) {
+            if let grace = data.graceRemainingSeconds {
+                // Waiting to sleep: the countdown is the status. The icon replaces the "Sleep requested in" label.
+                HStack(spacing: 8) {
+                    Image(systemName: "moon.zzz").font(.title3).foregroundStyle(.secondary)
+                    Text(formatCountdown(grace)).font(.headline).monospacedDigit()
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(data.graceLabel)
+                .accessibilityValue(formatCountdown(grace))
+                .accessibilityIdentifier("camlid.dashboard.next")
+                .help(data.graceLabel)
+            } else if data.presentedState != .completionGrace {
+                HStack(spacing: 8) {
+                    Image(systemName: data.statusSymbol).font(.title3).foregroundStyle(.secondary)
+                    // The same word the menu bar reads to VoiceOver ("Stopped" here used to contradict its "Ready").
+                    Text(data.statusTitle).font(.headline)
+                        .lineLimit(1).truncationMode(.tail)
+                }.accessibilityElement(children: .combine)
+                    .accessibilityIdentifier(CamLidAccessibility.IDs.statusHeader)
+                    .help(data.statusTitle + (data.displayedReasonText.isEmpty ? "" : ": " + data.displayedReasonText))
+            }
+            Spacer(minLength: 4)
+            Button(action: onOpenLog) { Label("Activity", systemImage: "clock.arrow.circlepath") }
+                .labelStyle(.iconOnly).buttonStyle(.borderless).help("Open Activity Log")
+                .accessibilityIdentifier(CamLidAccessibility.IDs.viewLogButton)
+        }
+    }
+
+    @ViewBuilder private var durationRow: some View {
+        if let onDurationChange, data.stopEnabled, data.mode == .timed || data.mode == .manual {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: "timer").foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                        .help("Timed duration; Infinite runs until stopped or a safety limit, including the battery time limit")
+                    Picker("Duration", selection: Binding(get: { timerSelection }, set: onDurationChange)) {
+                        Text("∞ Infinite").tag(0)
+                        ForEach(NumericChoice.presets(.timer).filter { $0 > 0 && $0 <= maximumDurationMinutes }, id: \.self) { value in
+                            Text(NumericChoice.label(value, field: .runCap)).tag(value)
+                        }
+                        if timerSelection != 0, !NumericChoice.presets(.timer).contains(timerSelection) {
+                            Text(NumericChoice.label(timerSelection, field: .runCap)).tag(timerSelection)
+                        }
+                    }.labelsHidden().accessibilityLabel("Session duration")
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .help("Changing the duration restarts the timer now; battery exposure keeps its original deadline")
+                        .disabled(data.state == .safetyStopped || data.state == .expired)
+                        .accessibilityIdentifier("camlid.dashboard.timer")
+                }
+                if let limit = data.timerLimitText {
+                    Text(limit).font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("camlid.dashboard.timerLimit")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var sleepDelayRow: some View {
+        if let onSleepDelayChange, data.stopEnabled, data.mode == .auto {
+            HStack(spacing: 8) {
+                Label("Sleep when done", systemImage: "moon.zzz").foregroundStyle(.secondary)
+                    .help("Auto waits after selected work ends; macOS sleep rules apply")
+                Picker("Sleep when done", selection: Binding(get: { sleepDelayMinutes }, set: onSleepDelayChange)) {
+                    ForEach(NumericChoice.presets(.completionDelay), id: \.self) { minutes in
+                        Text(minutes == 0 ? "Immediately" : "After \(minutes) min").tag(minutes)
+                    }
+                    if !NumericChoice.presets(.completionDelay).contains(sleepDelayMinutes) {
+                        Text("After \(sleepDelayMinutes) min").tag(sleepDelayMinutes)
+                    }
+                }.labelsHidden().accessibilityLabel("Auto sleep delay")
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .help("Wait this long after selected agents finish, then let the Mac sleep")
+                    .disabled(data.state == .safetyStopped || data.state == .expired)
+                    .accessibilityIdentifier("camlid.dashboard.sleepDelay")
+            }
+        }
+    }
+
+    /// Readiness is shown only when something is missing; a ready Mac is already said by the status icon.
+    @ViewBuilder private var notices: some View {
+        let showsCapability = !data.powerActuationAvailable && data.capabilityText?.hasPrefix("Closed lid ready") != true
+        if showsCapability || data.bannerMessage != nil {
+            VStack(alignment: .leading, spacing: 6) {
+                if showsCapability {
+                    PreviewBuildNotice(text: data.capabilityText, font: .caption)
+                    if let action = data.capabilityAction, let onCapabilityAction {
+                        Button(action.title) { onCapabilityAction(action) }
+                            .buttonStyle(.link).font(.caption)
+                            .help(action.help)
+                            .accessibilityIdentifier("camlid.dashboard.capabilityAction")
+                    }
+                }
+                if let message = data.bannerMessage {
+                    CamLidStatusLabel(message, systemImage: "exclamationmark.triangle",
+                                      tone: .warning, help: message)
+                }
+            }.padding(.top, 2)
+        }
     }
 }
 

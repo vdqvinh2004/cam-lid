@@ -230,7 +230,7 @@ public struct SettingsView: View {
             case .agents: SettingsAgentsPane(editor: editor)
             case .safety: SettingsSafetyPane(editor: editor, isExpanded: $safetyExpanded)
             }
-        }.formStyle(.grouped).padding(8)
+        }.formStyle(.grouped).padding(.horizontal, 8)
     }
 }
 
@@ -251,7 +251,7 @@ private struct SettingsGeneralPane: View {
         } footer: {
             Text("The Dashboard changes only the current session.")
         }
-        Section("App") {
+        Section {
             Toggle("Launch at login", isOn: Binding(get: { editor.draft.launchAtLogin }, set: editor.setLaunchAtLogin))
                 .help("Open CamLid at login without starting a session")
                 .accessibilityLabel("Launch at login")
@@ -261,6 +261,12 @@ private struct SettingsGeneralPane: View {
                 Button("Apply startup preference") { editor.onApplyLogin?() }
             }
             SettingsFieldOutcome(editor: editor, key: "launchAtLogin")
+            LabeledContent("Activity history") {
+                Button("Open Activity…", action: onOpenActivity)
+                    .help("Search, export or delete local activity")
+            }
+        } footer: {
+            Text("Activity stays on this Mac for 14 days; it never holds prompts, code or transcripts.")
         }
         Section {
             ForEach(Self.categories, id: \.self) { category in
@@ -292,19 +298,7 @@ private struct SettingsGeneralPane: View {
         } header: {
             Text("Notifications")
         }
-        Section {
-            LabeledContent {
-                Button("Open Activity…", action: onOpen)
-                    .help("Search, export or delete local activity")
-            } label: {
-                Text("Kept on this Mac for 14 days; never prompts, code or transcripts.")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("History")
-        }
     }
-    private var onOpen: () -> Void { onOpenActivity }
 }
 
 private struct PermissionStatusLabel: View {

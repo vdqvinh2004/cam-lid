@@ -48,7 +48,7 @@ public struct UpdatesView: View {
                         .disabled(!canCheck).help(canCheck ? "Ask GitHub for the newest release" : detail)
                         .accessibilityIdentifier("camlid.updates.check")
                 }
-                Text("CamLid only checks when you ask; it never downloads or installs updates.")
+                Text("CamLid never downloads or installs updates itself.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }.padding(20).frame(maxWidth: .infinity, alignment: .topLeading)
@@ -75,7 +75,7 @@ public struct UpdatesView: View {
     var title: String {
         switch snapshot.phase {
         case .unavailable: "Updates unavailable"
-        case .ready: "Check for updates"
+        case .ready: "Ready to check"
         case .checking: "Checking for updates…"
         case .current: "You’re up to date"
         case .available: "Update available"

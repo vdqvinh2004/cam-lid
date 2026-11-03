@@ -10,7 +10,7 @@ public enum OnboardingPage: Int, Sendable, CaseIterable {
         }
     }
     var preferredHeight: CGFloat {
-        372 // One height for every page (no jump); step 1 is the tallest static page, the agent list scrolls.
+        432 // One height for every page (no jump); step 1 is the tallest static page, the agent list scrolls.
     }
 }
 

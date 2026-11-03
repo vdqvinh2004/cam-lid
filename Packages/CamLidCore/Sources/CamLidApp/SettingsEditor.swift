@@ -13,7 +13,7 @@ public enum SettingsSection: String, Codable, CaseIterable, Sendable {
     }
     /// Content height that fits each pane (HIG: a settings window resizes to the selected pane). Closed Lid scrolls.
     public var preferredHeight: CGFloat {
-        switch self { case .general: 560; case .agents: 360; case .safety: 620 }
+        switch self { case .general: 520; case .agents: 360; case .safety: 590 }
     }
 }
 

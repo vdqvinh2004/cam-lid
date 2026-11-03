@@ -6,6 +6,17 @@ import CamLidCore
 
 @Suite("QA UI/UX refinement", .serialized)
 struct UIUXRefinementTests {
+    @Test func identicalConsecutiveActivityRowsCollapseIntoOneWithACount() throws {
+        func row(_ state: EffectiveState, provider: String = "orca") throws -> StoredTransition {
+            try StoredTransition(stateRevision: 1, category: .enrollment, newState: state,
+                reasonCodes: ["agentObservation"], providerKind: provider)
+        }
+        let rows = [try row(.ready), try row(.ready), try row(.ready), try row(.protected), try row(.ready), try row(.ready, provider: "codex")]
+        let runs = ActivityPresentation.collapsed(rows)
+        #expect(runs.map(\.count) == [3, 1, 1, 1])
+        #expect(runs[0].record.id == rows[0].id)
+        #expect(ActivityPresentation.collapsed([]).isEmpty)
+    }
     @Test func historyReadKeepsRowsRejectsLateRepliesAndPreservesFailure() throws {
         let record = try StoredTransition(stateRevision: 0, category: .configuration,
             newState: .off, reasonCodes: ["configApplied"])
