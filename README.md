@@ -92,6 +92,12 @@ camlid logs export --redacted --output events.json
 
 Full contract: [CLI](specs/003-native-foundation/contracts/cli.md).
 
+## License
+
+MIT, see [LICENSE](LICENSE). The agent marks bundled for identification remain the trademarks of their owners
+([TRADEMARKS.md](Packages/CamLidCore/Sources/CamLidApp/Resources/TRADEMARKS.md)); the license does not cover them.
+CamLid uses [Sparkle](https://github.com/sparkle-project/Sparkle) (MIT).
+
 ## Privacy
 
 History stays on the Mac (14 days or 20 MiB) and records mode changes, safety stops and agent states, never prompts,
