@@ -349,21 +349,13 @@ private struct SettingsAgentsPane: View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
                 badges(supported)
-                // The all-or-none action shares the "Other agents" row instead of sitting alone on an empty line.
-                HStack(alignment: .top) {
-                    if !others.isEmpty {
-                        DisclosureGroup("Other agents (\(others.count))", isExpanded: $showsOthers) { badges(others) }
-                            .disclosureGroupStyle(RowDisclosureStyle())
-                            .help("Not installed on this Mac, or not supported yet")
-                    } else {
-                        Spacer()
-                    }
-                    Button(editor.allProvidersEnabled ? "Disable All" : "Enable All") {
-                        editor.allProvidersEnabled ? editor.disableAllProviders() : editor.enableAllProviders()
-                    }
-                    .disabled(editor.selectableProviders.isEmpty)
-                    .help(editor.allProvidersEnabled ? "Ignore every agent for sleep decisions" : "Include all agents in sleep decisions")
-                    .accessibilityIdentifier("camlid.agents.enableAll")
+                // The all-or-none action shares the "Other agents" row; the expanded list keeps the full width below it.
+                if !others.isEmpty {
+                    DisclosureGroup("Other agents (\(others.count))", isExpanded: $showsOthers) { badges(others) }
+                        .disclosureGroupStyle(RowDisclosureStyle(trailing: AnyView(allProvidersButton)))
+                        .help("Not installed on this Mac, or not supported yet")
+                } else {
+                    HStack { Spacer(); allProvidersButton }
                 }
                 ForEach(orderedBadges) { state in
                     SettingsFieldOutcome(editor: editor, key: "provider:" + state.provider)
@@ -373,6 +365,15 @@ private struct SettingsAgentsPane: View {
             Text("Agents that may delay sleep")
         }
         WatchedProgramsSection(editor: editor)
+    }
+
+    private var allProvidersButton: some View {
+        Button(editor.allProvidersEnabled ? "Disable All" : "Enable All") {
+            editor.allProvidersEnabled ? editor.disableAllProviders() : editor.enableAllProviders()
+        }
+        .disabled(editor.selectableProviders.isEmpty)
+        .help(editor.allProvidersEnabled ? "Ignore every agent for sleep decisions" : "Include all agents in sleep decisions")
+        .accessibilityIdentifier("camlid.agents.enableAll")
     }
 
     private func badges(_ states: [AgentBadgeState]) -> some View {
@@ -793,7 +794,8 @@ private struct CustomNumberInput: NSViewRepresentable {
     func updateNSView(_ view: NSTextField, context: Context) {
         context.coordinator.parent = self
         let text = editor.numbers[field] ?? ""
-        if view.stringValue != text, view.currentEditor() == nil { view.stringValue = text }
+        // numbers mirrors every keystroke, so a difference here is an outside change (e.g. the CLI), even while focused.
+        if view.stringValue != text { view.stringValue = text }
     }
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var parent: CustomNumberInput

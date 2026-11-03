@@ -549,6 +549,19 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         return "Closed lid ready · untested Mac"
     }
 
+    /// The fix for whatever `closedLidCapabilityText` says is missing, offered right on the Dashboard.
+    var closedLidCapabilityAction: CapabilityAction? {
+        guard !helper.busy else { return nil }
+        let tested = config.powerMode == .strict ? strictRow != nil : closedLidPermit().allowsActuation
+        guard tested else { return .openClosedLidSettings }
+        switch helper.state {
+        case "installed": return config.closedLidOptIn ? nil : .openClosedLidSettings
+        case "notInstalled": return .installHelper
+        case "needsReauthorization": return .reinstallHelper
+        default: return .openClosedLidSettings
+        }
+    }
+
     private var holdDesired: Bool {
         guard closedLidAllowed, config.closedLidOptIn, helper.state == "installed",
               let state = session?.effectiveState else { return false }
@@ -882,6 +895,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     }
     private func showUtility(_ surface: UtilitySurface) {
         if surface == .settings { loginItem.refresh(); Task { await outcomeNotifications.refresh() } }
+        // Other keep-awake apps come and go; look again so a quit app's notice does not linger.
+        if surface == .dashboard { helper.refresh() }
         guard !terminationFlowActive else { return }
         if utilityUI?.isRunning != true {
             do {
@@ -995,7 +1010,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             leaseVerified: holdReconciler.leaseVerified(now: now),
             powerActuationAvailable: holdReconciler.leaseVerified(now: now),
             lidDisplayText: summary.lidDisplay,
-            capabilityText: closedLidCapabilityText,
+            capabilityText: closedLidCapabilityText, capabilityAction: closedLidCapabilityAction,
             tasks: allObservedTasks(now: now).map {
                 DashboardTaskRow(id: $0.id, provider: agents.provider(for: $0.id) ?? activityProvider(for: $0.id) ?? "agent",
                     stateText: $0.state.rawValue, confidenceText: $0.confidence.rawValue)

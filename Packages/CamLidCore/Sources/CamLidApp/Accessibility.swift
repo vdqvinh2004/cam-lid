@@ -3,19 +3,26 @@ import CamLidCore
 
 /// The native disclosure label and its trailing space form one keyboard-operable target.
 struct RowDisclosureStyle: DisclosureGroupStyle {
+    /// Shares the header row (e.g. an all-or-none button) while the content keeps the full width below.
+    var trailing: AnyView?
     func makeBody(configuration: DisclosureGroupStyleConfiguration) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Button { configuration.isExpanded.toggle() } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.right")
-                        .font(.caption).rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
-                        .accessibilityHidden(true)
-                    configuration.label
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }.contentShape(Rectangle())
-            }.buttonStyle(.plain)
-                .accessibilityValue(configuration.isExpanded ? "Expanded" : "Collapsed")
-                .help(configuration.isExpanded ? "Click row to collapse" : "Click row to expand")
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Button { configuration.isExpanded.toggle() } label: {
+                    // The chevron follows the first line, so a two-line label never drifts away from it.
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Image(systemName: "chevron.right")
+                            .font(.caption).rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
+                            .frame(width: 10)
+                            .accessibilityHidden(true)
+                        configuration.label
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }.contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                    .accessibilityValue(configuration.isExpanded ? "Expanded" : "Collapsed")
+                    .help(configuration.isExpanded ? "Click row to collapse" : "Click row to expand")
+                trailing
+            }
             if configuration.isExpanded { configuration.content.padding(.leading, 16) }
         }
     }
@@ -77,7 +84,7 @@ public enum CamLidAccessibility {
             case .protected: base = "Protected"
             case .completionGrace: base = "Waiting after work"
             case .safetyStopped: base = "Stopped by safety"
-            case .expired: base = "Session cap reached"
+            case .expired: base = "Session time limit reached"
             case .unavailable: base = "Status unavailable"
             case .recoveryRequired: base = "Recovery required"
             }
@@ -127,7 +134,7 @@ public enum CamLidAccessibility {
             case .completionGrace:
                 return StatusStyle(tone: .attention, symbolName: "moon.zzz", text: "Waiting after work")
             case .safetyStopped, .expired:
-                return StatusStyle(tone: .stopped, symbolName: "laptopcomputer.trianglebadge.exclamationmark", text: state == .safetyStopped ? "Stopped — safety" : "Cap reached")
+                return StatusStyle(tone: .stopped, symbolName: "laptopcomputer.trianglebadge.exclamationmark", text: state == .safetyStopped ? "Stopped — safety" : "Time limit reached")
             case .off:
                 return StatusStyle(tone: .neutral, symbolName: "laptopcomputer.slash", text: "Off")
             case .unavailable:

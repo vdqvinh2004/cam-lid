@@ -133,7 +133,13 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
                 guard let self, let state = self.state else { return }
                 self.send(.sleepDelay(minutes, state.revision))
             },
-            onOpenAgents: { [weak self] in self?.send(.settings(.agents)) })
+            onOpenAgents: { [weak self] in self?.send(.settings(.agents)) },
+            onCapabilityAction: { [weak self] action in
+                switch action {
+                case .installHelper, .reinstallHelper: self?.send(.installHelper)
+                case .openClosedLidSettings: self?.send(.settings(.safety))
+                }
+            })
         if let host = dashboardHost { host.rootView = view }
         else { dashboardHost = NSHostingController(rootView: view) }
         dashboardHost?.sizingOptions = []

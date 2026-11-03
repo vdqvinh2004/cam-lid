@@ -202,7 +202,8 @@ private struct CauseRow: View {
             .padding(.leading, 32)
             .padding(.vertical, 6)
         } label: {
-            HStack(alignment: .center, spacing: 10) {
+            // First-line alignment keeps the icon level with the title and the disclosure chevron on two-line rows.
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: cause.symbol)
                     .font(.title3)
                     .foregroundStyle(.secondary)

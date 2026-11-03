@@ -74,6 +74,24 @@ public struct DashboardMetric: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
+/// The fix offered beside the closed-lid readiness line when something can be done about it.
+public enum CapabilityAction: String, Codable, Sendable, Equatable {
+    case installHelper, reinstallHelper, openClosedLidSettings
+    public var title: String {
+        switch self {
+        case .installHelper: "Install Helper…"
+        case .reinstallHelper: "Reinstall Helper…"
+        case .openClosedLidSettings: "Open Closed Lid Settings…"
+        }
+    }
+    var help: String {
+        switch self {
+        case .installHelper, .reinstallHelper: "Asks for an administrator password to install the closed-lid helper"
+        case .openClosedLidSettings: "Opens Settings › Closed Lid"
+        }
+    }
+}
+
 /// Render model for the compact dashboard panel. All values are injected —
 /// countdowns come from explicit deadlines, telemetry strings are nil when
 /// unknown (rendered as "Unknown", never green). No live engine wiring.
@@ -94,6 +112,7 @@ public struct DashboardData: Codable, Sendable, Equatable {
     public let lidDisplayText: String?
     /// Replaces the fixed preview notice when set (closed-lid readiness on this Mac).
     public let capabilityText: String?
+    public let capabilityAction: CapabilityAction?
     public let tasks: [DashboardTaskRow]
     public let taskSummaryText: String
     public let batteryText: String?
@@ -127,7 +146,7 @@ public struct DashboardData: Codable, Sendable, Equatable {
         leaseVerified: Bool = false,
         powerActuationAvailable: Bool = false,
         lidDisplayText: String? = nil,
-        capabilityText: String? = nil,
+        capabilityText: String? = nil, capabilityAction: CapabilityAction? = nil,
         tasks: [DashboardTaskRow] = [],
         taskSummaryText: String = "No selected agents reporting work",
         batteryText: String? = nil,
@@ -152,7 +171,7 @@ public struct DashboardData: Codable, Sendable, Equatable {
         self.leaseVerified = leaseVerified
         self.powerActuationAvailable = powerActuationAvailable
         self.lidDisplayText = lidDisplayText
-        self.capabilityText = capabilityText
+        self.capabilityText = capabilityText; self.capabilityAction = capabilityAction
         self.tasks = tasks
         self.taskSummaryText = taskSummaryText
         self.batteryText = batteryText
@@ -209,6 +228,7 @@ public struct DashboardView: View {
     public let sleepDelayMinutes: Int
     public let onSleepDelayChange: (@MainActor @Sendable (Int) -> Void)?
     public let onOpenAgents: (() -> Void)?
+    public let onCapabilityAction: ((CapabilityAction) -> Void)?
 
     public init(data: DashboardData,
         onOpenLog: @escaping () -> Void, onClose: @escaping () -> Void,
@@ -216,12 +236,13 @@ public struct DashboardView: View {
         durationMinutes: Int = 120, onDurationChange: (@MainActor @Sendable (Int) -> Void)? = nil,
         maximumDurationMinutes: Int = 480, sleepDelayMinutes: Int = 2,
         onSleepDelayChange: (@MainActor @Sendable (Int) -> Void)? = nil,
-        onOpenAgents: (() -> Void)? = nil) {
+        onOpenAgents: (() -> Void)? = nil, onCapabilityAction: ((CapabilityAction) -> Void)? = nil) {
         self.data = data
         self.onOpenLog = onOpenLog; self.onClose = onClose; self.onModeChange = onModeChange
         self.durationMinutes = durationMinutes; self.onDurationChange = onDurationChange
         self.maximumDurationMinutes = maximumDurationMinutes; self.sleepDelayMinutes = sleepDelayMinutes
         self.onSleepDelayChange = onSleepDelayChange; self.onOpenAgents = onOpenAgents
+        self.onCapabilityAction = onCapabilityAction
     }
     public var body: some View {
         ViewThatFits(in: .vertical) {
@@ -235,14 +256,17 @@ public struct DashboardView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: data.statusSymbol).font(.title3).foregroundStyle(.secondary)
-                    // The same word the menu bar reads to VoiceOver ("Stopped" here used to contradict its "Ready").
-                    Text(data.statusTitle).font(.headline)
-                        .lineLimit(1).truncationMode(.tail)
-                }.accessibilityElement(children: .combine)
-                    .accessibilityIdentifier(CamLidAccessibility.IDs.statusHeader)
-                    .help(data.statusTitle + (data.displayedReasonText.isEmpty ? "" : ": " + data.displayedReasonText))
+                // While waiting to sleep, the menu bar icon and the countdown below already say so.
+                if data.presentedState != .completionGrace {
+                    HStack(spacing: 8) {
+                        Image(systemName: data.statusSymbol).font(.title3).foregroundStyle(.secondary)
+                        // The same word the menu bar reads to VoiceOver ("Stopped" here used to contradict its "Ready").
+                        Text(data.statusTitle).font(.headline)
+                            .lineLimit(1).truncationMode(.tail)
+                    }.accessibilityElement(children: .combine)
+                        .accessibilityIdentifier(CamLidAccessibility.IDs.statusHeader)
+                        .help(data.statusTitle + (data.displayedReasonText.isEmpty ? "" : ": " + data.displayedReasonText))
+                }
                 Spacer(minLength: 4)
                 Button(action: onOpenLog) { Label("Activity", systemImage: "clock.arrow.circlepath") }
                     .labelStyle(.iconOnly).buttonStyle(.borderless).help("Open Activity Log")
@@ -256,6 +280,12 @@ public struct DashboardView: View {
             }
             if !data.powerActuationAvailable {
                 PreviewBuildNotice(text: data.capabilityText, font: .caption)
+                if let action = data.capabilityAction, let onCapabilityAction {
+                    Button(action.title) { onCapabilityAction(action) }
+                        .buttonStyle(.link).font(.caption)
+                        .help(action.help)
+                        .accessibilityIdentifier("camlid.dashboard.capabilityAction")
+                }
             }
             HStack {
                 if let onModeChange {
@@ -328,10 +358,6 @@ public struct DashboardView: View {
             DashboardMetrics(metrics: data.metrics)
             if data.bannerMessage != nil || !data.listedAgents.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    if let message = data.bannerMessage {
-                        CamLidStatusLabel(message, systemImage: "exclamationmark.triangle",
-                                          tone: .warning, help: message)
-                    }
                     if !data.listedAgents.isEmpty {
                         BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
                             ForEach(data.listedAgents) { agent in
@@ -340,6 +366,11 @@ public struct DashboardView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier(CamLidAccessibility.IDs.taskList)
+                    }
+                    // Notices go last so the working agents stay at the top.
+                    if let message = data.bannerMessage {
+                        CamLidStatusLabel(message, systemImage: "exclamationmark.triangle",
+                                          tone: .warning, help: message)
                     }
                 }.padding(.top, 4)
             }
