@@ -76,6 +76,19 @@ Orca observation on; "Sleep when done" 1 min; AC power.
 
 Fixes between runs: `0cdf84e`, `b3157d3` (owner option A: fresh idle Orca metadata is completion), `4aab9e4`,
 `b0e8dfe` (the helper sleeps the Mac after every restore with the lid closed and no external display).
-Not covered by trial 8: app kill and helper kill during an Auto session (014 T706 remainder).
+Not covered by trial 8 itself: app kill and helper kill during an Auto session. They were run separately on
+2026-11-03 (below).
+
+### Trial 8 follow-up: app kill and helper kill, Standard, on battery (2026-11-03)
+Timed sessions (the kill paths do not depend on the agent), lid closed, battery 70–73%, "Allow on battery" on.
+
+| Run | Result | Evidence |
+|---|---|---|
+| App kill (SIGKILL) | **PASS** | Hold 11:28:53 (`SleepDisabled` 1), app killed 11:30:27; helper `restore … clientDisconnected`, `sleep requested`, `SleepDisabled` 0; **`Software Sleep pid=16414` (the helper) 11:30:32**. |
+| Helper kill (SIGKILL), first run | **FAIL**, fixed in `0d48656` | Hold 11:35:21, helper killed 11:36:34; launchd restarted it and the new helper restored `SleepDisabled` to 0 but did not sleep the Mac (`helperRestart` was on the no-sleep list): lid closed, Mac awake, no sleep in `pmset -g log` until the lid was opened. |
+| Helper kill, second run | **PASS** | Hold 11:42:50, helper killed 11:44:04; the new helper logged `restore … helperRestart` and `sleep requested`; **`Software Sleep pid=30077` 11:44:09**; `SleepDisabled` 0. |
+
+The recovery job was not the actor in either kill (launchd brought the helper back first); its branch is covered by
+unit tests only.
 
 Owner approval (2026-10-31): row `mac17-3-26a434` (Mac17,3, macOS 26A434) added to `QualifiedSupportRows.rows`.
