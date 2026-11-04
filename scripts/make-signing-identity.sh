@@ -26,7 +26,7 @@ if security find-certificate -c "$NAME" "$KEYCHAIN" >/dev/null 2>&1; then
   exit 0
 fi
 [ ! -e "$OUT" ] || { echo "$OUT already exists; move it away first." >&2; exit 1; }
-mkdir -m 700 "$OUT"
+mkdir -p -m 700 "$OUT"
 cd "$OUT"
 
 cat > cert.cnf <<EOF
