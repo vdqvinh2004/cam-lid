@@ -541,6 +541,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case "installed": break
         case "notInstalled": return "Can’t keep your Mac awake · helper not installed"
         case "needsReauthorization": return "Can’t keep your Mac awake · reinstall the helper after this update"
+        case "needsHelperUpdate": return "Can’t keep your Mac awake · the helper has an update to install"
         case "installedNotLoaded": return "Can’t keep your Mac awake · the helper is installed but not running"
         default: return "Can’t keep your Mac awake · the helper needs attention in Settings › Closed Lid"
         }
@@ -558,7 +559,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         switch helper.state {
         case "installed": return config.closedLidOptIn ? nil : .openClosedLidSettings
         case "notInstalled": return .installHelper
-        case "needsReauthorization", "installedNotLoaded": return .reinstallHelper
+        case "needsReauthorization", "needsHelperUpdate", "installedNotLoaded": return .reinstallHelper
         default: return .openClosedLidSettings
         }
     }

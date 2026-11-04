@@ -16,6 +16,7 @@ let package = Package(
     targets: [
         .target(
             name: "CamLidCore",
+            dependencies: [.product(name: "CamLidPowerWire", package: "CamLidPowerWire")],
             path: "Sources/CamLidCore"
         ),
         .target(

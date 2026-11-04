@@ -50,4 +50,25 @@ import Testing
         let pins = try LocalIdentityPins(appCDHash: hash, helperCDHash: String(repeating: "b", count: 40))
         #expect(try pins.requirement(forHelper: true) != pins.requirement(forHelper: false))
     }
+
+    @Test func signerPinsNameTheCertificateAndTheIdentifierNotAnExactBuild() throws {
+        let leaf = String(repeating: "c", count: 40)
+        let pins = try LocalIdentityPins(signerLeaf: leaf)
+        let helper = try pins.requirement(forHelper: true)
+        let app = try pins.requirement(forHelper: false)
+        #expect(helper.contains("identifier \"com.camlid.power-helper\"") && helper.contains("certificate leaf = H\"\(leaf)\""))
+        #expect(app.contains("identifier \"com.camlid.CamLid\"") && !app.contains("cdhash"))
+        #expect(PowerHelperVersion.current >= 1 && pins.helperVersion == PowerHelperVersion.current)
+    }
+
+    @Test func signerPinsRejectMalformedOrMixedContent() throws {
+        #expect(throws: (any Error).self) { try LocalIdentityPins(signerLeaf: "short") }
+        #expect(throws: (any Error).self) { try LocalIdentityPins(signerLeaf: String(repeating: "C", count: 40)) }
+        #expect(throws: (any Error).self) { try LocalIdentityPins(signerLeaf: String(repeating: "c", count: 40), helperVersion: 0) }
+        let mixed = Data(#"{"version":2,"signerLeaf":"\#(String(repeating: "c", count: 40))","helperVersion":1,"appCDHash":"\#(String(repeating: "a", count: 40))"}"#.utf8)
+        let decoded = try JSONDecoder().decode(LocalIdentityPins.self, from: mixed)
+        #expect(throws: (any Error).self) { try decoded.validate() }
+        let old = Data(#"{"version":1,"appCDHash":"\#(String(repeating: "a", count: 40))","helperCDHash":"\#(String(repeating: "b", count: 40))"}"#.utf8)
+        try JSONDecoder().decode(LocalIdentityPins.self, from: old).validate()   // existing installs keep working
+    }
 }

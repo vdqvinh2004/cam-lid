@@ -1,4 +1,5 @@
 import Foundation
+import CamLidPowerWire
 
 /// Locations of the Standard-mode helper. `root` is "/" in production and a temporary directory in tests.
 public struct HelperInstallPaths: Sendable {
@@ -45,6 +46,8 @@ public enum HelperInstallStatus: Equatable, Sendable {
     case needsReauthorization
     /// The installed helper binary does not match its pin.
     case helperIdentityMismatch
+    /// This app ships a newer helper than the one installed; the helper itself changed.
+    case needsHelperUpdate
     case partial(missing: [String])
 }
 
@@ -81,13 +84,17 @@ public struct HelperInstaller: Sendable {
     private let runner: any HelperCommandRunning
     private let isAdministrator: Bool
     private let applyOwnership: Bool
+    /// The helper version this app ships; tests give another to stand for a newer app.
+    private let bundledHelperVersion: Int
 
     public init(paths: HelperInstallPaths = HelperInstallPaths(), runner: any HelperCommandRunning = ProcessCommandRunner(),
-                isAdministrator: Bool = geteuid() == 0, applyOwnership: Bool = true) {
+                isAdministrator: Bool = geteuid() == 0, applyOwnership: Bool = true,
+                bundledHelperVersion: Int = PowerHelperVersion.current) {
         self.paths = paths
         self.runner = runner
         self.isAdministrator = isAdministrator
         self.applyOwnership = applyOwnership
+        self.bundledHelperVersion = bundledHelperVersion
     }
 
     // MARK: Status
@@ -100,8 +107,16 @@ public struct HelperInstaller: Sendable {
         if missing.count == required.count { return .notInstalled }
         if !missing.isEmpty { return .partial(missing: missing) }
         guard let pins = readPins() else { return .partial(missing: ["validPins"]) }
-        guard let helperHash = cdHash(of: paths.helperBinary), helperHash == pins.helperCDHash else { return .helperIdentityMismatch }
-        guard let appHash = cdHash(of: appBundle), appHash == pins.appCDHash else { return .needsReauthorization }
+        switch pins {
+        case .exactBuilds(let app, let helper):
+            guard let helperHash = cdHash(of: paths.helperBinary), helperHash == helper else { return .helperIdentityMismatch }
+            guard let appHash = cdHash(of: appBundle), appHash == app else { return .needsReauthorization }
+        case .signer(let leaf, let helperVersion):
+            // A certificate pin survives app updates: only a different signer, or a newer helper, needs the owner.
+            guard signerLeaf(of: paths.helperBinary) == leaf else { return .helperIdentityMismatch }
+            guard signerLeaf(of: appBundle) == leaf else { return .needsReauthorization }
+            guard bundledHelperVersion <= helperVersion else { return .needsHelperUpdate }
+        }
         return .installed(loaded: isServiceLoaded(HelperInstallPaths.helperLabel))
     }
 
@@ -135,7 +150,8 @@ public struct HelperInstaller: Sendable {
                 return .refused("previousPinsBackupExists", previousPinFile.path)
             }
             movedPins = true
-        case .installed where readPins()?.helperCDHash == helperHash && readPins()?.appCDHash == appHash:
+        case .installed where readPins() == expectedPins(app: appHash, helper: helperHash, appSigner: signerLeaf(of: appBundle),
+                                                         helperSigner: signerLeaf(of: source)):
             return .ok("alreadyInstalled")
         default:
             return .refused("alreadyInstalledDifferently", "Run: sudo camlid helper uninstall, then install; or helper trust after a rebuild.")
@@ -165,7 +181,8 @@ public struct HelperInstaller: Sendable {
             try FileManager.default.copyItem(at: source, to: paths.helperBinary)
             written.append(paths.helperBinary)
             try secure(paths.helperBinary, mode: 0o755)
-            try write(pinData(app: appHash, helper: helperHash), to: paths.pinFile, mode: 0o644)
+            try write(pinData(app: appHash, helper: helperHash, appSigner: signerLeaf(of: appBundle), helperSigner: signerLeaf(of: source)),
+                      to: paths.pinFile, mode: 0o644)
             written.append(paths.pinFile)
             try write(Self.plist(label: HelperInstallPaths.helperLabel, program: paths.helperBinary.path,
                                  argument: "--standard-v1", resident: true), to: paths.helperPlist, mode: 0o644)
@@ -197,7 +214,10 @@ public struct HelperInstaller: Sendable {
             return .refused("signatureUnreadable")
         }
         guard helperHash != appHash else { return .refused("identitiesNotDistinct") }
-        do { try write(pinData(app: appHash, helper: helperHash), to: paths.pinFile, mode: 0o644) }
+        do {
+            try write(pinData(app: appHash, helper: helperHash, appSigner: signerLeaf(of: appBundle),
+                              helperSigner: signerLeaf(of: paths.helperBinary)), to: paths.pinFile, mode: 0o644)
+        }
         catch { return .refused("trustFailed", String(describing: error)) }
         let kick = runner.run("/bin/launchctl", ["kickstart", "-k", "system/\(HelperInstallPaths.helperLabel)"])
         return kick.status == 0 ? .ok("trusted") : .ok("trustedRestartPending", kick.output)
@@ -288,17 +308,45 @@ public struct HelperInstaller: Sendable {
         return info.status == 0 ? Self.parseCDHash(info.output) : nil
     }
 
-    private func readPins() -> (appCDHash: String, helperCDHash: String)? {
+    private enum Pins: Equatable { case exactBuilds(app: String, helper: String), signer(leaf: String, helperVersion: Int) }
+
+    private func readPins() -> Pins? {
         guard let data = try? Data(contentsOf: paths.pinFile),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              object["version"] as? Int == 1, let app = object["appCDHash"] as? String,
-              let helper = object["helperCDHash"] as? String, app != helper else { return nil }
-        return (app, helper)
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        if object["version"] as? Int == 1, let app = object["appCDHash"] as? String,
+           let helper = object["helperCDHash"] as? String, app != helper { return .exactBuilds(app: app, helper: helper) }
+        if object["version"] as? Int == 2, let leaf = object["signerLeaf"] as? String,
+           let version = object["helperVersion"] as? Int, version >= 1 { return .signer(leaf: leaf, helperVersion: version) }
+        return nil
     }
 
-    private func pinData(app: String, helper: String) throws -> Data {
-        try JSONSerialization.data(withJSONObject: ["version": 1, "appCDHash": app, "helperCDHash": helper],
-                                   options: [.prettyPrinted, .sortedKeys])
+    /// SHA-1 of the leaf certificate, read from the designated requirement `codesign` prints: `certificate leaf = H"…"`.
+    /// Nil for an ad-hoc signature, which names no certificate.
+    private func signerLeaf(of url: URL) -> String? {
+        guard runner.run("/usr/bin/codesign", ["--verify", "--strict", url.path]).status == 0 else { return nil }
+        let out = runner.run("/usr/bin/codesign", ["-d", "-r-", url.path])
+        guard out.status == 0, let range = out.output.range(of: "certificate leaf = H\"") else { return nil }
+        let rest = out.output[range.upperBound...]
+        guard let end = rest.firstIndex(of: "\"") else { return nil }
+        let hash = String(rest[..<end])
+        return hash.count == 40 && hash.allSatisfy({ $0.isHexDigit && !$0.isUppercase }) ? hash : nil
+    }
+
+    /// One certificate for both app and helper pins that certificate; anything else pins the exact builds.
+    private func expectedPins(app: String, helper: String, appSigner: String?, helperSigner: String?) -> Pins {
+        if let appSigner, appSigner == helperSigner { return .signer(leaf: appSigner, helperVersion: bundledHelperVersion) }
+        return .exactBuilds(app: app, helper: helper)
+    }
+
+    private func pinData(app: String, helper: String, appSigner: String?, helperSigner: String?) throws -> Data {
+        switch expectedPins(app: app, helper: helper, appSigner: appSigner, helperSigner: helperSigner) {
+        case .signer(let leaf, let version):
+            return try JSONSerialization.data(withJSONObject: ["version": 2, "signerLeaf": leaf, "helperVersion": version],
+                                              options: [.prettyPrinted, .sortedKeys])
+        case .exactBuilds(let app, let helper):
+            return try JSONSerialization.data(withJSONObject: ["version": 1, "appCDHash": app, "helperCDHash": helper],
+                                              options: [.prettyPrinted, .sortedKeys])
+        }
     }
 
     private func isRegularFile(_ url: URL) -> Bool {

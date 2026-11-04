@@ -94,7 +94,7 @@ public struct UpdatesView: View {
         case "networkUnavailable": "Reconnect to the internet, then try again. Your installed version hasn’t changed."
         case "updateCheckFailed": "The check didn’t complete. Your installed version hasn’t changed. Try again later."
         case "latestCompatibleVersion": "This is the newest published version."
-        case "updateAvailable": "A newer version is available. Download it from the releases page, then reinstall the helper once."
+        case "updateAvailable": "A newer version is available. Download it from the releases page and replace the app. CamLid asks you to reinstall the helper only if the helper changed."
         case "checkingReleases": "Asking GitHub for the newest release. Nothing is downloaded or installed."
         default: "CamLid checks only when you ask. It sends no account, no cookies and no system profile."
         }

@@ -27,10 +27,19 @@ HELPER="$APP/Contents/Library/LaunchServices/camlid-power-helper"
 
 echo "== Verifying the bundle"
 fail() { echo "FAILED: $1" >&2; exit 1; }
+# SHA-1 of the leaf certificate: what the helper pins, taken from the designated requirement.
+leaf() { codesign -d -r- "$1" 2>&1 | sed -n 's/.*certificate leaf = H"\([0-9a-f]*\)".*/\1/p' | head -1; }
 verify() {
   codesign --verify --deep --strict "$1" 2>/dev/null || fail "deep signature check of $1"
   info="$(codesign -dvvv "$1" 2>&1)"
-  echo "$info" | grep -q 'flags=.*adhoc' || fail "app is not ad-hoc signed"
+  if [ -n "${CAMLID_SIGN_IDENTITY:-}" ]; then
+    echo "$info" | grep -q 'flags=.*adhoc' && fail "signed ad hoc although CAMLID_SIGN_IDENTITY is set"
+    [ -n "$(leaf "$1")" ] || fail "no signing certificate found on $1"
+    [ "$(leaf "$1")" = "$(leaf "$1/Contents/Library/LaunchServices/camlid-power-helper")" ] || fail "app and helper use different certificates"
+    [ "$(leaf "$1")" = "$(leaf "$1/Contents/Helpers/camlid")" ] || fail "app and command-line tool use different certificates"
+  else
+    echo "$info" | grep -q 'flags=.*adhoc' || fail "app is not ad-hoc signed"
+  fi
   echo "$info" | grep -q 'flags=.*runtime' || fail "hardened runtime is off (the helper rejects the app without it)"
   [ -z "$(codesign -d --entitlements - "$1" 2>/dev/null | grep -i 'key' || true)" ] || fail "the app carries entitlements"
   [ ! -d "$1/Contents/Frameworks" ] || fail "unexpected nested frameworks"
@@ -57,6 +66,13 @@ verify "$BUILD/unzipped/CamLid.app"   # the signature must survive the archive
 [ "$(codesign -dvvv "$BUILD/unzipped/CamLid.app" 2>&1 | sed -n 's/^CDHash=//p')" = "$APP_CDHASH" ] || fail "app changed in the archive"
 SHA="$(cut -d' ' -f1 "dist/$NAME.zip.sha256")"
 
+if [ -n "${CAMLID_SIGN_IDENTITY:-}" ]; then
+  LEAF="$(leaf "$APP")"
+  PIN_TEXT="The helper only obeys an app signed with this release certificate (SHA-1 $LEAF) under the identifier com.camlid.CamLid, so a changed or unsigned app is refused. Updating the app does not need the helper reinstalled unless the notes say the helper changed."
+else
+  PIN_TEXT="The helper only obeys the exact app (and helper) code hashes it was installed with, so a changed app is refused and every rebuild needs Reinstall helper…."
+fi
+
 cat > "dist/RELEASE_NOTES-$VERSION.md" <<NOTES
 ## CamLid $VERSION
 
@@ -79,7 +95,7 @@ shasum -a 256 $NAME.zip      # must print: $SHA
 codesign -dvvv /Applications/CamLid.app 2>&1 | grep CDHash    # app:    $APP_CDHASH
 codesign -dvvv /Applications/CamLid.app/Contents/Library/LaunchServices/camlid-power-helper 2>&1 | grep CDHash   # helper: $HELPER_CDHASH
 \`\`\`
-The helper only obeys the exact app (and helper) code hashes it was installed with, so a changed app is refused.
+$PIN_TEXT
 You can always build it yourself instead: see the README.
 
 ### Remove

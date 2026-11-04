@@ -2,32 +2,71 @@ import Foundation
 import Darwin
 import Security
 
-/// Explicit local-development trust, installed by root out-of-band, not a UID-only fallback.
-/// Both executables remain kernel-validated against distinct exact CDHashes.
+/// Bumped whenever the helper's behavior changes. The pins record the version installed; an app that ships a higher
+/// one asks for a reinstall, an app that ships the same one never does.
+public enum PowerHelperVersion {
+    public static let current = 1
+}
+
+/// Explicit local trust, installed by root out-of-band, not a UID-only fallback.
+/// Version 1 (ad-hoc builds): both executables are kernel-validated against distinct exact CDHashes, so any rebuild
+/// needs a new install. Version 2 (releases signed with a stable certificate): both are validated against their
+/// identifier plus the signing certificate's hash, so an app update keeps working until the helper itself changes.
 public struct LocalIdentityPins: Codable, Sendable {
     public let version: Int
-    public let appCDHash: String
-    public let helperCDHash: String
+    public let appCDHash: String?
+    public let helperCDHash: String?
+    /// SHA-1 of the leaf certificate that signed both the app and the helper (version 2).
+    public let signerLeaf: String?
+    /// `PowerHelperVersion.current` at install time (version 2).
+    public let helperVersion: Int?
 
     public init(appCDHash: String, helperCDHash: String) throws {
         version = 1
         self.appCDHash = appCDHash
         self.helperCDHash = helperCDHash
+        signerLeaf = nil; helperVersion = nil
         try validate()
     }
 
+    public init(signerLeaf: String, helperVersion: Int = PowerHelperVersion.current) throws {
+        version = 2
+        self.signerLeaf = signerLeaf
+        self.helperVersion = helperVersion
+        appCDHash = nil; helperCDHash = nil
+        try validate()
+    }
+
+    private static func isSHA1(_ text: String?) -> Bool {
+        guard let text else { return false }
+        return text.count == 40 && text.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
+    }
+
     public func validate() throws {
-        let hashes = [appCDHash, helperCDHash]
-        guard version == 1, appCDHash != helperCDHash,
-              hashes.allSatisfy({ $0.count == 40 && $0.utf8.allSatisfy({
-                  (48...57).contains($0) || (97...102).contains($0)
-              }) }) else { throw HelperIdentityFailure.invalidIdentity }
+        switch version {
+        case 1:
+            guard let app = appCDHash, let helper = helperCDHash, app != helper,
+                  Self.isSHA1(app), Self.isSHA1(helper), signerLeaf == nil, helperVersion == nil else {
+                throw HelperIdentityFailure.invalidIdentity
+            }
+        case 2:
+            guard Self.isSHA1(signerLeaf), let helperVersion, helperVersion >= 1,
+                  appCDHash == nil, helperCDHash == nil else { throw HelperIdentityFailure.invalidIdentity }
+        default: throw HelperIdentityFailure.invalidIdentity
+        }
     }
 
     public func requirement(forHelper: Bool) throws -> String {
         try validate()
-        let hash = forHelper ? helperCDHash : appCDHash
-        let text = "cdhash H\"\(hash)\" and !(entitlement[\"com.apple.security.get-task-allow\"] exists)"
+        let noDebug = "!(entitlement[\"com.apple.security.get-task-allow\"] exists)"
+        let text: String
+        if version == 2, let signerLeaf {
+            let identifier = forHelper ? PowerHelperIdentity.serviceName : PowerHelperIdentity.appIdentifier
+            text = "identifier \"\(identifier)\" and certificate leaf = H\"\(signerLeaf)\" and \(noDebug)"
+        } else {
+            let hash = (forHelper ? helperCDHash : appCDHash) ?? ""
+            text = "cdhash H\"\(hash)\" and \(noDebug)"
+        }
         var requirement: SecRequirement?
         guard SecRequirementCreateWithString(text as CFString, [], &requirement) == errSecSuccess else {
             throw HelperIdentityFailure.invalidRequirement

@@ -70,6 +70,8 @@ import CamLidCore
             message = loaded ? "Installed and running." : "Installed but not running. Reinstall or restart the Mac."
         case .needsReauthorization:
             state = "needsReauthorization"; message = "This build of CamLid changed since the helper was installed. Reinstall to authorize it."
+        case .needsHelperUpdate:
+            state = "needsHelperUpdate"; message = "This version of CamLid ships a newer helper. Reinstall to update it."
         case .helperIdentityMismatch:
             state = "helperIdentityMismatch"; message = "The installed helper does not match its pin. Remove it and install again."
         case .partial(let missing) where Set(missing) == ["helper", "daemonPlist", "recoveryPlist"]:

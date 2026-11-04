@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import CryptoKit
 
 @objc public protocol PowerHelperXPC {
     func perform(_ data: Data, withReply reply: @escaping @Sendable (Data) -> Void)
@@ -66,6 +67,14 @@ public enum PowerHelperIdentity {
         // Root-installed exact pins, never caller-configured trust or a UID-only bypass.
         let pins = try LocalIdentityPins.loadInstalled()
         let values = try signingInformation(expectedIdentifier: ownIdentifier)
+        if pins.version == 2 {
+            // Own check: this process is signed by the pinned certificate. The peer is held to the same by the requirement.
+            guard let certificates = values[kSecCodeInfoCertificates as String] as? [SecCertificate], let leaf = certificates.first,
+                  Self.sha1Hex(SecCertificateCopyData(leaf) as Data) == pins.signerLeaf else {
+                throw HelperIdentityFailure.invalidIdentity
+            }
+            return try pins.requirement(forHelper: forHelper)
+        }
         guard let hash = values[kSecCodeInfoUnique as String] as? Data, hash.count == 20 else {
             throw HelperIdentityFailure.invalidIdentity
         }
@@ -74,6 +83,11 @@ public enum PowerHelperIdentity {
             throw HelperIdentityFailure.invalidIdentity
         }
         return try pins.requirement(forHelper: forHelper)
+    }
+
+    /// The hash `certificate leaf = H"…"` compares: SHA-1 of the certificate's DER bytes.
+    static func sha1Hex(_ data: Data) -> String {
+        Insecure.SHA1.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     public static func requirement(identifier: String, team: String) throws -> String {

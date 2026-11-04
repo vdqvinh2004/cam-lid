@@ -668,6 +668,7 @@ public enum Commands {
             case .notInstalled: label = "notInstalled"
             case .installed(let loaded): label = loaded ? "installed" : "installedNotLoaded"
             case .needsReauthorization: label = "needsReauthorization"
+            case .needsHelperUpdate: label = "needsHelperUpdate"
             case .helperIdentityMismatch: label = "helperIdentityMismatch"
             case .partial: label = "partial"
             }

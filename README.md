@@ -20,7 +20,9 @@ root helper; check them before you run it.
 3. Continue with [Install and use](#install-and-use).
 
 Updating: *Check for Updates…* asks GitHub for the newest release when you click it and opens the Releases page; it
-never downloads or installs anything. After installing a new version, click **Reinstall helper…** once.
+never downloads or installs anything. A release is signed with CamLid's own certificate, so the installed helper keeps
+working with the new app; CamLid asks you to reinstall the helper only when the helper itself changed, and the release
+notes say so. An app you sign ad hoc yourself needs **Reinstall helper…** after every rebuild.
 
 ## What it does
 
@@ -44,7 +46,8 @@ administrator password ([ADR 0001](docs/adr/0001-persistent-helper-and-strict-ex
 [spec 014](specs/014-persistent-helper/spec.md)).
 
 - **Standard (default)** sets the system `SleepDisabled` setting while a session runs and restores it afterwards.
-- The helper only acts for a signed CamLid app or CLI whose code hash it pinned at install, holds a 30-second lease
+- The helper only acts for a signed CamLid app whose signing certificate (or, for ad-hoc builds, exact code hash) it
+  pinned at install ([ADR 0005](docs/adr/0005-stable-signing-certificate-for-the-helper-pin.md)), holds a 30-second lease
   that the app renews every 10 seconds, and restores the setting when the lease lapses (app quit, crash or hang).
 - An independent recovery job runs every 15 seconds and restores the setting if the helper itself is gone.
 - A journal records what CamLid changed, so the setting is restored after a crash or restart.
@@ -68,7 +71,9 @@ xcodebuild -project CamLid.xcodeproj -scheme CamLid -configuration Release \
 ditto "$HOME/CamLidBuild/Build/Products/Release/CamLid.app" /Applications/CamLid.app
 ```
 
-The build signs the app and its embedded helper ad hoc. `project.yml` is the XcodeGen source
+The build signs the app and its embedded helper ad hoc. To sign with a stable certificate instead (so rebuilds and
+updates keep the installed helper), run `scripts/make-signing-identity.sh` once, then
+`CAMLID_SIGN_IDENTITY="CamLid Release Signing" scripts/release.sh`. `project.yml` is the XcodeGen source
 (`xcodegen generate` after changing targets).
 
 Tests (each package):

@@ -4,6 +4,7 @@ import Testing
 
 private final class FakeRunner: HelperCommandRunning, @unchecked Sendable {
     var hashes: [String: String] = [:]          // path suffix -> cdhash
+    var leaves: [String: String] = [:]          // path suffix -> signing certificate hash (absent: ad-hoc)
     var failing: Set<String> = []               // "executable arg0" prefixes that exit 1
     var calls: [String] = []
     var loaded: Set<String> = []                // launchd labels currently loaded
@@ -23,6 +24,13 @@ private final class FakeRunner: HelperCommandRunning, @unchecked Sendable {
             case "bootout": loaded.remove(String(target.dropFirst("system/".count))); return (0, "")
             default: return (0, "")
             }
+        }
+        if executable == "/usr/bin/codesign", arguments.first == "-d", arguments.dropFirst().first == "-r-", let path = arguments.last {
+            guard let hash = hashes.first(where: { path.hasSuffix($0.key) })?.value else { return (1, "") }
+            if let leaf = leaves.first(where: { path.hasSuffix($0.key) })?.value {
+                return (0, "Executable=\(path)\ndesignated => identifier \"x\" and certificate leaf = H\"\(leaf)\"\n")
+            }
+            return (0, "designated => cdhash H\"\(hash)\"\n")
         }
         if executable == "/usr/bin/codesign", arguments.first == "-dvvv", let path = arguments.last {
             guard let hash = hashes.first(where: { path.hasSuffix($0.key) })?.value else { return (1, "") }
@@ -55,6 +63,49 @@ private struct Rig {
 }
 
 @Suite struct HelperInstallerTests {
+    private func installedWithOneSigner(_ rig: Rig, helperVersion: Int = 1) throws -> HelperInstaller {
+        let leaf = String(repeating: "c", count: 40)
+        rig.runner.leaves = ["CamLid.app": leaf, "camlid-power-helper": leaf, "com.camlid.power-helper": leaf]
+        let installer = HelperInstaller(paths: rig.paths, runner: rig.runner, isAdministrator: true, applyOwnership: false,
+                                        bundledHelperVersion: helperVersion)
+        #expect(installer.install(appBundle: rig.app).accepted)
+        return installer
+    }
+
+    @Test func aSharedCertificatePinsTheSignerAndSurvivesAnAppUpdate() throws {
+        let rig = try Rig()
+        let installer = try installedWithOneSigner(rig)
+        let pins = try JSONSerialization.jsonObject(with: Data(contentsOf: rig.paths.pinFile)) as? [String: Any]
+        #expect(pins?["version"] as? Int == 2 && pins?["signerLeaf"] as? String == String(repeating: "c", count: 40))
+        #expect(pins?["helperVersion"] as? Int == 1 && pins?["appCDHash"] == nil)
+        #expect(installer.status(appBundle: rig.app) == .installed(loaded: true))
+        // A new app build: another CDHash, same certificate. No reinstall.
+        rig.runner.hashes["CamLid.app"] = String(repeating: "d", count: 40)
+        #expect(installer.status(appBundle: rig.app) == .installed(loaded: true))
+    }
+
+    @Test func aDifferentSignerOrANewerHelperNeedsTheOwner() throws {
+        let rig = try Rig()
+        _ = try installedWithOneSigner(rig)
+        rig.runner.leaves["CamLid.app"] = String(repeating: "e", count: 40)
+        #expect(rig.installer().status(appBundle: rig.app) == .needsReauthorization)
+        rig.runner.leaves["CamLid.app"] = String(repeating: "c", count: 40)
+        let newer = HelperInstaller(paths: rig.paths, runner: rig.runner, isAdministrator: true, applyOwnership: false,
+                                    bundledHelperVersion: 2)
+        #expect(newer.status(appBundle: rig.app) == .needsHelperUpdate)
+        rig.runner.leaves["com.camlid.power-helper"] = String(repeating: "e", count: 40)
+        #expect(rig.installer().status(appBundle: rig.app) == .helperIdentityMismatch)
+    }
+
+    @Test func adHocBuildsStillPinExactCDHashes() throws {
+        let rig = try Rig()
+        #expect(rig.installer().install(appBundle: rig.app).accepted)
+        let pins = try JSONSerialization.jsonObject(with: Data(contentsOf: rig.paths.pinFile)) as? [String: Any]
+        #expect(pins?["version"] as? Int == 1)
+        rig.runner.hashes["CamLid.app"] = String(repeating: "d", count: 40)
+        #expect(rig.installer().status(appBundle: rig.app) == .needsReauthorization)
+    }
+
     @Test func refusesWithoutAdministratorAndChangesNothing() throws {
         let rig = try Rig()
         let result = rig.installer(admin: false).install(appBundle: rig.app)

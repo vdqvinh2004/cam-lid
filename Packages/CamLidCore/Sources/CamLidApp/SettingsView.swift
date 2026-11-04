@@ -562,14 +562,14 @@ private struct SettingsClosedLidSection: View {
         return editor.closedLidPermit == "untestedAcknowledged" ? "Untested — allowed" : "Not tested"
     }
 
-    private var installed: Bool { ["installed", "installedNotLoaded", "needsReauthorization", "helperIdentityMismatch", "partial"].contains(editor.helperState) }
 
     var body: some View {
         Section {
             // The one status line; details below on request.
             PreviewBuildNotice(text: editor.capabilityText.isEmpty ? nil : editor.capabilityText)
             // Helper actions sit up front only when something needs doing; otherwise they live under Details.
-            if !helperHealthy { helperButtons }
+            // The helper's actions sit in one place for every state: install, reinstall and remove.
+            helperButtons
             ForEach(editor.keepAwakeApps.filter(\.resetsSleepSetting), id: \.self) { app in
                 Label("\(app.name) resets the sleep setting and will interrupt closed lid. Quit \(app.name) or remove its helper.",
                       systemImage: "exclamationmark.triangle")
@@ -616,7 +616,6 @@ private struct SettingsClosedLidSection: View {
                 Text(editor.helperMessage)
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if helperHealthy { helperButtons }
             }
             .disclosureGroupStyle(RowDisclosureStyle())
         }
@@ -628,9 +627,23 @@ private struct SettingsClosedLidSection: View {
         }
     }
 
-    private var helperHealthy: Bool { editor.helperState == "installed" && !editor.helperBusy }
+    private var helperButtons: some View { HelperButtons(editor: editor) }
 
-    private var helperButtons: some View {
+    private var helperLabel: String {
+        switch editor.helperState {
+        case "installed": "Installed"
+        case "notInstalled": "Not installed"
+        case "unknown": "Not checked"
+        default: "Needs attention"
+        }
+    }
+}
+
+/// Install, reinstall and remove the closed-lid helper. Each asks for an administrator password.
+private struct HelperButtons: View {
+    @ObservedObject var editor: SettingsEditor
+    private var installed: Bool { ["installed", "installedNotLoaded", "needsReauthorization", "needsHelperUpdate", "helperIdentityMismatch", "partial"].contains(editor.helperState) }
+    var body: some View {
         HStack {
             Button(installed ? "Reinstall helper…" : "Install helper…") { editor.onInstallHelper?() }
                 .disabled(editor.helperBusy)
@@ -643,15 +656,6 @@ private struct SettingsClosedLidSection: View {
                     .accessibilityIdentifier("camlid.settings.helper.remove")
             }
             if editor.helperBusy { ProgressView().controlSize(.small) }
-        }
-    }
-
-    private var helperLabel: String {
-        switch editor.helperState {
-        case "installed": "Installed"
-        case "notInstalled": "Not installed"
-        case "unknown": "Not checked"
-        default: "Needs attention"
         }
     }
 }
