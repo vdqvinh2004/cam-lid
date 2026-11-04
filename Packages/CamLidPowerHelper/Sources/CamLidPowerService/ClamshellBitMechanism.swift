@@ -6,6 +6,9 @@ import IOKit.pwr_mgt
 public struct ClamshellBitCalls: Sendable {
     /// Sets or clears the root-domain clamshell-sleep-disable bit (selector `kPMSetClamshellSleepState`).
     public var setBit: @Sendable (Bool) -> Int32
+    /// `setBit` returns this when `IOPMrootDomain` does not exist (shutdown teardown, or before it registers): the
+    /// bit lives in that object, so there is nothing to clear and a restart would clear it anyway.
+    public static let rootDomainMissing: Int32 = -1
     /// Creates a `PreventUserIdleSystemSleep` assertion the OS releases after `seconds`.
     public var createIdleAssertion: @Sendable (_ seconds: Double) -> (code: Int32, id: UInt32)
     /// Restarts the assertion's timeout from now.
@@ -23,7 +26,7 @@ public struct ClamshellBitCalls: Sendable {
     public static let native = ClamshellBitCalls(
         setBit: { on in
             let root = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
-            guard root != 0 else { return -1 }
+            guard root != 0 else { return rootDomainMissing }
             defer { IOObjectRelease(root) }
             var connect: io_connect_t = 0
             let opened = IOServiceOpen(root, mach_task_self_, 0, &connect)
@@ -105,7 +108,8 @@ public final class ClamshellBitMechanism: LeasePowerMechanism {
         let idle = assertion.map(calls.release) ?? 0
         assertion = nil
         applyAcknowledged = false
-        guard bit == 0, idle == 0 else { throw PowerServiceFailure.backend }
+        // No root domain means no bit to leave set: the helper being stopped by a shutdown is not a failed restore.
+        guard bit == 0 || bit == ClamshellBitCalls.rootDomainMissing, idle == 0 else { throw PowerServiceFailure.backend }
         return .callsAcknowledgedOnly
     }
 

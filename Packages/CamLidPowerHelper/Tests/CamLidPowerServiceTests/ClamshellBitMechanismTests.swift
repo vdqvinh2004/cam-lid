@@ -8,13 +8,14 @@ final class FakeClamshellCalls: @unchecked Sendable {
     private(set) var log: [String] = []
     var bit = false
     var failSetBit = false
+    var rootDomainGone = false
     var failCreate = false
     var nextID: UInt32 = 41
 
     func note(_ entry: String) { lock.withLock { log.append(entry) } }
     var calls: ClamshellBitCalls {
         ClamshellBitCalls(
-            setBit: { [self] on in note("bit \(on)"); if failSetBit { return 1 }; bit = on; return 0 },
+            setBit: { [self] on in note("bit \(on)"); if rootDomainGone { return ClamshellBitCalls.rootDomainMissing }; if failSetBit { return 1 }; bit = on; return 0 },
             createIdleAssertion: { [self] seconds in
                 note("create \(Int(seconds.rounded()))")
                 if failCreate { return (1, 0) }
@@ -54,6 +55,15 @@ final class FakeClamshellCalls: @unchecked Sendable {
         #expect(fake.log.suffix(2) == ["bit false", "release 42"])
         #expect(try m.clear() == .callsAcknowledgedOnly)   // the recovery job owns no assertion
         #expect(fake.log.last == "bit false" && !fake.bit)
+    }
+
+    @Test func clearingWhileTheRootDomainIsGoneCountsAsClearedButApplyDoesNot() throws {
+        let fake = FakeClamshellCalls(); let m = make(fake)
+        try m.apply(remainingNanos: 30_000_000_000, episodeID: UUID())
+        fake.rootDomainGone = true             // shutdown teardown: nothing left to clear, a restart clears the bit
+        #expect(try m.clear() == .callsAcknowledgedOnly)
+        #expect(fake.log.last == "release 42")
+        #expect(throws: PowerServiceFailure.self) { try make(fake).apply(remainingNanos: 30_000_000_000, episodeID: UUID()) }
     }
 
     @Test func aFailedBitLeavesNothingBehind() throws {
