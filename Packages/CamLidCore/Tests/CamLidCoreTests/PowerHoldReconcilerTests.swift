@@ -104,6 +104,22 @@ import Testing
         #expect(r.status == .inactive && r.restoration == .verified)
     }
 
+    @Test func aReleaseAfterTheHelperAlreadyStoppedTheLeaseIsVerified() {
+        var r = held()
+        _ = r.next(desired: false, remainingSessionSeconds: nil, now: 105)
+        r.received(HoldReply(accepted: false, state: "restored", reason: "invalidLease"), now: 105)
+        #expect(r.status == .inactive && r.restoration == .verified)
+        #expect(r.stopReasons.isEmpty)
+        #expect(r.next(desired: false, remainingSessionSeconds: nil, now: 110) == nil)
+    }
+
+    @Test func anInvalidLeaseWhileTheHelperIsStillActiveIsStillAFailure() {
+        var r = held()
+        _ = r.next(desired: false, remainingSessionSeconds: nil, now: 105)
+        r.received(HoldReply(accepted: false, state: "active", reason: "invalidLease"), now: 105)
+        #expect(r.status == .releaseFailed("invalidLease") && r.restoration == .failed)
+    }
+
     @Test func aFailedReleaseIsRetriedAndNeverReportedRestored() {
         var r = held()
         _ = r.next(desired: false, remainingSessionSeconds: nil, now: 105)

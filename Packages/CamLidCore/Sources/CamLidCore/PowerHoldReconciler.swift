@@ -155,7 +155,9 @@ public struct PowerHoldReconciler: Sendable {
                 restoration = Self.restoration(afterStop: reply)
             }
         case .release:
-            if reply.accepted, reply.state == "restored" {
+            // The helper ends a lease itself on a safety stop and then refuses our release as an invalid lease. Its
+            // state already says the sleep setting was restored, so that is the verified outcome, not a failure.
+            if reply.state == "restored", reply.accepted || reply.reason == "invalidLease" {
                 status = .inactive; restoration = .verified
                 token = nil; lastAccepted = nil; lastRenewSent = nil
             } else {
