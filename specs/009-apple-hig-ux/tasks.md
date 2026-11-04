@@ -29,7 +29,7 @@
 
 - [x] T009 [US3] Refine labels/values/order, text status equivalents and restrained announcements in Packages/CamLidCore/Sources/CamLidApp/Accessibility.swift and affected views; retain stable IDs or migrate checks atomically (UX-007).
 - [x] T010 [US3] Respect appearance/contrast/transparency/motion and visible display bounds across Packages/CamLidCore/Sources/CamLidApp/DashboardView.swift and AppCoordinator.swift; native chrome, no background focus steals (UX-008/009).
-- [ ] T011 [US3] Record actual keyboard, VoiceOver, appearance, scaling/notch/external-display and 20-task/long-label walkthrough evidence in Tests/UI/HIGValidation.md; “Blocked evidence must never be recorded as pass.” (UX-SC-002/003).
+- [ ] T011 [US3] Record actual keyboard, VoiceOver, appearance, scaling/notch/external-display and 20-task/long-label walkthrough evidence in Tests/UI/HIGValidation.md; “Blocked evidence must never be recorded as pass.” (UX-SC-002/003). **2026-11-05 progress:** the two Closed Lid switches now carry accessible names (checked in the Accessibility tree after commit `4809af7`); Activity rows expose state, age and reason; keyboard and appearance were covered on 2026-11-03. VoiceOver speech, notch, second display and the 20-task case are still not run. Evidence: [native matrix addendum](../../docs/qa/native-matrix-2026-11-05.md). Not ticked.
 
 ## Phase 5: US2 — Configure and understand history (P2)
 
