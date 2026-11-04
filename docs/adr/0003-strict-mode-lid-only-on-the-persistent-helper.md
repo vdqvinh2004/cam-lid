@@ -101,8 +101,10 @@ Consequences confirmed or revised by the trials:
 - **Shutdown is the one place a Strict restore fails.** The restore returns `backend` while IOKit shuts down. It is
   harmless because the bit lives in kernel memory and a restart clears it; it is the reason a record from another
   boot is acknowledged without a write.
-- **The recovery job's Strict branch was not exercised.** In S3 launchd brought the helper back before the job's
-  15 s interval, so the helper's own restart did the clearing. That branch is covered by unit tests only.
+- **The recovery job's Strict branch was exercised in S6 (2026-11-04).** In S3 launchd brought the helper back before
+  the job's 15 s interval. In S6 the helper was killed and booted out with the lid closed: the job restored with
+  `independentRecovery`, asked for no sleep of its own, and the Mac slept through `Clamshell Sleep` about 5 s later
+  (on the charger; not tried on battery).
 - **Battery:** Strict on battery passed in S1, S3 and S4. Standard on battery with the lid closed, and a session ending
   at the battery stop level, were not tried.
 - **E5 (powerd interference) is still not run** and remains a post-release observation. No trial saw powerd clear the
