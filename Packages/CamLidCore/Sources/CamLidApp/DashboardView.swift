@@ -253,8 +253,8 @@ public struct DashboardView: View {
     private var timerSelection: Int {
         durationMinutes == 0 ? 0 : max(0, min(durationMinutes, maximumDurationMinutes))
     }
-    /// Order is by urgency: what holds the Mac awake and the countdown first, then the controls, then telemetry,
-    /// and notices last.
+    /// Top to bottom: header, reason, closed-lid notice, mode, its picker, status chips, agents (or the no-agent hint),
+    /// then banner. Hidden when empty: reason, notice (ready Mac), picker (no session), agents (none working), banner.
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
@@ -264,15 +264,7 @@ public struct DashboardView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier(CamLidAccessibility.IDs.reasonText)
             }
-            if !data.listedAgents.isEmpty {
-                BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
-                    ForEach(data.listedAgents) { agent in
-                        DashboardAgentBadge(agent: agent)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityIdentifier(CamLidAccessibility.IDs.taskList)
-            }
+            capabilityNotice
             HStack {
                 if let onModeChange {
                     ModeBadges(selected: data.stopEnabled ? data.mode : .off, onSelect: onModeChange, activatesSession: true,
@@ -280,23 +272,39 @@ public struct DashboardView: View {
                         .accessibilityIdentifier(CamLidAccessibility.IDs.dashboardMode)
                 } else { Text("Mode: \(data.mode == .manual ? "Timed" : data.mode.rawValue.capitalized)") }
             }
-            if !data.hasEnabledAgents {
-                HStack(spacing: 4) {
-                    Text("Auto needs an agent.").foregroundStyle(.secondary)
-                    if let onOpenAgents {
-                        Button("Choose Agents…", action: onOpenAgents)
-                            .buttonStyle(.link)
-                            .help("Open Settings → Agents to choose which agents may delay sleep")
-                            .accessibilityIdentifier("camlid.dashboard.chooseAgents")
-                    }
-                }
-                .font(.caption)
-            }
             durationRow
             sleepDelayRow
             DashboardMetrics(metrics: data.metrics)
-            notices
+            agentsSection
+            if let message = data.bannerMessage {
+                CamLidStatusLabel(message, systemImage: "exclamationmark.triangle",
+                                  tone: .warning, help: message)
+            }
         }.padding(10).frame(minWidth: 232, maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    /// The working agents, or the reason there are none to show when none is selected in Settings.
+    @ViewBuilder private var agentsSection: some View {
+        if !data.hasEnabledAgents {
+            HStack(spacing: 4) {
+                Text("No agent selected.").foregroundStyle(.secondary)
+                if let onOpenAgents {
+                    Button("Choose Agents…", action: onOpenAgents)
+                        .buttonStyle(.link)
+                        .help("Open Settings → Agents to choose which agents may delay sleep")
+                        .accessibilityIdentifier("camlid.dashboard.chooseAgents")
+                }
+            }
+            .font(.caption)
+        } else if !data.listedAgents.isEmpty {
+            BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
+                ForEach(data.listedAgents) { agent in
+                    DashboardAgentBadge(agent: agent)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier(CamLidAccessibility.IDs.taskList)
+        }
     }
 
     private var header: some View {
@@ -381,24 +389,17 @@ public struct DashboardView: View {
     }
 
     /// Readiness is shown only when something is missing; a ready Mac is already said by the status icon.
-    @ViewBuilder private var notices: some View {
-        let showsCapability = !data.powerActuationAvailable && data.capabilityText?.hasPrefix("Closed lid ready") != true
-        if showsCapability || data.bannerMessage != nil {
-            VStack(alignment: .leading, spacing: 6) {
-                if showsCapability {
-                    PreviewBuildNotice(text: data.capabilityText, font: .caption)
-                    if let action = data.capabilityAction, let onCapabilityAction {
-                        Button(action.title) { onCapabilityAction(action) }
-                            .buttonStyle(.link).font(.caption)
-                            .help(action.help)
-                            .accessibilityIdentifier("camlid.dashboard.capabilityAction")
-                    }
+    @ViewBuilder private var capabilityNotice: some View {
+        if !data.powerActuationAvailable && data.capabilityText?.hasPrefix("Closed lid ready") != true {
+            VStack(alignment: .leading, spacing: 4) {
+                PreviewBuildNotice(text: data.capabilityText, font: .caption)
+                if let action = data.capabilityAction, let onCapabilityAction {
+                    Button(action.title) { onCapabilityAction(action) }
+                        .buttonStyle(.link).font(.caption)
+                        .help(action.help)
+                        .accessibilityIdentifier("camlid.dashboard.capabilityAction")
                 }
-                if let message = data.bannerMessage {
-                    CamLidStatusLabel(message, systemImage: "exclamationmark.triangle",
-                                      tone: .warning, help: message)
-                }
-            }.padding(.top, 2)
+            }
         }
     }
 }
