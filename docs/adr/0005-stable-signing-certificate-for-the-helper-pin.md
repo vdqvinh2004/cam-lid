@@ -34,6 +34,10 @@ Identifier-only trust is not an option: any local program can be ad-hoc signed w
 - An ad-hoc program with the same identifier fails the requirement; the helper's requirement does not accept the app's
   identifier and vice versa.
 - The release build verifies that app, helper and tool share one certificate (`scripts/release.sh`).
+- **Update without reinstall (2026-11-04, real build):** the helper installed from the first certificate-signed build
+  stayed `installed` after the app was replaced by a second build with a different CDHash (`705fb508…` to
+  `5c02590a…`), with no `helperUntrusted` blocker. The pin is therefore version 2, and nothing asked for the
+  administrator password.
 
 ## Consequences
 - **The private key is the root of trust.** Whoever holds it can sign an app the helper obeys. Keep the `.p12` and its
