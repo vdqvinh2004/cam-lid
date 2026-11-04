@@ -584,6 +584,7 @@ private struct SettingsClosedLidSection: View {
             }
             Toggle("Keep awake with the lid closed", isOn: Binding(get: { editor.draft.closedLidOptIn }, set: editor.setClosedLidOptIn))
                 .help("Lets sessions keep this Mac awake with the lid closed, within the safety limits")
+                .accessibilityLabel(Text("Keep awake with the lid closed"))
                 .accessibilityIdentifier("camlid.settings.closedLid.enabled")
             SettingsFieldOutcome(editor: editor, key: "closedLidOptIn")
             VStack(alignment: .leading, spacing: 4) {
@@ -668,6 +669,7 @@ private struct SettingsSafetyPane: View {
         SettingsClosedLidSection(editor: editor)
         Section {
             Toggle("Allow on battery", isOn: Binding(get: { editor.batteryAllowed }, set: editor.setBatteryAllowed))
+                .accessibilityLabel(Text("Allow on battery"))
                 .accessibilityIdentifier("camlid.settings.batteryMode")
                 .help("Off: sessions need the charger. On: sessions may run on battery within the limits below.")
             SettingsFieldOutcome(editor: editor, key: "batteryAllowed")
