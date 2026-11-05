@@ -1,9 +1,9 @@
 # Tasks: v0.3 — coverage, Vietnamese, maintenance
 
-**Feature context:** `019-coverage-and-localization` · **Status:** 0/23 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `019-coverage-and-localization` · **Status:** 1/27 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
-- [ ] T001 Owner decides Q-E (audio holds), after the research in T070.
+- [x] T001 Owner decides Q-E: build audio holds, after research. — 2026-11-05.
 
 ## Phase 1 — Localization (US1)
 - [ ] T010 [US1] Inventory every user-visible string (Dashboard, Settings, Activity, Onboarding, Updates, menu, notifications, help).
@@ -39,4 +39,10 @@
 
 ## Phase 7 — Audio research (FR-007)
 - [ ] T070 Research whether other processes' power assertions give a reliable audio signal; record in a spec note.
-- [ ] T071 Owner decides Q-E from T070.
+- [ ] T071 Go or no-go for the audio hold, from the T070 result.
+
+## Phase 8 — Audio hold (US7, Q-E)
+- [ ] T080 [US7] Implement the signal reader chosen in T070, behind a protocol with a fake for tests.
+- [ ] T081 [US7] Add an audio-playback rule type next to watched programs, for Auto sessions.
+- [ ] T082 [US7] Tests: the rule holds while audio plays; ends after the quiet period (proposed 60 s); never holds without an audio source; Activity records start and end only.
+- [ ] T083 [US7] Live: audio plays with the lid open and the Auto session holds; audio stops; the hold ends within the quiet period.

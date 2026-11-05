@@ -75,8 +75,8 @@ When a verified lease holds the Mac awake, `camlid status` and the Dashboard bot
 
 ## Open questions
 
-- **Q-A — Strict in the release.** Keep "Strict (experimental)" visible (ADR 0003 decision 8 requires the label), or hide it behind a developer switch for 0.1.0? Default: keep it visible and labelled. The owner decides.
-- **Q-B — Window or no window.** Decided by the measurement gate, not in advance.
+- **Q-A — Strict in the release. Decided 2026-11-05: yes, visible.** "Strict (experimental)" stays in the release, labelled as ADR 0003 decision 8 requires. Its label does not use the word "Preview".
+- **Q-B — Window or no window. Decided 2026-11-05: yes, decide by measurement.** The gate in User Story 2 chooses. If the gate is inconclusive, there is no window.
 
 ## Out of scope
 

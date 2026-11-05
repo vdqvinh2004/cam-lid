@@ -75,8 +75,8 @@ One recorded calibration run per agent (Claude Code, Codex, OpenCode) in the QA 
 
 ## Open questions
 
-- **Q-C — `camlid run` with the lid closed?** Default: allowed only when the closed-lid helper path is enabled and healthy. Otherwise the hold is lid-open only, and the CLI says so.
-- **Q-D — Display sleep.** Default: not in this version; the display assertion stays off, as today.
+- **Q-C — `camlid run` with the lid closed. Decided 2026-11-05: yes, with the default.** Allowed only when the closed-lid helper path is enabled and healthy. Otherwise the hold is lid-open only, and the CLI says so.
+- **Q-D — Display sleep. Decided 2026-11-05: default.** Not in v0.2; the display assertion stays off, as today.
 
 ## Out of scope
 

@@ -1,9 +1,9 @@
 # Tasks: Release readiness for v0.1.0
 
-**Feature context:** `017-release-readiness` · **Status:** 0/19 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `017-release-readiness` · **Status:** 1/19 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
-- [ ] T001 Owner decides Q-A (Strict visibility in the release).
+- [x] T001 Owner decides Q-A: Strict stays visible, labelled experimental. — 2026-11-05.
 - [ ] T002 Run the measurement gate (User Story 2); record the result in the QA addendum; choose window or no window.
 
 ## Phase 1 — Readiness and wording (US1)

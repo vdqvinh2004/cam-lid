@@ -19,7 +19,7 @@
 - **FR-004 Simulation with the user's configuration.** `camlid simulate --use-current-config` reads the stored configuration. The default stays unchanged and is documented.
 - **FR-005 `start` does not persist the mode.** Persistence only through `config set mode`. Release note for the change.
 - **FR-006 Spec hygiene.** No `[~]` without a reason; references to ignored directories replaced by tracked paths or removed; `specs/README.md` updated.
-- **FR-007 Audio holds, research first.** Read other processes' power assertions before considering audio sampling. Build only if the research shows a reliable signal, and record the decision.
+- **FR-007 Audio holds (approved 2026-11-05).** Research first (T070): decide whether other processes' power assertions, or another signal, reliably indicate audio playback. Build only with a reliable signal; if there is none, record the finding and close this item.
 - **FR-008 Remaining owner tests.** T026 (lid transitions; temperature stays blocked without a reference), T306 (battery stop-level session with the lid closed), grace in a real session, a VoiceOver walkthrough, and notch and second-display checks.
 
 ## User Scenarios & Testing
@@ -42,16 +42,26 @@ The spec link check finds no reference to ignored paths; every `[~]` has a reaso
 ### User Story 6 — Owner tests are recorded (P2)
 T026, T306, grace, VoiceOver and the notch/second-display check each end with a recorded pass or a specific failure.
 
+### User Story 7 — Audio keeps an Auto session awake (P2)
+
+While audio plays, an Auto session with this rule stays awake with the lid open. The rule ends after a quiet period (60 seconds is proposed; the research confirms it). Activity records the start and the end of the rule, not the audio.
+
+**Acceptance**
+1. Audio plays for two minutes: the hold is visible for that time (read-back, as in 018 FR-002).
+2. Audio stops: the hold ends after the quiet period.
+3. No audio source: the rule never holds.
+
 ## Success Criteria
 
 - **SC-001** No English on the five main screens in Vietnamese.
 - **SC-002** The guard behaves as specified on both branches.
 - **SC-003** One simulated session matches a live session.
 - **SC-004** Zero links to ignored paths in tracked specs.
+- **SC-005** Audio hold verified live, or the research recorded that no reliable signal exists.
 
 ## Open questions
 
-- **Q-E — Audio holds.** Build or drop after the research? The owner decides.
+- **Q-E — Audio holds. Decided 2026-11-05: build, after the research.** The research in T070 comes first; the build goes ahead only if it finds a reliable signal.
 
 ## Out of scope
 

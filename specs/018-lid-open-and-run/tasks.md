@@ -1,10 +1,10 @@
 # Tasks: v0.2 — lid-open keep-awake, wrapper, shortcut, calibration
 
-**Feature context:** `018-lid-open-and-run` · **Status:** 0/23 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `018-lid-open-and-run` · **Status:** 1/23 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [ ] T001 Write and accept ADR 0006 (amends ADR 0002).
-- [ ] T002 Confirm Q-C and Q-D.
+- [x] T002 Confirm Q-C and Q-D. — Q-C: yes, with the default. Q-D: default (display sleep not in v0.2). 2026-11-05.
 
 ## Phase 1 — Lid-open keep-awake (US1)
 - [ ] T010 [US1] `KeepAwakeAssertion` with create, read-back and release; a fake for tests.
