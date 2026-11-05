@@ -41,9 +41,10 @@ struct BackendReadinessIntegrationTests {
             #expect(status["powerActuation"] as? Bool == false)
             #expect(status["backendVerified"] as? Bool == false)
             #expect(status["leaseVerified"] as? Bool == false)
-            #expect(status["effectiveState"] as? String == "unavailable")
+            let readiness = status["protection"] as? [String: Any]
+            #expect(status["effectiveState"] as? String == "Needs setup")
             #expect(status["restoration"] as? String == "noPowerResourcesOwned")
-            #expect(status["reasonCodes"] as? [String] == ["backendPendingM1"])
+            #expect(status["reasonCodes"] as? [String] == readiness?["blockerCodes"] as? [String])
         }
 
         let initial = try object(await cli(["status"]))
@@ -86,7 +87,7 @@ struct BackendReadinessIntegrationTests {
                 let decision = try JSONDecoder().decode(GuardedSleepDecision.self, from: Data(reply.json.utf8))
                 #expect(!decision.eligible)
                 #expect(decision.outcome == "blocked")
-                #expect(decision.blockers.contains("previewOnly"))
+                #expect(decision.blockers.contains("backendUnverified"))
             }
             let after = try object(await cli(["status"]))
             checkUnavailable(after)

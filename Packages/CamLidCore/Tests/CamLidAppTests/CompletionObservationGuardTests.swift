@@ -11,7 +11,7 @@ struct CompletionObservationGuardTests {
         let reply = try JSONDecoder().decode(CLIResult.self, from: app.handleControl(.sleep, payload: payload))
         let decision = try JSONDecoder().decode(GuardedSleepDecision.self, from: Data(reply.json.utf8))
         #expect(reply.exitCode == 3 && !decision.eligible)
-        #expect(decision.blockers.contains("previewOnly"))
+        #expect(decision.blockers.contains("backendUnverified"))
         return decision
     }
 

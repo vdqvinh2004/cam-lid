@@ -69,7 +69,7 @@ struct ControlIntegrationTests {
         #expect(try status()["session"] == nil)
         #expect(await coordinator.flushHistory())
         let stored = FileHistoryStorage(directory: root).load()
-        #expect(stored.contains { $0.reasonCodes.contains("modeOffPreview") && $0.sessionID != nil })
+        #expect(stored.contains { $0.reasonCodes.contains("modeOff") && $0.sessionID != nil })
     }
 
     @Test @MainActor func actualTransportUsesPersistedConfigAndHistory() async throws {

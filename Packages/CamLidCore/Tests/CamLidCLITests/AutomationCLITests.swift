@@ -28,7 +28,7 @@ import CamLidCore
         let text = String(decoding: bytes, as: UTF8.self)
         #expect(!text.contains("PRIVATE_OWNER") && !text.contains("42-"))
         #expect(text.contains("partial") && text.contains("Truncated"))
-        #expect(snapshot.activeSessionMode == nil && snapshot.protection == .preview)
+        #expect(snapshot.activeSessionMode == nil && snapshot.protection == .notRequested)
         let json = try JSONSerialization.jsonObject(with: bytes) as! [String: Any]
         #expect(json["activeSessionMode"] is NSNull)
         let unavailable = DiagnosticSnapshot(coverage: ["userAssertions": .unavailable])

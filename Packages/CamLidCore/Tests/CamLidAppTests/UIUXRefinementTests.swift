@@ -80,7 +80,7 @@ struct UIUXRefinementTests {
         let stop = NSMenuItem(); stop.tag = 2
         #expect(!helper.validateMenuItem(start) && !helper.validateMenuItem(stop))
         let configuration = try Configuration()
-        let protection = ProtectionReadiness(facts: ProtectionReadinessFacts(buildKind: .preview,
+        let protection = ProtectionReadiness(facts: ProtectionReadinessFacts(buildKind: .release,
             supportRowID: nil, supportRowQualified: false, helperTrusted: false, helperAvailable: false,
             recoveryRequired: false, recoveryJournalReady: false, ownershipEvidence: .unknown,
             matchingGlobalOverrideObserved: false, backendVerified: false, leaseVerified: false,

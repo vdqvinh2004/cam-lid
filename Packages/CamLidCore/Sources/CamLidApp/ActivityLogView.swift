@@ -442,7 +442,7 @@ enum ActivityPresentation {
     static func readableReason(_ code: String) -> String {
         switch code {
         case "agentToolFailed": return "Agent tool failed; turn outcome is separate"
-        case "backendPendingM1", "backendUnverified": return "Closed-lid backend unavailable"
+        case "backendUnverified", "previewOnly": return "Closed-lid backend unavailable"
         case "agentEvent": return "Agent activity updated"
         case "sleepBlocked": return "Sleep request blocked"
         case "configApplied": return "Settings updated"
@@ -450,8 +450,9 @@ enum ActivityPresentation {
         case "appLaunched": return "CamLid opened"
         case "appQuitNoOwnedPower": return "CamLid quit without a session"
         case "onboardingComplete": return "Welcome completed"
-        case "previewSessionStarted": return "Session started"
-        case "previewSessionStopped": return "Session stopped"
+        case "sessionStarted", "previewSessionStarted": return "Session started"
+        case "sessionStopped", "previewSessionStopped": return "Session stopped"
+        case "modeOff", "modeOffPreview": return "Mode turned off"
         case "agentStateChanged": return "Agent state changed"
         case "agentObservation": return "Agent checked"
         case "sessionTimerChanged": return "Timer changed"

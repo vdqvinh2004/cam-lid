@@ -366,13 +366,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             ?? (health.powerSource == .ac ? config.runCapMinutes : min(config.runCapMinutes, config.batteryCapMinutes))
         sessionTimerMinutes = config.timedDurationMinutes == 0 ? 0 : min(config.timedDurationMinutes, startTimerMaximum)
         sessionSleepDelayMinutes = config.completionDelayMinutes
-        record(category: .enrollment, newState: created.effectiveState, reasons: ["previewSessionStarted"])
+        record(category: .enrollment, newState: created.effectiveState, reasons: ["sessionStarted"])
         refresh()
     }
 
     public func menuBarStopProtection() {
         guard session != nil, !terminationFlowActive else { return }
-        record(category: .stateTransition, newState: .ready, reasons: ["previewSessionStopped"])
+        record(category: .stateTransition, newState: .ready, reasons: ["sessionStopped"])
         session = nil
         refresh()
     }
@@ -776,7 +776,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case (_, _, true): .noExternalOverride
         default: .unknown
         }
-        return ProtectionReadiness(facts: ProtectionReadinessFacts(buildKind: .preview,
+        return ProtectionReadiness(facts: ProtectionReadinessFacts(buildKind: .current,
             supportRowID: row, supportRowQualified: row != nil, helperTrusted: installed,
             helperAvailable: installed, recoveryRequired: holdReconciler.restoration == .failed,
             recoveryJournalReady: installed, ownershipEvidence: ownership, matchingGlobalOverrideObserved: false,
@@ -919,7 +919,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     func diagnosticSnapshot() async -> DiagnosticSnapshot {
         var snapshot = await SleepDiagnosticReader.shared.snapshot()
         snapshot.configuredMode = config.mode; snapshot.activeSessionMode = session?.requestedMode
-        snapshot.protection = .preview; snapshot.restoration = "noPowerResourcesOwned"
+        snapshot.protection = holdReconciler.leaseVerified(now: uptime()) ? .verified : .notRequested; snapshot.restoration = "noPowerResourcesOwned"
         return snapshot
     }
     func receiveUtilityEvent(_ event: UtilityUIEvent) {
@@ -1459,7 +1459,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                task.state == .failed || (task.state == .completed && session?.requestedMode != .auto) {
                 outcomeNotifications.emit(category: task.state == .failed ? .failure : .completion,
                     session: session?.id ?? "app", event: identity,
-                    reason: "terminalEvidence", preview: false, now: now)
+                    reason: "terminalEvidence", now: now)
             }
         }
         refresh()
@@ -1486,7 +1486,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         switch command {
         case .status, .doctor, .agentsList:
             latestHealth = currentHealth()
-            var object: [String: Any] = ["schemaVersion": 1, "available": true, "preview": true,
+            let readiness = protectionReadiness()
+            var object: [String: Any] = ["schemaVersion": 1, "available": true,
                 "powerActuation": holdReconciler.leaseVerified(now: uptime()),
                 "leaseVerified": holdReconciler.leaseVerified(now: uptime()),
                 "backendVerified": holdReconciler.leaseVerified(now: uptime()),
@@ -1495,8 +1496,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 "keepAwakeApps": helper.keepAwakeApps.map { ["name": $0.name, "resetsSleepSetting": $0.resetsSleepSetting] },
                 "restoration": holdReconciler.status == .inactive && holdReconciler.restoration == .verified
                     ? "noPowerResourcesOwned" : "\(holdReconciler.restoration)",
-                "mode": config.mode.rawValue, "effectiveState": "unavailable", "policyState": sessionStateForRecord().rawValue,
-                "revision": revision, "reasonCodes": ["backendPendingM1"],
+                "mode": config.mode.rawValue, "effectiveState": readiness.state.rawValue, "policyState": sessionStateForRecord().rawValue,
+                "revision": revision, "reasonCodes": readiness.blockerCodes,
                 "settingsCommitPending": hasPendingSettingsWork,
                 "historyError": history.lastError as Any? ?? NSNull(),
                 "omittedHistoryRecords": omittedHistoryRecords,
@@ -1535,10 +1536,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 "maxHoldingTasks": PolicyLimits.maxEnrolledTasks, "trackedRuns": agents.trackedRunCount,
                 "retiredRuns": agents.retiredRunCount, "lastRejection": agents.lastRejection as Any? ?? NSNull()] as [String: Any]
             object["agentDetection"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(badgeStates()))
-            var protection = try JSONSerialization.jsonObject(with: JSONEncoder().encode(protectionReadiness())) as! [String: Any]
+            var protection = try JSONSerialization.jsonObject(with: JSONEncoder().encode(readiness)) as! [String: Any]
             protection["readinessState"] = protection.removeValue(forKey: "state")
-            protection["effectiveState"] = "Preview"
-            protection["state"] = "preview"
             object["protection"] = protection
             object["updates"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(updates.snapshot))
             if let latestHealth {
@@ -1556,7 +1555,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             object["tasks"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(allObservedTasks(now: uptime())))
             result = CLIResult(json: String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self), exitCode: 0)
         case .admitCommand, .renewCommand, .finishCommand:
-            result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"backendPendingM1\",\"preview\":true,\"powerActuation\":false}", exitCode: 3)
+            result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"automationUnavailable\",\"powerActuation\":false}", exitCode: 3)
         case .sleep:
             guard options.positionals.isEmpty, Set(options.flags.keys).isSubset(of: ["json", "dry-run"]),
                   options.flags.values.allSatisfy({ $0 == "true" }) else { throw IPCError.invalidInput("invalidSleepOptions") }
@@ -1601,8 +1600,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case .start:
             throw IPCError.invalidInput("startIsAsync")   // handled by `handleControlAsync` → `startFromControl`
         case .quit:
-            // Preview owns no power resources. A future actuating backend must
-            // replace this with restoration-confirmed shutdown before shipping.
+            // Closing the hold connection makes the helper restore the sleep setting.
             let cleanup = releaseHoldForQuit()
             record(category: .configuration, newState: .off, reasons: ["cliQuit", cleanup])
             // AppKit's terminateLater loop must not nest inside a main-dispatch
@@ -1615,8 +1613,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             menuBarStopProtection()
             // With a held lease the release is sent on the next tick; `status` shows `restoration` when it lands.
             let cleanup = held ? "releaseRequested" : "noPowerResourcesOwned"
-            result = CLIResult(json: "{\"schemaVersion\":1,\"released\":\(hadSession),\"cleanupOutcome\":\"\(cleanup)\",\"preview\":true}", exitCode: 0)
-        default: throw IPCError.policyDenied("commandNotAvailableInPreview")
+            result = CLIResult(json: "{\"schemaVersion\":1,\"released\":\(hadSession),\"cleanupOutcome\":\"\(cleanup)\"}", exitCode: 0)
+        default: throw IPCError.policyDenied("commandNotAvailable")
         }
         return try JSONEncoder().encode(result)
     }
@@ -1707,7 +1705,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         outcomeNotifications.configure(categories: candidate.notificationCategories ?? [])
         if changedLogin { loginItem.apply(candidate.launchAtLogin) }
         if config.mode == .off, session != nil {
-            record(category: .stateTransition, newState: .off, reasons: ["modeOffPreview"]); session = nil
+            record(category: .stateTransition, newState: .off, reasons: ["modeOff"]); session = nil
         } else if var active = session, active.requestedMode != config.mode {
             sessionTimerMinutes = config.timedDurationMinutes == 0
                 ? 0 : min(config.timedDurationMinutes, timerMaximumMinutes(now: uptime()))
@@ -1802,7 +1800,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             : newState == .ready && reasons.contains("graceExpired") ? .completion : nil
         if let alertCategory {
             outcomeNotifications.emit(category: alertCategory, session: session?.id ?? "app", event: transition.id.uuidString,
-                reason: reasons.first ?? "stateChanged", preview: false, now: uptime())
+                reason: reasons.first ?? "stateChanged", now: uptime())
         }
     }
 }

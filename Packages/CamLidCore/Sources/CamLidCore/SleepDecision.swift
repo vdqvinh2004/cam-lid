@@ -25,7 +25,7 @@ public struct GuardedSleepDecision: Codable, Equatable, Sendable {
         if workActive { reasons.append("trackedWorkActive") }
         if workUnknown { reasons.append("workUnknown") }
         if restore != .verified { reasons.append("restorationUnverified") }
-        if !backendVerified { reasons.append("previewOnly") }
+        if !backendVerified { reasons.append("backendUnverified") }
         return Self(schemaVersion: 1, eligible: reasons.isEmpty, blockers: reasons,
             outcome: reasons.isEmpty ? "notRequested" : "blocked")
     }

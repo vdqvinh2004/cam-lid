@@ -55,7 +55,7 @@ extension QARefinementSupport {
         }
     }
     func protectionFixture() -> ProtectionReadiness {
-        ProtectionReadiness(facts: ProtectionReadinessFacts(buildKind: .preview, supportRowID: nil,
+        ProtectionReadiness(facts: ProtectionReadinessFacts(buildKind: .release, supportRowID: nil,
             supportRowQualified: false, helperTrusted: false, helperAvailable: false, recoveryRequired: false,
             recoveryJournalReady: false, ownershipEvidence: .unknown, matchingGlobalOverrideObserved: false,
             backendVerified: false, leaseVerified: false, safetyQualifying: false, requestedClosedLidIntent: true))

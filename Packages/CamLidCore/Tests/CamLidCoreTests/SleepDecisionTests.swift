@@ -1,12 +1,12 @@
 import Testing
 @testable import CamLidCore
 @Suite("Explicit sleep admission") struct SleepDecisionTests {
-    @Test func staleUnknownWorkInteractionAndPreviewBlockTogether() {
+    @Test func staleUnknownWorkInteractionAndBackendBlockTogether() {
         let decision = GuardedSleepDecision.evaluate(now: 100, observedAt: 90, lid: .unknown,
             displaysObservedAt: 100, displays: .unknown, inputObservedAt: 100,
             idleSeconds: nil, workActive: true, workUnknown: true, restore: .unknown, backendVerified: false)
         #expect(!decision.eligible)
-        #expect(Set(decision.blockers) == ["telemetryStale", "displayUnknown", "inputUnknown", "trackedWorkActive", "workUnknown", "restorationUnverified", "previewOnly"])
+        #expect(Set(decision.blockers) == ["telemetryStale", "displayUnknown", "inputUnknown", "trackedWorkActive", "workUnknown", "restorationUnverified", "backendUnverified"])
     }
     @Test func freshClosedLidIsInsufficientWithRecentInputOrWork() {
         let allowed = GuardedSleepDecision.evaluate(now: 100, observedAt: 100, lid: .closed,
@@ -51,13 +51,13 @@ import Testing
             displayAt: 95, inputAt: 95).eligible)
     }
 
-    @Test func restorationAndPreviewBlockOtherwiseEligibleRequest() {
+    @Test func restorationAndBackendBlockOtherwiseEligibleRequest() {
         for restore in [RestoreState.pending, .unknown, .failed, .conflict] {
             #expect(evaluate(observedAt: 100, lid: .closed, displays: .unknown, idle: 60,
                 restore: restore).blockers == ["restorationUnverified"])
         }
         #expect(evaluate(observedAt: 100, lid: .closed, displays: .unknown, idle: 60,
-            backendVerified: false).blockers == ["previewOnly"])
+            backendVerified: false).blockers == ["backendUnverified"])
     }
 
     private func evaluate(

@@ -1,9 +1,17 @@
 import Foundation
 
 public enum ProtectionBuildKind: String, Codable, Sendable, Equatable {
-    case preview
     case development
     case release
+
+    /// Release builds are compiled without DEBUG; every other build is development.
+    public static var current: Self {
+        #if DEBUG
+        .development
+        #else
+        .release
+        #endif
+    }
 }
 
 public enum ProtectionOwnershipEvidence: String, Codable, Sendable, Equatable {
@@ -15,7 +23,6 @@ public enum ProtectionOwnershipEvidence: String, Codable, Sendable, Equatable {
 }
 
 public enum ProtectionEffectiveState: String, Codable, Sendable, Equatable {
-    case preview = "Preview"
     case needsSetup = "Needs setup"
     case untestedConfiguration = "Untested configuration"
     case conflict = "Conflict"
@@ -75,7 +82,7 @@ public struct ProtectionReadinessFacts: Codable, Sendable, Equatable {
 }
 
 /// Pure presentation projection. Protected is reachable only when every proof
-/// gate is satisfied by current facts from a qualified non-preview backend.
+/// gate is satisfied by current facts from a qualified backend in a release build.
 public struct ProtectionReadiness: Codable, Sendable, Equatable {
     public let state: ProtectionEffectiveState
     /// Only a qualified current support row is public; otherwise JSON contains null.
@@ -97,7 +104,7 @@ public struct ProtectionReadiness: Codable, Sendable, Equatable {
 
         if facts.recoveryRequired {
             state = .recoveryRequired
-        } else if ownershipBlocked {
+        } else if Self.ownershipConflict(facts) {
             state = .conflict
         } else if !facts.helperTrusted {
             state = .needsSetup
@@ -105,8 +112,9 @@ public struct ProtectionReadiness: Codable, Sendable, Equatable {
             state = .untestedConfiguration
         } else if needsSetup {
             state = .needsSetup
-        } else if facts.buildKind == .preview {
-            state = .preview
+        } else if ownershipBlocked {
+            // Unknown ownership only becomes a conflict once the helper is there to observe it.
+            state = .conflict
         } else if facts.leaseVerified && facts.safetyQualifying && facts.requestedClosedLidIntent {
             state = .protected
         } else {
@@ -130,6 +138,18 @@ public struct ProtectionReadiness: Codable, Sendable, Equatable {
               identifier.rangeOfCharacter(from: .controlCharacters) == nil
         else { return nil }
         return identifier
+    }
+
+    /// Evidence of another override. Unknown ownership alone is not a conflict.
+    private static func ownershipConflict(_ facts: ProtectionReadinessFacts) -> Bool {
+        switch facts.ownershipEvidence {
+        case .conflict:
+            return true
+        case .noExternalOverride:
+            return facts.matchingGlobalOverrideObserved
+        case .unknown, .verifiedCamLidOwnership:
+            return false
+        }
     }
 
     private static func ownershipBlocked(_ facts: ProtectionReadinessFacts) -> Bool {
@@ -165,7 +185,6 @@ public struct ProtectionReadiness: Codable, Sendable, Equatable {
         if !facts.helperAvailable { result.append("helperUnavailable") }
         if !facts.recoveryJournalReady { result.append("recoveryJournalUnready") }
         if !facts.backendVerified { result.append("backendUnverified") }
-        if facts.buildKind == .preview { result.append("previewPowerDisabled") }
         if facts.requestedClosedLidIntent && !facts.safetyQualifying {
             result.append("safetyEvidenceNotQualifying")
         }
@@ -186,7 +205,6 @@ public struct ProtectionReadiness: Codable, Sendable, Equatable {
         case "helperUnavailable": return "The power helper is not installed or available."
         case "recoveryJournalUnready": return "The recovery journal is not ready to restore system state."
         case "backendUnverified": return "The closed-lid backend has not passed its verification checks."
-        case "previewPowerDisabled": return "Preview mode does not control system power."
         case "safetyEvidenceNotQualifying": return "Current safety and agent evidence does not permit closed-lid protection."
         case "leaseNotVerified": return "The system is ready, but no protection lease is verified."
         default: return "Protection is blocked until its safety requirements are met."

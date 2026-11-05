@@ -65,26 +65,25 @@ struct NotificationBudget {
         catch { permission = "unavailable" }
         onPermissionChanged?()
     }
-    func emit(category: NotificationCategory, session: String, event: String, reason: String,
-              preview: Bool, now: Double) {
+    func emit(category: NotificationCategory, session: String, event: String, reason: String, now: Double) {
         guard supported, enabled.contains(category) else { return }
         Task { @MainActor in
             await refresh()
             guard enabled.contains(category), ["authorized", "provisional"].contains(permission),
                   budget.admit(session: session, event: event, category: category, reason: reason, now: now) else { return }
-            let content = Self.content(category: category, preview: preview)
+            let content = Self.content(category: category)
             let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
             try? await deliver(request)
         }
     }
-    static func content(category: NotificationCategory, preview: Bool) -> UNMutableNotificationContent {
+    static func content(category: NotificationCategory) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
-        content.title = (preview ? "CamLid Preview: " : "CamLid: ") + category.title
+        content.title = "CamLid: " + category.title
         // Fixed templates only: no raw reason, argv, process or history payload.
         switch category {
-        case .completion: content.body = preview ? "Preview work settled. No power or sleep change was made." : "Tracked work settled. Check Activity for the sleep outcome."
+        case .completion: content.body = "Tracked work settled. Check Activity for the sleep outcome."
         case .failure: content.body = "Tracked work reported a failure. Check Activity for details."
-        case .safety: content.body = preview ? "A safety condition stopped preview protection. No host power change was made." : "A safety condition stopped protection. Check Activity for details."
+        case .safety: content.body = "A safety condition stopped protection. Check Activity for details."
         case .restoration: content.body = "Recovery needs attention. Check Activity before starting another session."
         }
         content.sound = .default

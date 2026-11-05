@@ -1,7 +1,7 @@
 import Foundation
 
 public enum DiagnosticCoverage: String, Codable, Sendable { case complete, partial, unavailable }
-public enum ProtectionOutcome: String, Codable, Sendable { case preview, unsupported, requested, verified, restoring, failed }
+public enum ProtectionOutcome: String, Codable, Sendable { case notRequested, unsupported, requested, verified, restoring, failed }
 public enum SleepEffect: String, Codable, Sendable {
     case systemIdle, displayIdle, userActivity, global, kernel, unknown
     public static func assertion(_ type: String) -> Self {
@@ -56,7 +56,7 @@ public struct DiagnosticSnapshot: Codable, Equatable, Sendable {
     public var preventedBy: [String]
     public init(observedAt: Date = Date(), coverage: [String: DiagnosticCoverage] = [:], errors: [String] = [],
                 configuredMode: RequestedMode = .off, activeSessionMode: RequestedMode? = nil,
-                protection: ProtectionOutcome = .preview, restoration: String = "noPowerResourcesOwned",
+                protection: ProtectionOutcome = .notRequested, restoration: String = "noPowerResourcesOwned",
                 blockers: [DiagnosticBlocker] = [], preventedBy: [String] = []) {
         self.observedAt = observedAt; self.coverage = coverage; self.errors = errors
         self.configuredMode = configuredMode; self.activeSessionMode = activeSessionMode

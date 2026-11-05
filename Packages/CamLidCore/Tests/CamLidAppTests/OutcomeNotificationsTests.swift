@@ -134,19 +134,19 @@ import CamLidCore
         #expect(requests == 0 && service.permission == "notDetermined")
         await service.authorizeFromUserAction(); await service.authorizeFromUserAction()
         #expect(requests == 1 && service.permission == "denied")
-        service.emit(category: .safety, session: "s", event: "denied", reason: "thermal", preview: true, now: 0)
+        service.emit(category: .safety, session: "s", event: "denied", reason: "thermal", now: 0)
         for _ in 0..<20 { await Task.yield() }
         #expect(deliveries == 0)
         status = "authorized"
-        service.emit(category: .safety, session: "s", event: "approved", reason: "thermal", preview: true, now: 1)
+        service.emit(category: .safety, session: "s", event: "approved", reason: "thermal", now: 1)
         for _ in 0..<20 { await Task.yield() }
         #expect(deliveries == 1)
         status = "denied"
-        service.emit(category: .safety, session: "s", event: "revoked", reason: "battery", preview: true, now: 2)
+        service.emit(category: .safety, session: "s", event: "revoked", reason: "battery", now: 2)
         for _ in 0..<20 { await Task.yield() }
         #expect(deliveries == 1)
-        let copy = OutcomeNotifications.content(category: .completion, preview: true)
-        #expect(copy.title.hasPrefix("CamLid Preview") && copy.body.contains("No power or sleep change"))
+        let copy = OutcomeNotifications.content(category: .completion)
+        #expect(copy.title.hasPrefix("CamLid: ") && copy.body.contains("Check Activity"))
     }
     @Test func criticalAlertSurvivesOrdinaryBudgetAndReplay() {
         var gate = NotificationBudget()

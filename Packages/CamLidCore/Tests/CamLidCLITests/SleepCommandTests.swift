@@ -47,14 +47,14 @@ private struct SleepFixtureChannel: IPCChannel {
         let dryReply = try JSONEncoder().encode(CLIResult(
             json: "{\"eligible\":true,\"outcome\":\"notRequested\",\"blockers\":[]}", exitCode: 0))
         let requestReply = try JSONEncoder().encode(CLIResult(
-            json: "{\"eligible\":false,\"outcome\":\"blocked\",\"blockers\":[\"previewOnly\"]}", exitCode: 3))
+            json: "{\"eligible\":false,\"outcome\":\"blocked\",\"blockers\":[\"backendUnverified\"]}", exitCode: 3))
         let recorder = SleepRequestRecorder(replies: [dryReply, requestReply])
         let channel = SleepFixtureChannel(recorder: recorder)
 
         let dry = Commands.run(argv: ["sleep", "--dry-run", "--json"], channel: channel)
         let request = Commands.run(argv: ["sleep", "--json"], channel: channel)
         #expect(dry.exitCode == 0 && dry.json.contains("notRequested"))
-        #expect(request.exitCode == 3 && request.json.contains("previewOnly"))
+        #expect(request.exitCode == 3 && request.json.contains("backendUnverified"))
 
         let requests = recorder.requests
         #expect(requests.map(\.0) == [.sleep, .sleep])

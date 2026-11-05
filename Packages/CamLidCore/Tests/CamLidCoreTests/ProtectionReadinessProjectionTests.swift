@@ -9,8 +9,7 @@ struct ProtectionReadinessProjectionTests {
     func everyProofGateIsRequired() {
         var cases: [ProtectionReadinessFacts] = []
 
-        var facts = eligibleFacts(); facts.buildKind = .preview; cases.append(facts)
-        facts = eligibleFacts(); facts.buildKind = .development; cases.append(facts)
+        var facts = eligibleFacts(); facts.buildKind = .development; cases.append(facts)
         facts = eligibleFacts(); facts.supportRowID = nil; cases.append(facts)
         facts = eligibleFacts(); facts.supportRowQualified = false; cases.append(facts)
         facts = eligibleFacts(); facts.helperTrusted = false; cases.append(facts)
@@ -31,11 +30,10 @@ struct ProtectionReadinessProjectionTests {
         #expect(ProtectionReadiness(facts: eligibleFacts()).state == .protected)
     }
 
-    @Test("recovery, conflict, trust, qualification, setup, then preview priority")
+    @Test("recovery, conflict, trust, qualification, setup, then readiness priority")
     func statePriorityIsStable() {
         var facts = eligibleFacts()
-        facts.buildKind = .preview
-        #expect(ProtectionReadiness(facts: facts).state == .preview)
+        #expect(ProtectionReadiness(facts: facts).state == .protected)
 
         facts.recoveryRequired = true
         facts.helperTrusted = false
@@ -53,8 +51,27 @@ struct ProtectionReadinessProjectionTests {
         facts.helperAvailable = false
         #expect(ProtectionReadiness(facts: facts).state == .untestedConfiguration)
 
-        facts.buildKind = .preview
+        facts.buildKind = .release
         #expect(ProtectionReadiness(facts: facts).state == .needsSetup)
+    }
+
+    @Test("a release build without a verified lease is Ready and names the missing lease")
+    func withoutLeaseItIsReadyWithAReason() {
+        var facts = eligibleFacts()
+        facts.leaseVerified = false
+        let result = ProtectionReadiness(facts: facts)
+        #expect(result.state == .ready)
+        #expect(result.blockerCodes.contains("leaseNotVerified"))
+    }
+
+    @Test("unknown ownership without a helper is setup, not a conflict")
+    func unknownOwnershipWithoutHelperNeedsSetup() {
+        var facts = eligibleFacts()
+        facts.ownershipEvidence = .unknown
+        facts.helperTrusted = false
+        let result = ProtectionReadiness(facts: facts)
+        #expect(result.state == .needsSetup)
+        #expect(result.blockerCodes.contains("externalOwnershipUnknown"))
     }
 
     @Test("matching global value without ownership evidence remains a conflict")

@@ -173,7 +173,7 @@ struct UISimplicityTests {
         #expect(status["powerActuation"] as? Bool == false)
         #expect(await app.flushHistory())
         let events = FileHistoryStorage(directory: fixture.root.appendingPathComponent("history")).load()
-        #expect(!events.contains { $0.reasonCodes.contains("previewSessionStarted") })
+        #expect(!events.contains { $0.reasonCodes.contains("sessionStarted") })
     }
 
     @Test @MainActor func offModeSettingsEventStaysOffInHistory() async throws {
