@@ -14,7 +14,7 @@
 
 ## Compatibility
 
-- CLI contract change: `preview` is removed; `effectiveState` and `state` take real values. The release notes list the change. Renamed codes parse for one version.
+- CLI contract change: `preview` is removed; `effectiveState` and `state` take real values. The release notes list the change. No aliases: nothing outside the repo depends on the codes yet.
 - Helper unchanged: `PowerHelperVersion` stays 1 because no helper source change is planned. If the helper changes, bump it and follow ADR 0005.
 
 ## Test strategy

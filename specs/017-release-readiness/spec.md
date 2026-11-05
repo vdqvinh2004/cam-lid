@@ -1,6 +1,6 @@
 # Feature Specification: Release readiness for v0.1.0
 
-**Status:** Planned. Owner decisions recorded; no implementation started.
+**Status:** In progress. Owner decisions recorded; Phase 1 code done, live check pending.
 **Depends on:** [016 Strict trials](../016-strict-lid-only/spec.md), [ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md), [ADR 0005](../../docs/adr/0005-stable-signing-certificate-for-the-helper-pin.md).
 **Blocks:** the first public release.
 
@@ -60,7 +60,7 @@ When a verified lease holds the Mac awake, `camlid status` and the Dashboard bot
 
 - **FR-001** Build kind comes from the build configuration: Release → release, Debug → development. No hardcoded value.
 - **FR-002** Readiness reaches protected only from evidence: verified lease, qualifying safety and requested intent. Blockers name real causes.
-- **FR-003** Remove Preview from status and start replies, reason codes, Activity text, notification code and release text. Renamed reason codes stay parseable for one version.
+- **FR-003** Remove Preview from status and start replies, reason codes, Activity text, notification code and release text. No aliases: 0.1.0 is the first release, so no client depends on the old codes.
 - **FR-004** `camlid start` reports `powerActuation` from the lease.
 - **FR-005** Sensor timing as in User Story 2.
 - **FR-006** Release gating as in User Story 3.
