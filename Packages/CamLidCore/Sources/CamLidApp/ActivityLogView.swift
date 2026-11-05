@@ -440,6 +440,8 @@ enum ActivityPresentation {
     }
 
     static func readableReason(_ code: String) -> String {
+        if code.hasPrefix("exitStatus:") { return "Command exited with status \(code.dropFirst("exitStatus:".count))" }
+        if code.hasPrefix("durationSeconds:") { return "Command ran for \(code.dropFirst("durationSeconds:".count)) s" }
         switch code {
         case "agentToolFailed": return "Agent tool failed; turn outcome is separate"
         case "backendUnverified", "previewOnly": return "Closed-lid backend unavailable"
@@ -477,6 +479,8 @@ enum ActivityPresentation {
         case "safetyLatched": return "Stopped by safety"
         case "lastTaskStopped": return "Last agent task stopped"
         case "gracePending": return "Waiting to sleep"
+        case "commandStarted": return "Command started"
+        case "commandFinished": return "Command finished"
         default: return code.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression).capitalized
         }
     }

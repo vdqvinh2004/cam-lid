@@ -407,3 +407,31 @@ public enum ConfigError: Error, Equatable, Sendable {
     case invalidType(key: String)
     case stringTooLong(Int)
 }
+
+/// The saved settings file (`preferences.json`). The app writes it; `simulate --use-current-config` reads it.
+public struct PersistedSettings: Codable, Sendable {
+    public static let currentSchemaVersion = 1
+    public static let fileName = "preferences.json"
+
+    public let schemaVersion: Int
+    public let revision: Int
+    public let configuration: Configuration
+
+    public init(schemaVersion: Int, revision: Int, configuration: Configuration) {
+        self.schemaVersion = schemaVersion
+        self.revision = revision
+        self.configuration = configuration
+    }
+
+    public static var defaultURL: URL {
+        FileHistoryStorage.defaultDirectory.appendingPathComponent(fileName)
+    }
+
+    /// Accepts only what the app accepts: the current schema, revision 1 or later, and a valid configuration.
+    public static func validated(_ data: Data) -> PersistedSettings? {
+        guard let saved = try? JSONDecoder().decode(PersistedSettings.self, from: data),
+            saved.schemaVersion == currentSchemaVersion, saved.revision >= 1,
+            (try? saved.configuration.validate()) != nil else { return nil }
+        return saved
+    }
+}

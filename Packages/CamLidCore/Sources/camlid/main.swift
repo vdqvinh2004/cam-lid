@@ -14,5 +14,5 @@ import Foundation
 let controlDirectory = ProcessInfo.processInfo.environment["CAMLID_CONTROL_DIRECTORY"].map { URL(fileURLWithPath: $0) }
 let result = Commands.runWithRealIO(
     argv: Array(CommandLine.arguments.dropFirst()), channel: LocalControlChannel(directory: controlDirectory ?? LocalControlChannel.defaultDirectory))
-print(result.json)
+if !result.json.isEmpty { print(result.json) }   // `run` prints nothing itself: the command's output is its own
 Foundation.exit(Int32(result.exitCode))

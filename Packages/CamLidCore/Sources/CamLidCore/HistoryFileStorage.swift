@@ -4,6 +4,13 @@ import Foundation
 /// Private, bounded JSONL history. Failures are observable, never reported as
 /// successful deletion. Lock protects all file operations and diagnostics.
 public final class FileHistoryStorage: HistoryStorage, @unchecked Sendable {
+    /// `~/Library/Application Support/CamLid/History`: the history file and the saved settings live here.
+    public static var defaultDirectory: URL {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+        return support.appendingPathComponent("CamLid/History", isDirectory: true)
+    }
+
     private let lock = NSLock()
     private let directory: URL
     private let baseName: String

@@ -13,14 +13,17 @@
 - [ ] T014 [US1] Screen check in Vietnamese; record any English left.
 
 ## Phase 2 — Helper guard (US2)
-- [ ] T020 [US2] `scripts/check-helper-version.sh` comparing helper sources with the last tag.
-- [ ] T021 [US2] Test on a clean tree (pass) and on a deliberate change (fail).
-- [ ] T022 [US2] Call it from `release.sh`.
+- [x] T020 [US2] `scripts/check-helper-version.sh` compares the helper's source fingerprint with a recorded baseline
+  (`scripts/helper-version.baseline`), not a tag. — 2026-11-05.
+- [x] T021 [US2] `scripts/test-check-helper-version.sh`: six cases (record, unchanged pass, changed without a bump
+  fails, bumped passes, re-record, lower version fails). — 2026-11-05.
+- [x] T022 [US2] `release.sh` calls the guard before it builds; a failure refuses the release. — 2026-11-05.
 
 ## Phase 3 — Simulation and start (US3)
-- [ ] T030 [US3] `simulate --use-current-config`.
+- [x] T030 [US3] `simulate --use-current-config`. — 2026-11-05: reads the saved settings file; defaults when none is saved; fixtures refuse the flag. Live with the debug CLI on the real file: `configSource: saved`, and the echoed mode and `closedLidOptIn` match the file; output without the flag is unchanged.
 - [ ] T031 [US3] Replay one recorded session; record the match.
-- [ ] T032 [US3] `start` stops persisting the mode; release note.
+- [x] T032 [US3] `start` stops persisting the mode; release note. — 2026-11-05: `start --mode manual` ran the session in
+  manual while the saved mode stayed `timed` (checked live with `config get`). The release note is still to write.
 
 ## Phase 4 — Coverage (US4)
 - [ ] T040 [US4] Qualify one more Mac or macOS build, or record "not planned for 0.3".
@@ -38,8 +41,14 @@
 - [ ] T062 [US5] Update `specs/README.md`.
 
 ## Phase 7 — Audio research (FR-007)
-- [ ] T070 Research whether other processes' power assertions give a reliable audio signal; record in a spec note.
-- [ ] T071 Go or no-go for the audio hold, from the T070 result.
+- [x] T070 Research whether other processes' power assertions give a reliable audio signal. — 2026-11-05, on this Mac
+  (macOS 26A434). A 6-second system sound at 10 % volume created no assertion of its own. `coreaudiod` already holds
+  `PreventUserIdleSystemSleep` named `com.apple.audio.…:output.context.preventuseridlesleep` with or without playback,
+  so it does not tell playback apart. Brave held `NoIdleSleepAssertion` named "Playing audio" for as long as a page
+  played audio. So only Chromium-based browsers show a named playback signal. Music apps and other browsers were not
+  tested.
+- [ ] T071 Go or no-go for the audio hold. Needs the owner: a browser-only rule covers web audio, not music apps.
+  Build it for browsers only, or wait until another signal is found?
 
 ## Phase 8 — Audio hold (US7, Q-E)
 - [ ] T080 [US7] Implement the signal reader chosen in T070, behind a protocol with a fake for tests.

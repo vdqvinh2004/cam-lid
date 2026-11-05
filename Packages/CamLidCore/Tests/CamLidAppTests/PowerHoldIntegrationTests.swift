@@ -136,14 +136,15 @@ struct PowerHoldIntegrationTests {
         } else { Issue.record("no second acquire") }
     }
 
-    @Test @MainActor func aHelperRefusalOutranksTheLidRunNotice() async throws {
+    @Test @MainActor func aHelperRefusalKeepsTheLidOpenSessionAndOutranksTheLidRunNotice() async throws {
         let (app, transport, support) = try await rig(row: "test-row", keepAwake: [KeepAwakeApp(name: "LidRun", resetsSleepSetting: true)])
         defer { support.cleanup() }
         transport.refuseAcquireWith = "safetyRefused"
         await app.startPreviewSession()
-        await settle { app.dashboardData().state == .safetyStopped }
         await settle { app.dashboardData().bannerMessage?.contains("lid open") == true }
         #expect(app.dashboardData().bannerMessage?.contains("only start with the lid open") == true)
+        // Lid open: a refused closed-lid lease does not stop the session; the lid-open keep-awake carries it.
+        #expect(app.dashboardData().state == .protected)
     }
 
     @Test @MainActor func withoutAQualifiedRowNothingReachesTheHelper() async throws {
@@ -155,15 +156,13 @@ struct PowerHoldIntegrationTests {
         #expect(!app.dashboardData().leaseVerified && !app.dashboardData().powerActuationAvailable)
     }
 
-    @Test @MainActor func aHelperRefusalStaysExplainedAfterTheSessionStops() async throws {
+    @Test @MainActor func aHelperRefusalWithTheLidOpenIsExplainedWhileTheSessionRuns() async throws {
         let (app, transport, support) = try await rig(row: "test-row")
         defer { support.cleanup() }
         transport.refuseAcquireWith = "preexistingOverride"
         await app.startPreviewSession()
-        await settle { app.dashboardData().state == .safetyStopped }
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        #expect(app.dashboardData().state == .safetyStopped)
-        #expect(app.dashboardData().bannerMessage?.contains("Another app already disables sleep") == true)
+        await settle { app.dashboardData().bannerMessage?.contains("Another app already disables sleep") == true }
+        #expect(app.dashboardData().state == .protected)
     }
 
     @Test @MainActor func anAcceptedUntestedMacHoldsAndSaysItIsUntested() async throws {

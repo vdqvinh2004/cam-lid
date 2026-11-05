@@ -75,7 +75,7 @@ enum SleepDiagnosticsCopy {
         Rule(names: ["brave", "brave browser", "brave browser helper"], key: "brave",
              title: "Brave Browser is active", symbol: "globe"),
         Rule(names: ["camlid", "com.camlid.power-helper"], key: "camlid",
-             title: "CamLid is keeping your Mac awake", symbol: "moon.fill"),
+             title: "CamLid is active", symbol: "moon.fill"),
         Rule(names: ["zoom.us", "zoom"], key: "zoom", title: "Zoom is on a call", symbol: "video.fill"),
         Rule(names: ["microsoft teams", "msteams"], key: "teams",
              title: "Microsoft Teams is on a call", symbol: "video.fill"),

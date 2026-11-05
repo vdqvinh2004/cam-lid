@@ -14,12 +14,20 @@ struct RecentInputObservation: Sendable, Equatable {
     let sampledAtMonotonic: Double
 }
 
+/// One worker pass with the call time of each source. The stall budget applies to each source's own call, so a
+/// slow source marks only itself unknown.
+struct SensorPass: Sendable {
+    let readings: SensorReadings
+    let lidElapsed: Double
+    let temperatureElapsed: Double
+}
+
 /// Read-only battery, thermal pressure, display and physical lid observations.
-/// Hardware reads run on one utility worker. A blocked source can delay refresh,
-/// but never blocks the app's main thread or creates a queue of stale work.
+/// Hardware reads run on one user-initiated worker, so a busy Mac does not starve them. A blocked source can delay
+/// refresh, but never blocks the app's main thread or creates a queue of stale work.
 public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
     private let lock = NSLock()
-    private let workerQueue = DispatchQueue(label: "dev.camlid.sensor-read", qos: .utility)
+    private let workerQueue = DispatchQueue(label: "dev.camlid.sensor-read", qos: .userInitiated)
     private let sampleInterval: Double
     private let clock: @Sendable () -> Double
     private let thermalReader: @Sendable () -> ThermalPressure
@@ -66,13 +74,17 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
             lastSampleStartedAt = now
             workerQueue.async { [weak self] in
                 guard let self else { return }
-                let readings: SensorReadings
+                let readStartedAt = self.clock()
+                let pass: SensorPass
                 if let injectedReader = self.injectedReader {
-                    readings = injectedReader(now)
+                    // The injected reader stands for the whole pass, so its duration counts against every source.
+                    let readings = injectedReader(readStartedAt)
+                    let elapsed = self.clock() - readStartedAt
+                    pass = SensorPass(readings: readings, lidElapsed: elapsed, temperatureElapsed: elapsed)
                 } else {
-                    readings = self.readHardware(startedAt: now)
+                    pass = self.readHardware(startedAt: readStartedAt)
                 }
-                self.finish(readings, startedAt: now, finishedAt: self.clock())
+                self.finish(pass, startedAt: readStartedAt)
             }
         }
         let cached = latestReadings
@@ -101,10 +113,19 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
         return now >= lastSampleStartedAt && now - lastSampleStartedAt >= sampleInterval
     }
 
-    private func finish(_ readings: SensorReadings, startedAt: Double, finishedAt: Double) {
-        let elapsed = finishedAt - startedAt
+    private func finish(_ pass: SensorPass, startedAt: Double) {
+        let completed = Self.settle(pass, startedAt: startedAt)
+        lock.lock()
+        latestReadings = completed
+        workerInFlight = false
+        lock.unlock()
+    }
+
+    /// Applies each source's own stall budget. A timed-out source is marked unknown, never timestamped as current.
+    static func settle(_ pass: SensorPass, startedAt: Double) -> SensorReadings {
+        let readings = pass.readings
         let lid: LidObservation
-        if !elapsed.isFinite || elapsed < 0 || elapsed > 0.2 {
+        if !withinStallBudget(pass.lidElapsed) {
             // The source may have returned a plausible state after a long stall.
             // Timestamping it as current would make stale physical state look safe.
             lid = LidObservation(availability: "error", reasonCode: "slowSensorRead")
@@ -118,16 +139,10 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
         } else {
             lid = LidObservation(availability: "error", reasonCode: "missingSensorRead")
         }
-        // Numerical die readings share the lid stall budget: a slow worker must not
-        // present aged silicon data as current.
-        let temperature: TemperatureObservation
-        if !elapsed.isFinite || elapsed < 0 || elapsed > 0.2 {
-            temperature = TemperatureObservation(availability: "error", reasonCode: "slowSensorRead")
-        } else {
-            temperature = readings.temperature
-        }
-
-        let completed = SensorReadings(
+        let temperature = withinStallBudget(pass.temperatureElapsed)
+            ? readings.temperature
+            : TemperatureObservation(availability: "error", reasonCode: "slowSensorRead")
+        return SensorReadings(
             batteryPercent: readings.batteryPercent,
             powerSource: readings.powerSource,
             // Thermal data comes from `read()` directly, never from this cache.
@@ -139,22 +154,28 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
             lidObservation: lid,
             temperature: temperature
         )
-        lock.lock()
-        latestReadings = completed
-        workerInFlight = false
-        lock.unlock()
     }
 
-    private func readHardware(startedAt: Double) -> SensorReadings {
+    static let stallBudgetSeconds = 0.2
+
+    static func withinStallBudget(_ elapsed: Double) -> Bool {
+        elapsed.isFinite && elapsed >= 0 && elapsed <= stallBudgetSeconds
+    }
+
+    private func readHardware(startedAt: Double) -> SensorPass {
         let (battery, power) = Self.batteryAndPower()
+        let lidStartedAt = clock()
         let lid = LidStateReader.read()
+        let lidElapsed = clock() - lidStartedAt
         // This function is called only by the serial worker. `sampler` therefore
         // has a single writer and the main thread never waits for Mach/IOKit.
         let cpu = sampler.sample(Self.cpuTicks())
-        // Numerical die read shares the worker: ~64ms typical, bounded by the
-        // 200ms stall guard in `finish`. Any failure reports `.unsupported`.
+        // The die temperature read is slow under load, so it runs last and has its own stall
+        // budget in `settle`. It never marks the lid. Any failure reports `.unsupported`.
+        let temperatureStartedAt = clock()
         let temperature = TemperatureReader.read()
-        return SensorReadings(
+        let temperatureElapsed = clock() - temperatureStartedAt
+        let readings = SensorReadings(
             batteryPercent: battery,
             powerSource: power,
             thermalPressure: .unknown,
@@ -165,6 +186,7 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
             lidObservation: lid,
             temperature: temperature
         )
+        return SensorPass(readings: readings, lidElapsed: lidElapsed, temperatureElapsed: temperatureElapsed)
     }
 
     static func cpuTicks() -> [UInt32]? {

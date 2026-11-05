@@ -18,7 +18,8 @@ reads do not launch protection or modify power. JSON stdout, diagnostics stderr,
 | `camlid recover --owned-only --dry-run --json` | Restricted helper diagnosis independent of app; dry-run default |
 | `camlid recover --owned-only --apply --json` | Explicit authenticated owned-journal restoration; reject uncertain ownership |
 | `camlid doctor --json` | Read-only permissions/backend/integration/restore/conflict diagnosis |
-| `camlid simulate --scenario scenario.json --json` | Isolated fake clock/sensors/power; host cannot be mutated |
+| `camlid simulate --scenario scenario.json --json` | Isolated fake clock/sensors/power; host cannot be mutated; default configuration |
+| `camlid simulate --scenario scenario.json --use-current-config --json` | Same, with the saved settings (defaults if none saved); output adds `configSource` and `config`; fixtures refuse the flag |
 | `camlid event --stdin` | Excluded legacy integration; exit3/externalObservationOnly before stdin or IPC |
 | `camlid run -- command args...` | Excluded legacy wrapper; exit3/externalObservationOnly, never launches |
 

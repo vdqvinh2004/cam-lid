@@ -125,6 +125,10 @@ public enum CamLidAccessibility {
         public let symbolName: String
         public let text: String
 
+        /// Keep-awake held with the lid open. Closed-lid protection is not verified here, so it never says "Protected".
+        public static let keepingAwakeWithLidOpen = StatusStyle(
+            tone: .ok, symbolName: "laptopcomputer", text: "Keeping awake (lid open)")
+
         public static func style(for state: EffectiveState) -> StatusStyle {
             switch state {
             case .protected:

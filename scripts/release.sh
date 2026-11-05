@@ -1,19 +1,44 @@
 #!/bin/sh
-# Builds a GitHub release of CamLid: a Release build, ad-hoc signed (there is no Apple Developer ID), verified, zipped,
-# with the SHA-256 of the zip and the code hashes (CDHash) of the app and its helper.
-# Usage: scripts/release.sh [version]     version defaults to MARKETING_VERSION in project.yml
+# Builds a GitHub release of CamLid: a Release build signed with CAMLID_SIGN_IDENTITY (the project's release
+# certificate; there is no Apple Developer ID), verified, zipped, with the SHA-256 of the zip and the code hashes
+# (CDHash) of the app, its helper and its command-line tool.
+# Usage: scripts/release.sh [--adhoc] [version]     version defaults to MARKETING_VERSION in project.yml
 # Output: dist/CamLid-<version>-macos-arm64.zip, its .sha256, and dist/RELEASE_NOTES-<version>.md
+# Without CAMLID_SIGN_IDENTITY the build is refused. --adhoc makes a local test build instead: it is named -ADHOC
+# and its notes say not to publish it.
 # Uploading is a separate, deliberate step (the GitHub Releases page, or `gh release create`).
 set -eu
 cd "$(dirname "$0")/.."
-VERSION="${1:-$(sed -n 's/^ *MARKETING_VERSION: *//p' project.yml | head -1)}"
+ADHOC=0
+VERSION=""
+for arg in "$@"; do
+  case "$arg" in
+    --adhoc) ADHOC=1 ;;
+    -*) echo "unknown option: $arg" >&2; exit 2 ;;
+    *) VERSION="$arg" ;;
+  esac
+done
+[ -n "$VERSION" ] || VERSION="$(sed -n 's/^ *MARKETING_VERSION: *//p' project.yml | head -1)"
 case "$VERSION" in [0-9]*.[0-9]*) ;; *) echo "bad version: $VERSION" >&2; exit 2 ;; esac
+if [ -n "${CAMLID_SIGN_IDENTITY:-}" ] && [ "$ADHOC" = 1 ]; then
+  echo "--adhoc conflicts with CAMLID_SIGN_IDENTITY; unset one of them." >&2
+  exit 2
+fi
+if [ -z "${CAMLID_SIGN_IDENTITY:-}" ] && [ "$ADHOC" != 1 ]; then
+  echo "Refusing an ad-hoc release. Set CAMLID_SIGN_IDENTITY to the release certificate (see scripts/make-signing-identity.sh)." >&2
+  echo "For a local test build that must not be published, pass --adhoc." >&2
+  exit 1
+fi
 if [ -n "$(git status --porcelain)" ] && [ "${ALLOW_DIRTY:-0}" != 1 ]; then
   echo "The working tree has uncommitted changes; a release must come from a commit (ALLOW_DIRTY=1 to override)." >&2
   exit 1
 fi
+sh scripts/check-helper-version.sh || { echo "Refusing the release: the helper version guard failed (see above)." >&2; exit 1; }
 COMMIT="$(git rev-parse --short HEAD)"
-NAME="CamLid-$VERSION-macos-arm64"
+if [ -n "$(git status --porcelain)" ]; then COMMIT="$COMMIT, with uncommitted changes"; fi
+SUFFIX=""
+if [ "$ADHOC" = 1 ]; then SUFFIX="-ADHOC"; fi
+NAME="CamLid-$VERSION-macos-arm64$SUFFIX"
 BUILD="$(mktemp -d)"
 trap 'rm -rf "$BUILD"' EXIT
 mkdir -p dist
@@ -55,6 +80,10 @@ verify "$APP"
 APP_CDHASH="$(codesign -dvvv "$APP" 2>&1 | sed -n 's/^CDHash=//p')"
 HELPER_CDHASH="$(codesign -dvvv "$HELPER" 2>&1 | sed -n 's/^CDHash=//p')"
 [ -n "$APP_CDHASH" ] && [ -n "$HELPER_CDHASH" ] && [ "$APP_CDHASH" != "$HELPER_CDHASH" ] || fail "code hashes"
+CLI_CDHASH="$(codesign -dvvv "$APP/Contents/Helpers/camlid" 2>&1 | sed -n 's/^CDHash=//p')"
+[ -n "$CLI_CDHASH" ] || fail "command-line tool code hash"
+HELPER_VERSION="$(sed -n 's/^    public static let current = \([0-9][0-9]*\)$/\1/p' Packages/CamLidPowerWire/Sources/CamLidPowerWire/LocalIdentityPins.swift | head -1)"
+[ -n "$HELPER_VERSION" ] || fail "helper version not found"
 
 echo "== Zipping"
 rm -f "dist/$NAME.zip" "dist/$NAME.zip.sha256"
@@ -68,19 +97,38 @@ SHA="$(cut -d' ' -f1 "dist/$NAME.zip.sha256")"
 
 if [ -n "${CAMLID_SIGN_IDENTITY:-}" ]; then
   LEAF="$(leaf "$APP")"
+  CERT="$LEAF"
   PIN_TEXT="The helper only obeys an app signed with this release certificate (SHA-1 $LEAF) under the identifier com.camlid.CamLid, so a changed or unsigned app is refused. Updating the app does not need the helper reinstalled unless the notes say the helper changed."
 else
+  CERT="none (ad-hoc build)"
   PIN_TEXT="The helper only obeys the exact app (and helper) code hashes it was installed with, so a changed app is refused and every rebuild needs Reinstall helper…."
 fi
 
-cat > "dist/RELEASE_NOTES-$VERSION.md" <<NOTES
+BANNER=""
+if [ "$ADHOC" = 1 ]; then BANNER="**Local test build: ad-hoc signed. Do not publish it.**
+
+"; fi
+cat > "dist/RELEASE_NOTES-$VERSION$SUFFIX.md" <<NOTES
 ## CamLid $VERSION
 
-Keeps a Mac awake with the lid closed while AI coding agents work, and lets it sleep when they are done.
+${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and lets it sleep when they are done.
 
-**Pre-release.** Tested on one Mac (Mac17,3, macOS 26A434, Apple silicon). On any other model or macOS build, closed
-lid stays off until you accept "untested configuration" in Settings › Closed Lid. Strict mode is limited to tested
-Macs. See the README for what this does to your Mac.
+### Known limits
+- **Tested on one Mac:** Mac17,3, macOS 26A434, Apple silicon. On any other Mac or macOS build, closed-lid operation
+  stays off until you accept "untested configuration" in Settings › Closed Lid.
+- **Strict mode is experimental**, limited to tested Macs. The README says what it changes.
+- **Not notarized by Apple.** The project has no Apple Developer account, so the first launch needs the steps below.
+- Apple silicon only, macOS 14 or later.
+
+### Build and signing
+| Item | Value |
+| --- | --- |
+| Signing certificate (SHA-1) | $CERT |
+| Helper version | $HELPER_VERSION |
+| App CDHash | \`$APP_CDHASH\` |
+| Helper CDHash | \`$HELPER_CDHASH\` |
+| Command-line tool CDHash | \`$CLI_CDHASH\` |
+| Zip SHA-256 | \`$SHA\` |
 
 ### Install
 1. Download \`$NAME.zip\`, unzip it and move **CamLid.app** to \`/Applications\`.
@@ -115,4 +163,4 @@ echo "Built dist/$NAME.zip"
 echo "SHA-256   $SHA"
 echo "App CDHash    $APP_CDHASH"
 echo "Helper CDHash $HELPER_CDHASH"
-echo "Notes     dist/RELEASE_NOTES-$VERSION.md"
+echo "Notes     dist/RELEASE_NOTES-$VERSION$SUFFIX.md"

@@ -146,4 +146,14 @@ struct SleepDiagnosticsCopyTests {
         #expect(causes.first?.subtitle == "Keeps your Mac and screen awake")
         #expect(SleepDiagnosticsCopy.headline(causes) == "Some App is active. That's keeping your Mac awake.")
     }
+
+    @Test func camLidsOwnAssertionsAreCamLidNotAnotherApp() {
+        let causes = SleepDiagnosticsCopy.causes(for: snapshot([
+            blocker("1", "PreventUserIdleSystemSleep", .systemIdle, "CamLid", pid: 77),
+            blocker("2", "PreventUserIdleSystemSleep", .systemIdle, "com.camlid.power-helper", pid: 78),
+        ], preventedBy: ["CamLid"]))
+        #expect(causes.map(\.title) == ["CamLid is active"])
+        #expect(causes.first?.activeNow == true)
+        #expect(SleepDiagnosticsCopy.headline(causes) == "CamLid is active. That's keeping your Mac awake.")
+    }
 }

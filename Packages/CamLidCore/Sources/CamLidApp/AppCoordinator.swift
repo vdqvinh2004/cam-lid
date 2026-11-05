@@ -44,6 +44,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private let helper: HelperController
     private var holdReconciler = PowerHoldReconciler()
     private var holdTransport: (any PowerHoldTransport)?
+    private let keepAwake = KeepAwakeAssertion()
+    private let shortcut = GlobalHotKey()
+    private var commandAdmissions = CommandAdmissions()
+    /// Identifies this app instance in admissions: a relaunch makes older receipts stale.
+    private let instanceID = UUID().uuidString
+    private let instanceGeneration: UInt64 = 1
     private let makeHoldTransport: () -> any PowerHoldTransport
     /// Support row that qualifies closed-lid actuation on this Mac and OS build, or nil. `QualifiedSupportRows`
     /// is empty today, so the helper is never asked to hold power in a shipped build.
@@ -133,9 +139,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 controlDirectory: root.appendingPathComponent("control"), preferences: preferences)
             return
         }
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
-        self.init(historyDirectory: support.appendingPathComponent("CamLid/History", isDirectory: true))
+        self.init(historyDirectory: FileHistoryStorage.defaultDirectory)
     }
 
     init(historyDirectory: URL, controlDirectory: URL = LocalControlChannel.defaultDirectory,
@@ -160,7 +164,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         self.preferences = preferences
         self.outcomeNotifications = outcomeNotifications ?? OutcomeNotifications()
         self.permissions = permissions ?? AppPermissions()
-        self.configURL = historyDirectory.appendingPathComponent("preferences.json")
+        self.configURL = historyDirectory.appendingPathComponent(PersistedSettings.fileName)
         self.settingsInstaller = settingsInstaller ?? { source, destination in
             guard Darwin.rename(source.path, destination.path) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
@@ -187,10 +191,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         start()
+        _ = shortcut.register { [weak self] in self?.toggleAutoFromShortcut() }
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
         timer?.invalidate()
+        shortcut.unregister()
         // Closing the connection makes the helper restore at once; a crash does the same.
         holdTransport?.close()
         controlServer.stop()
@@ -325,10 +331,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         await startPreviewSession()
     }
 
-    func startPreviewSession() async {
+    func startPreviewSession(mode requested: RequestedMode? = nil) async {
         guard !authorityUnavailable, !terminationFlowActive else { return }
         refusalNotice = nil
-        guard config.mode != .off else {
+        guard (requested ?? config.mode) != .off else {
             refusalNotice = "Choose a mode before starting."
             refresh(); toggleDashboard(show: true); return
         }
@@ -352,7 +358,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             refresh(); toggleDashboard(show: true); return
         }
         helper.refresh()
-        let mode = config.mode
+        let mode = requested ?? config.mode
         let now = uptime()
         sessionBatteryDeadline = health.powerSource == .battery
             ? now + Double(min(config.runCapMinutes, config.batteryCapMinutes)) * 60 : nil
@@ -368,6 +374,15 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         sessionSleepDelayMinutes = config.completionDelayMinutes
         record(category: .enrollment, newState: created.effectiveState, reasons: ["sessionStarted"])
         refresh()
+    }
+
+    /// ⌃⌥⌘K: starts Auto when nothing is running, and stops the running session otherwise (spec 018 FR-009).
+    func toggleAutoFromShortcut() {
+        if session != nil {
+            menuBarStopProtection()
+        } else {
+            Task { await startPreviewSession(mode: .auto) }
+        }
     }
 
     public func menuBarStopProtection() {
@@ -394,6 +409,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     func releaseHoldForQuit() -> String {
         let held = holdReconciler.status == .held || holdReconciler.status == .acquiring
         holdTransport?.close()
+        keepAwake.release()
         return held ? "helperRestoresOnDisconnect" : "noPowerResourcesOwned"
     }
 
@@ -564,6 +580,19 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
     }
 
+    /// A refused or lost closed-lid lease ends a session only when the lid is closed. With the lid open the session
+    /// carries on with the lid-open keep-awake, and closed-lid protection is reported as unavailable instead.
+    static func holdSafetyReasons(lidState: LidState?, holdStops: [String]) -> [String] {
+        lidState == .closed ? holdStops : []
+    }
+
+    /// Lid-open keep-awake: a working session keeps the Mac awake while the lid is not closed. A closed lid is the
+    /// helper's job (`holdDesired`); without the helper, closing the lid sleeps the Mac.
+    private var keepAwakeDesired: Bool {
+        guard let state = session?.effectiveState, state == .protected || state == .completionGrace else { return false }
+        return latestHealth?.lidState != .closed
+    }
+
     private var holdDesired: Bool {
         guard closedLidAllowed, config.closedLidOptIn, helper.state == "installed",
               let state = session?.effectiveState else { return false }
@@ -615,8 +644,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             return "Closed lid is off on this untested Mac (\(identity)). To allow it, see Settings › Closed Lid."
         }
         if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Closed Lid." }
-        // A stopped session keeps the helper's reason; the reconciler itself resets once the session stops.
-        if let stop = session.stopReasons.first(where: { $0.hasPrefix("helper") }) {
+        // The helper's refusal explains closed lid while the session runs, even when the lid is open and it does not
+        // stop the session. A stopped session keeps the reason it latched.
+        if let stop = (session.stopReasons + holdReconciler.stopReasons).first(where: { $0.hasPrefix("helper") }) {
             switch stop {
             case "helperLeaseLost": return "Closed lid lost contact with the helper; sleep was restored automatically."
             case "helperReleaseFailed": return "The sleep setting could not be restored yet. CamLid is retrying."
@@ -690,7 +720,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let baseSignal = safety.evaluate(
             health: health, config: config, cpuStop: cpuEvaluation.stop, now: now)
         // The helper's refusal or stop ends a closed-lid session; the app never works around it.
-        let signal = SafetySignal(reasons: baseSignal.reasons + holdReconciler.stopReasons)
+        let signal = SafetySignal(reasons: baseSignal.reasons + Self.holdSafetyReasons(
+            lidState: latestHealth?.lidState, holdStops: holdReconciler.stopReasons))
         let lifetime = updateLifetimePolicy(now: now)
         if var active = session {
             // Battery exposure latches a cap from session start; AC return and timer edits cannot extend it.
@@ -712,7 +743,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 armed: true, safety: signal, recoveryConflict: false,
                 completionUncertain: agentCompletionUncertain()
                     || (!config.adapterEnrollment.isEmpty && now - lastProcessSuccess > 15),
-                lifetimeHoldReason: lifetime?.holdReason ?? (hasLifetimeRules ? "lifetimeRuleUnknown" : nil),
+                lifetimeHoldReason: commandHoldReason(now: now) ?? lifetime?.holdReason
+                    ?? (hasLifetimeRules ? "lifetimeRuleUnknown" : nil),
                 lifetimeCompletionSuppressed: lifetime?.suppressesAutoCompletion ?? hasLifetimeRules,
                 nowMonotonic: now)
             let changed = decision.state != active.effectiveState
@@ -727,6 +759,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             }
         }
         driveHold(now: now)
+        keepAwake.reconcile(wanted: keepAwakeDesired, now: now)
         let shown = session?.effectiveState ?? (config.mode == .off ? .off : .ready)
         if shown != lastReportedState {
             lastReportedState = shown
@@ -743,7 +776,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
         menuBar.update(status: MenuBarStatus(
             state: shown, reasonText: latestReason, leaseVerified: holdReconciler.leaseVerified(now: now),
-            agentWorking: agentWorking, timerRemainingSeconds: timerRemaining))
+            agentWorking: agentWorking, timerRemainingSeconds: timerRemaining,
+            keepingAwakeWithLidOpen: shown == .protected && !holdReconciler.leaseVerified(now: now)
+                && keepAwake.verified && health.lidState == .open))
         updates.refreshSafety()
         if utilityUI?.isRunning == true { utilityUI?.send(.update(utilityUIState())) }
     }
@@ -1010,7 +1045,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             mode: active?.requestedMode ?? config.mode, state: state,
             reasonText: latestReason ?? "",
             leaseVerified: holdReconciler.leaseVerified(now: now),
-            powerActuationAvailable: holdReconciler.leaseVerified(now: now),
+            powerActuationAvailable: holdReconciler.leaseVerified(now: now) || keepAwake.verified,
             lidDisplayText: summary.lidDisplay,
             capabilityText: closedLidCapabilityText, capabilityAction: closedLidCapabilityAction,
             tasks: allObservedTasks(now: now).map {
@@ -1033,7 +1068,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             timerMinutes: active == nil ? nil : sessionTimerMinutes,
             timerMaximumMinutes: active == nil ? nil : timerMaximumMinutes(now: now),
             timerLimitText: active == nil ? nil : timerLimitText(now: now),
-            sleepDelayMinutes: active == nil ? nil : sessionSleepDelayMinutes)
+            sleepDelayMinutes: active == nil ? nil : sessionSleepDelayMinutes,
+            keepingAwakeWithLidOpen: state == .protected && !holdReconciler.leaseVerified(now: now)
+                && keepAwake.verified && health?.lidState == .open)
         return data
     }
 
@@ -1080,7 +1117,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
         if let refusal = powerModeRefusal(patch) { return .failed(refusal) }
         guard revision < Int.max, let candidate = try? config.applying(patch),
-              let data = try? JSONEncoder().encode(PersistedSettings(schemaVersion: 1, revision: revision + 1, configuration: candidate)) else {
+              let data = try? JSONEncoder().encode(PersistedSettings(
+                  schemaVersion: PersistedSettings.currentSchemaVersion, revision: revision + 1, configuration: candidate)) else {
             return .failed(settingsRefusal(for: patch))
         }
         let expires = min(deadline ?? (uptime() + 0.7), uptime() + 0.7)
@@ -1396,6 +1434,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     func handleControlAsync(_ command: AllowlistedCommand, payload: Data, deadline: Double) async throws -> Data {
         try requireControlAdmission(command)
+        if command == .admitCommand { return try await admitCommandRun(payload) }
         if command == .diagnose {
             _ = try BoundedPayload(payload)
             guard payload.isEmpty else { throw IPCError.invalidInput("diagnoseTakesNoPayload") }
@@ -1473,6 +1512,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     func handleControl(_ command: AllowlistedCommand, payload: Data) throws -> Data {
         try requireControlAdmission(command)
+        // Renewal and finish carry their own payloads, not CLIOptions, so they are handled before the options decode.
+        if command == .renewCommand { return try JSONEncoder().encode(try renewCommandRun(payload)) }
+        if command == .finishCommand { return try JSONEncoder().encode(try finishCommandRun(payload)) }
         _ = try BoundedPayload(payload)
         if command == .logsExport {
             // Real transport uses the ordered off-main read path above.
@@ -1536,6 +1578,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 "maxHoldingTasks": PolicyLimits.maxEnrolledTasks, "trackedRuns": agents.trackedRunCount,
                 "retiredRuns": agents.retiredRunCount, "lastRejection": agents.lastRejection as Any? ?? NSNull()] as [String: Any]
             object["agentDetection"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(badgeStates()))
+            object["keepAwake"] = ["held": keepAwake.held, "verified": keepAwake.verified,
+                "issue": keepAwake.issue as Any? ?? NSNull()] as [String: Any]
+            object["shortcut"] = ["keys": "control-option-command-K", "registered": shortcut.isRegistered]
             var protection = try JSONSerialization.jsonObject(with: JSONEncoder().encode(readiness)) as! [String: Any]
             protection["readinessState"] = protection.removeValue(forKey: "state")
             object["protection"] = protection
@@ -1554,8 +1599,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             if let session { object["session"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(session)) }
             object["tasks"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(allObservedTasks(now: uptime())))
             result = CLIResult(json: String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self), exitCode: 0)
-        case .admitCommand, .renewCommand, .finishCommand:
-            result = CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"automationUnavailable\",\"powerActuation\":false}", exitCode: 3)
+        case .admitCommand:
+            throw IPCError.invalidInput("admitIsAsync")   // handled by `handleControlAsync` → `admitCommandRun`
         case .sleep:
             guard options.positionals.isEmpty, Set(options.flags.keys).isSubset(of: ["json", "dry-run"]),
                   options.flags.values.allSatisfy({ $0 == "true" }) else { throw IPCError.invalidInput("invalidSleepOptions") }
@@ -1643,15 +1688,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             minutes = Int(value)
         }
         guard session == nil else { return reply(3, ["accepted": false, "reason": "sessionAlreadyActive"]) }
-        if let mode, mode != config.mode {
-            await activateDashboardMode(mode, expectedRevision: revision)
-        } else {
-            await startPreviewSession()
-        }
+        // The requested mode applies to this session only. The saved mode changes only through `config set`.
+        await startPreviewSession(mode: mode)
         guard let active = session else {
             let reason: String = if authorityUnavailable { "appUnavailable" }
                 else if terminationFlowActive { "applicationTerminating" }
-                else if config.mode == .off { "modeOff" }
+                else if (mode ?? config.mode) == .off { "modeOff" }
                 else if config.closedLidOptIn && !closedLidAllowed { "closedLidNotPermitted" }
                 else { config.batteryEntryRefusal(health: currentHealth()) ?? "notStarted" }
             return reply(3, ["accepted": false, "reason": reason, "detail": refusalNotice ?? NSNull()])
@@ -1665,13 +1707,92 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             "note": "Power is held once the helper confirms; check `camlid status` for leaseVerified."])
     }
 
+    // MARK: - camlid run admissions (ADR 0006)
+
+    /// Admits one `camlid run` command. An Auto session starts when none runs, and the admitted command then counts as
+    /// work, so the session stays protected until the command finishes.
+    private func admitCommandRun(_ payload: Data) async throws -> Data {
+        let request = try JSONDecoder().decode(AdmitCommandRequest.self, from: payload)
+        try request.validate()
+        guard !authorityUnavailable, !terminationFlowActive else { throw IPCError.unavailable }
+        if session == nil {
+            await startPreviewSession(mode: .auto)
+            guard session != nil else {
+                return try JSONEncoder().encode(commandRefusal(config.batteryEntryRefusal(health: currentHealth()) ?? "sessionNotStarted"))
+            }
+        }
+        // The backend is verified before admission: the lid-open assertion must be held and read back.
+        keepAwake.reconcile(wanted: true, now: uptime())
+        do {
+            let receipt = try commandAdmissions.admit(
+                label: request.label, session: session, uid: getuid(), bootID: instanceID,
+                generation: instanceGeneration, backendVerified: commandBackendVerified(),
+                safetyClear: commandSafetyClear(), now: uptime())
+            record(category: .enrollment, newState: sessionStateForRecord(), reasons: ["commandStarted"])
+            refresh()
+            let json = String(decoding: try JSONEncoder().encode(receipt), as: UTF8.self)
+            return try JSONEncoder().encode(CLIResult(json: json, exitCode: 0))
+        } catch let error as IPCError {
+            guard case .policyDenied(let reason) = error else { throw error }
+            return try JSONEncoder().encode(commandRefusal(reason))
+        }
+    }
+
+    /// Renews an admission. A receipt whose session has ended, or whose safety stop latched, is refused with its reason.
+    private func renewCommandRun(_ payload: Data) throws -> CLIResult {
+        let request = try JSONDecoder().decode(RenewCommandRequest.self, from: payload)
+        do {
+            let next = try commandAdmissions.renew(
+                request.receipt, session: session, uid: getuid(), bootID: instanceID, generation: instanceGeneration,
+                backendVerified: commandBackendVerified(), safetyClear: commandSafetyClear(), now: uptime())
+            return CLIResult(json: String(decoding: try JSONEncoder().encode(next), as: UTF8.self), exitCode: 0)
+        } catch let error as IPCError {
+            guard case .policyDenied(let reason) = error else { throw error }
+            return commandRefusal(reason)
+        }
+    }
+
+    /// A refused admission call. The reason travels in the reply, as `camlid start` replies do, not as a thrown error,
+    /// because the wire keeps only the denial class.
+    private func commandRefusal(_ reason: String) -> CLIResult {
+        CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"\(reason)\"}", exitCode: 3)
+    }
+
+    /// Finishes an admission and records how the command ended. The session then winds down through grace.
+    private func finishCommandRun(_ payload: Data) throws -> CLIResult {
+        let request = try JSONDecoder().decode(FinishCommandRequest.self, from: payload)
+        try commandAdmissions.finish(
+            request.receipt, uid: getuid(), bootID: instanceID, generation: instanceGeneration, now: uptime())
+        var reasons = ["commandFinished"]
+        if let exitStatus = request.exitStatus { reasons.append("exitStatus:\(exitStatus)") }
+        if let seconds = request.durationSeconds { reasons.append("durationSeconds:\(Int(seconds.rounded()))") }
+        record(category: .enrollment, newState: sessionStateForRecord(), reasons: reasons)
+        refresh()
+        return CLIResult(json: "{\"schemaVersion\":1,\"accepted\":true}", exitCode: 0)
+    }
+
+    /// The backend a command needs: the lid-open assertion held and read back, or a verified closed-lid lease.
+    private func commandBackendVerified() -> Bool {
+        keepAwake.verified || holdReconciler.leaseVerified(now: uptime())
+    }
+
+    private func commandSafetyClear() -> Bool {
+        !(session?.latchedSafetyStop ?? true)
+    }
+
+    /// An admitted command counts as work for an Auto session (ADR 0006). Expired admissions are dropped here.
+    private func commandHoldReason(now: Double) -> String? {
+        commandAdmissions.expire(now: now)
+        return commandAdmissions.count > 0 ? "commandRunning" : nil
+    }
+
     // MARK: - Config persistence (validated; never silently arms)
 
     private func requireControlAdmission(_ command: AllowlistedCommand) throws {
         if terminationFlowActive && ![.status, .doctor, .agentsList, .configGet, .logsExport].contains(command) {
             throw IPCError.policyDenied("applicationTerminating")
         }
-        guard ![.event, .agentDiagnostic, .run, .admitCommand, .renewCommand, .finishCommand].contains(command) else {
+        guard ![.event, .agentDiagnostic, .run].contains(command) else {
             throw IPCError.policyDenied("externalObservationOnly")
         }
     }
@@ -1680,7 +1801,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private func persistConfig(_ candidate: Configuration) -> Bool {
         guard !authorityUnavailable, !terminationFlowActive, !hasPendingSettingsInstallation, revision < Int.max else { return false }
         let nextRevision = revision + 1
-        let snapshot = PersistedSettings(schemaVersion: 1, revision: nextRevision, configuration: candidate)
+        let snapshot = PersistedSettings(schemaVersion: PersistedSettings.currentSchemaVersion, revision: nextRevision, configuration: candidate)
         do {
             try candidate.validate()
             try settingsWriter(JSONEncoder().encode(snapshot), configURL)
@@ -1755,9 +1876,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             guard let data else {
                 refusalNotice = "Saved settings could not be read. Using safe defaults."; return
             }
-            guard let saved = try? JSONDecoder().decode(PersistedSettings.self, from: data),
-                saved.schemaVersion == 1, saved.revision >= 1,
-                (try? saved.configuration.validate()) != nil else {
+            guard let saved = PersistedSettings.validated(data) else {
                 refusalNotice = "Saved settings were invalid, so CamLid uses safe defaults."
                 return
             }
@@ -1826,12 +1945,6 @@ private final class ControlReplyBox: @unchecked Sendable {
         guard let result else { throw IPCError.unavailable }
         return try result.get()
     }
-}
-
-private struct PersistedSettings: Codable {
-    let schemaVersion: Int
-    let revision: Int
-    let configuration: Configuration
 }
 
 // Explicit session edits; routine policy evaluation never renews a deadline.

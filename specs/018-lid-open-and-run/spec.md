@@ -51,7 +51,7 @@
 
 ### User Story 4 — Agent detection is calibrated (P2)
 
-One recorded calibration run per agent (Claude Code, Codex, OpenCode) in the QA addendum. Thresholds change only with a recorded run. A fixture records the rule that a busy process without session activity is Unknown, not Working (ADR 0002).
+One recorded calibration run per agent (Claude Code, Codex, OpenCode) in the QA addendum. Thresholds change only with a recorded run. A fixture records the rule that a CPU-busy process which is not a recognised agent is not Working (ADR 0002).
 
 ## Requirements
 

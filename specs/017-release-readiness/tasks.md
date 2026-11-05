@@ -12,19 +12,51 @@
 - [x] T012 [US1] Renamed: `commandNotAvailableInPreview` → `commandNotAvailable`; `modeOffPreview` → `modeOff`; `backendPendingM1` → `automationUnavailable` (admit, renew, finish); `previewOnly` → `backendUnverified`. `previewPowerDisabled` removed with the Preview state. No aliases (see FR-003). Activity labels keep the old codes, so stored history reads correctly. — 2026-11-05.
 - [x] T013 [US1] `camlid status` has no `preview` field. `protection.readinessState` carries the state; top-level `effectiveState` and `reasonCodes` carry the same state and the blockers. `start` already reported `powerActuation` from the lease, so it was not changed. — 2026-11-05.
 - [x] T014 [US1] Preview branch removed from `OutcomeNotifications` (title and body); Activity labels for the new codes. — 2026-11-05.
-- [ ] T015 [US1] Live check: status and Dashboard agree at each checkpoint of a session. Needs an installed build.
+- [~] T015 [US1] Live check: status and Dashboard agree at each checkpoint of a session. Status checked on the installed
+  build (readiness never says Preview; `keepAwake` and `leaseVerified` agree with the session). Dashboard not checked:
+  the popover is not readable through accessibility and the cua-driver connection dropped. 2026-11-05: the driver answers
+  again on its default socket, with Accessibility and Screen Recording granted. A status snapshot taken then: auto session
+  (an observed Orca task working), configured `timed`, `keepAwake` held and verified, shortcut registered. The popover was
+  closed (no CamLid window listed). 2026-11-05, later: the menu-bar icon was clicked through desktop input, the popover was
+  read from a screenshot, and a second click closed it. At idle it matches `camlid status`: Ready, neither Auto nor Timed
+  active, battery 83%, lid open, thermal fair, Orca 2 working. CPU and temperature differ a little between the two reads
+  (sampled at different times). Second checkpoint, same day, Auto started with `camlid start --mode auto`: the Dashboard
+  showed Auto selected and "Sleep when done: After 2 min", but its header read "Unknown" while status had session
+  `protected`, `keepAwake` held and verified, and `leaseVerified` false. Cause: `MenuBarController.presentedState` maps
+  `protected` to `unavailable` whenever the helper lease is unverified, even with the lid open. Decided by the owner: a verified
+  lid-open keep-awake shows "Keeping awake (lid open)", never "Protected". Fixed in code 2026-11-05. Installed 2026-11-05
+  (CDHash `0068507b…`): with the closed-lid lease verified, the Dashboard showed Protected, matching status. The new label
+  has not been seen live; it needs an unverified lease with the lid open. Still open: the checkpoint when an Auto session ends.
 
 ## Phase 2 — Sensor timing (US2)
-- [ ] T020 [US2] Measure sensor-call time and scheduling delay under 100 % CPU for three minutes (the gate).
-- [ ] T021 [US2] Time only the sensor call in `LiveSensorProvider.finish()`; raise the sampler queue's quality of service.
-- [ ] T022 [US2] If the gate requires it, add the tolerance window within the spec limits; closed, missing and stale paths stop at once.
-- [ ] T023 [US2] Test: a stalled source stops the session within the configured bound.
-- [ ] T024 [US2] Live: three minutes at 100 % CPU with a closed-lid session; no `lidUnknown` stop.
+- [x] T020 [US2] Measure sensor-call time and scheduling delay under 100 % CPU for three minutes (the gate). — 2026-11-05,
+  Mac17,3, ten cores busy for 180 s (`SensorTimingGateTests`, env-gated). Lid read alone: p99 7 ms, max 11 ms, never
+  over 200 ms, from either queue. Whole production read: temperature read median 146 ms, max 478 ms; the whole pass
+  went over 200 ms in 13 of 153 reads, and each such pass marked the lid unknown. The stall budget was measured on
+  the whole pass, so a slow temperature read stopped the lid.
+- [x] T021 [US2] Each source has its own budget (`LiveSensorProvider.settle`): the lid is measured on its own call,
+  the die temperature on its own call, and the worker queue is `.userInitiated`. — 2026-11-05.
+- [x] T022 [US2] Decision from T020: no tolerance window. The lid call stays far inside 200 ms under full load, so the
+  gate's rule (time only the call, raise QoS) applies. — 2026-11-05.
+- [x] T023 [US2] Tests: `SensorStallBudgetTests` (4): a slow temperature never marks the lid; a slow lid marks only
+  the lid; the lid keeps its read-start time; the budget is 200 ms inclusive. `TemperatureReaderTests` now drives its
+  slow read on the clock. — 2026-11-05.
+- [x] T024 [US2] Live: three minutes at 100 % CPU with a session running; no `lidUnknown` stop. — 2026-11-05: 190 s
+  with ten full-load processes, 95 samples. The session was `protected` in every sample, the lid was open and
+  available in every sample, and there was no `slowSensorRead` or stop. Caveat: the session had the closed-lid option
+  on, but the helper refused the closed-lid lease (thermal `fair`), so it ran on the lid-open keep-awake. The lid
+  stayed open.
 
 ## Phase 3 — Release gate (US3)
-- [ ] T030 [US3] `scripts/release.sh` refuses ad-hoc builds unless `--adhoc`; test the refusal.
-- [ ] T031 [US3] Release-notes template (fingerprint, helper version, CDHash table, tested configuration, limits, Strict line); no "pre-release" or "Preview" wording.
-- [ ] T032 [US3] Update `README.md` status, signing and install text (FR-007).
+- [x] T030 [US3] `scripts/release.sh` refuses ad-hoc builds unless `--adhoc`; `--adhoc` builds are named `-ADHOC`.
+  `scripts/test-release-arguments.sh` checks the four refusal paths (4/4 pass). — 2026-11-05.
+- [x] T031 [US3] Release notes from the template: known limits, signing table (certificate SHA-1, helper version,
+  CDHashes, zip SHA-256). Checked in the signed local build's notes; no "Pre-release" or "Preview". — 2026-11-05.
+- [x] T032 [US3] README status and build text match the signed release (not notarized, self-signed certificate,
+  refusal without the identity). — 2026-11-05.
 - [ ] T033 [US3] Enable Private vulnerability reporting (owner signs in to `gh`, or uses the web page).
-- [ ] T034 [US3] Full test run in all packages; signed build; install; `helper status` installed.
+- [~] T034 [US3] Full test run in all packages; signed build; install; `helper status` installed. — 2026-11-05: the
+  CamLid package passes; signed local builds from the uncommitted tree (`ALLOW_DIRTY`) are installed and `helper status`
+  reports installed. CamLidPowerWire (11 tests) and CamLidPowerHelper (94) also pass. Not run: LidRecoveryJournal and
+  LidNativeAdapter. Still open: a release built from a commit.
 - [ ] T035 [US3] Owner approves; create the GitHub release.

@@ -3,10 +3,10 @@
 A native macOS menu bar app that keeps a Mac awake with the lid closed while AI coding agents work, and lets it
 sleep when they are done.
 
-**Status: pre-release, unsigned, tested on one Mac.** Closed-lid operation has passed attended trials on
+**Status: signed with the project's own release certificate, not notarized by Apple, tested on one Mac.** Closed-lid operation has passed attended trials on
 Mac17,3 with macOS 26A434 only ([trial record](specs/014-persistent-helper/g2-trial.md)). On any other model or
-macOS build it stays off unless you explicitly accept "untested configuration" in Settings › Closed Lid. Builds are
-ad-hoc signed and not notarized by Apple ([why](docs/adr/0004-distribution-through-github-releases.md)).
+macOS build it stays off unless you explicitly accept "untested configuration" in Settings › Closed Lid. Releases are
+signed with a self-signed certificate, not an Apple Developer ID, and not notarized ([why](docs/adr/0004-distribution-through-github-releases.md)).
 
 ## Download
 
@@ -73,7 +73,8 @@ ditto "$HOME/CamLidBuild/Build/Products/Release/CamLid.app" /Applications/CamLid
 
 The build signs the app and its embedded helper ad hoc. To sign with a stable certificate instead (so rebuilds and
 updates keep the installed helper), run `scripts/make-signing-identity.sh` once, then
-`CAMLID_SIGN_IDENTITY="CamLid Release Signing" scripts/release.sh`. `project.yml` is the XcodeGen source
+`CAMLID_SIGN_IDENTITY="CamLid Release Signing" scripts/release.sh`. Without that variable the script refuses to build;
+`scripts/release.sh --adhoc` makes a local test build named `-ADHOC`, not for publication. `project.yml` is the XcodeGen source
 (`xcodegen generate` after changing targets).
 
 Tests (each package):
@@ -104,6 +105,7 @@ be cleared first, see Download).
 ```sh
 camlid status --json            # state, agents, health, helper lease
 camlid start --mode auto        # same path as the Dashboard; refuses with a reason code
+camlid run -- make build        # keeps the Mac awake while this command runs; needs CamLid running
 camlid stop
 camlid config get --json
 camlid helper status            # install | uninstall | trust need administrator rights

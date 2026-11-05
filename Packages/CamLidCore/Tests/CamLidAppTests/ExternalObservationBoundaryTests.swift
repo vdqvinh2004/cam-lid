@@ -81,7 +81,7 @@ struct ExternalObservationBoundaryTests {
             state: .working, evidenceKind: .lifecycle, confidence: .exact, sequence: 0,
             receivedMonotonic: ContinuousTime.now)
         let bytes = try JSONEncoder().encode(event)
-        let commands: [AllowlistedCommand] = [.event, .agentDiagnostic, .run, .admitCommand, .renewCommand, .finishCommand]
+        let commands: [AllowlistedCommand] = [.event, .agentDiagnostic, .run]
         for command in commands {
             #expect(throws: IPCError.policyDenied("externalObservationOnly")) {
                 try app.handleControl(command, payload: bytes)
@@ -89,6 +89,12 @@ struct ExternalObservationBoundaryTests {
             await #expect(throws: IPCError.policyDenied("externalObservationOnly")) {
                 try await app.handleControlAsync(command, payload: bytes, deadline: ContinuousTime.now + 1)
             }
+        }
+        // Admission, renewal and finish take their own payloads. An event payload is refused and creates no task.
+        #expect(throws: (any Error).self) { try app.handleControl(.renewCommand, payload: bytes) }
+        #expect(throws: (any Error).self) { try app.handleControl(.finishCommand, payload: bytes) }
+        await #expect(throws: (any Error).self) {
+            try await app.handleControlAsync(.admitCommand, payload: bytes, deadline: ContinuousTime.now + 1)
         }
         let reply = try JSONDecoder().decode(CLIResult.self, from: app.handleControl(.status, payload: Data()))
         let status = try #require(JSONSerialization.jsonObject(with: Data(reply.json.utf8)) as? [String: Any])

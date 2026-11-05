@@ -138,6 +138,8 @@ public struct DashboardData: Codable, Sendable, Equatable {
     public let timerMaximumMinutes: Int?
     public let timerLimitText: String?
     public let sleepDelayMinutes: Int?
+    /// Lid open, keep-awake verified and the closed-lid lease unverified: the header says so instead of Unknown.
+    public let keepingAwakeWithLidOpen: Bool
 
     public init(
         mode: RequestedMode = .off,
@@ -163,7 +165,8 @@ public struct DashboardData: Codable, Sendable, Equatable {
         lastSessionText: String? = nil,
         stopEnabled: Bool = false, startEnabled: Bool = false, metrics: [DashboardMetric] = DashboardMetric.from(nil), agents: [AgentBadgeState] = [],
         timerMinutes: Int? = nil, timerMaximumMinutes: Int? = nil, timerLimitText: String? = nil,
-        sleepDelayMinutes: Int? = nil
+        sleepDelayMinutes: Int? = nil,
+        keepingAwakeWithLidOpen: Bool = false
     ) {
         self.mode = mode
         self.state = state
@@ -191,6 +194,7 @@ public struct DashboardData: Codable, Sendable, Equatable {
         self.agents = agents
         self.timerMinutes = timerMinutes; self.timerMaximumMinutes = timerMaximumMinutes
         self.timerLimitText = timerLimitText; self.sleepDelayMinutes = sleepDelayMinutes
+        self.keepingAwakeWithLidOpen = keepingAwakeWithLidOpen
     }
 
     /// Honest empty state: unknown telemetry, no fabricated values.
@@ -451,11 +455,17 @@ public extension DashboardData {
     var presentedState: EffectiveState {
         state == .protected && (!leaseVerified || !powerActuationAvailable) ? .unavailable : state
     }
+    /// The lid-open header applies only while the closed-lid lease is unverified; a verified lease keeps "Protected".
+    var showsLidOpenAwake: Bool { keepingAwakeWithLidOpen && state == .protected && !leaseVerified }
     var statusTitle: String {
+        if showsLidOpenAwake { return CamLidAccessibility.StatusStyle.keepingAwakeWithLidOpen.text }
         if presentedState == .completionGrace && !powerActuationAvailable { return "Waiting after work" }
         return CamLidAccessibility.StatusStyle.style(for: presentedState).text
     }
-    var statusSymbol: String { CamLidAccessibility.StatusStyle.style(for: presentedState).symbolName }
+    var statusSymbol: String {
+        showsLidOpenAwake ? CamLidAccessibility.StatusStyle.keepingAwakeWithLidOpen.symbolName
+            : CamLidAccessibility.StatusStyle.style(for: presentedState).symbolName
+    }
     var graceLabel: String { powerActuationAvailable ? "Sleep requested in" : "Delay remaining" }
 }
 

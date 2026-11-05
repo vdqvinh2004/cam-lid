@@ -52,6 +52,8 @@ struct BackendReadinessIntegrationTests {
         #expect(initial["activeSessionMode"] is NSNull)
 
         for mode in [RequestedMode.auto, .timed] {
+            // Each mode starts its own session: the previous one must end, or its mode would carry over.
+            _ = await cli(["stop"])
             app.changeMode(mode)
             await app.startPreviewSession()
             let before = try object(await cli(["status"]))
@@ -76,10 +78,17 @@ struct BackendReadinessIntegrationTests {
             #expect(try object(start)["reason"] as? String == "sessionAlreadyActive")
 
             let marker = root.appendingPathComponent("must-not-launch-" + mode.rawValue)
-            let protectedRun = await cli(["run", "--keep-awake", "--", "/usr/bin/touch", marker.path])
-            #expect(protectedRun.exitCode == 3)
-            #expect(try object(protectedRun)["reason"] as? String == "externalObservationOnly")
-            #expect(!FileManager.default.fileExists(atPath: marker.path))
+            // Only an Auto session admits a command, and only with a verified backend. The lid-open assertion is
+            // verified in this fixture, so Auto runs the command; the other modes refuse it and launch nothing.
+            let protectedRun = await cli(["run", "--", "/usr/bin/touch", marker.path])
+            if mode == .auto {
+                #expect(protectedRun.exitCode == 0)
+                #expect(FileManager.default.fileExists(atPath: marker.path))
+            } else {
+                #expect(protectedRun.exitCode == 3)
+                #expect(try object(protectedRun)["reason"] as? String == "commandAdmissionDenied")
+                #expect(!FileManager.default.fileExists(atPath: marker.path))
+            }
 
             for arguments in [["sleep", "--dry-run"], ["sleep"]] {
                 let reply = await cli(arguments)

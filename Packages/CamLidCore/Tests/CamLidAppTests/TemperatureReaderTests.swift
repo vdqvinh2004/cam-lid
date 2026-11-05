@@ -72,7 +72,8 @@ struct TemperatureReaderTests {
             clock: { clock.now() },
             thermalReader: { .nominal },
             reader: { startedAt in
-                Thread.sleep(forTimeInterval: 0.35)
+                // The read takes 350 ms on the worker's clock; stall budgets are measured on that clock.
+                clock.set(startedAt + 0.35)
                 var readings = tempSensorReadings(at: startedAt)
                 readings.temperature = TemperatureObservation(
                     valueCelsius: 41.5, sensorID: "PMU tdie6", displayName: "CPU die (hottest)",
@@ -81,7 +82,6 @@ struct TemperatureReaderTests {
             }
         )
         _ = provider.read()
-        clock.set(601)
         tempWaitUntil(timeout: 2) { provider.read().temperature.availability == "error" }
         #expect(provider.read().temperature.availability == "error")
         #expect(provider.read().temperature.valueCelsius == nil)

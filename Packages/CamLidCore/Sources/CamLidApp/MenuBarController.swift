@@ -41,9 +41,13 @@ public struct MenuBarStatus: Sendable, Equatable {
     public let agentWorking: Bool
     /// Timed/manual mode: live remaining seconds, or nil for Infinite.
     public let timerRemainingSeconds: Double?
+    /// Lid open, keep-awake verified and the closed-lid lease unverified: the label says so instead of Unknown.
+    public let keepingAwakeWithLidOpen: Bool
 
     public init(state: EffectiveState, reasonText: String? = nil, leaseVerified: Bool = false,
-                agentWorking: Bool = false, timerRemainingSeconds: Double? = nil) {
+                agentWorking: Bool = false, timerRemainingSeconds: Double? = nil,
+                keepingAwakeWithLidOpen: Bool = false) {
+        self.keepingAwakeWithLidOpen = keepingAwakeWithLidOpen
         self.state = state
         self.reasonText = reasonText
         self.leaseVerified = leaseVerified
@@ -78,6 +82,9 @@ public struct MenuBarStatus: Sendable, Equatable {
     }
 
     public var accessibilityLabel: String {
+        if keepingAwakeWithLidOpen && state == .protected && !leaseVerified {
+            return "CamLid: \(CamLidAccessibility.StatusStyle.keepingAwakeWithLidOpen.text)"
+        }
         let reason: String?
         if state == .protected, !leaseVerified {
             reason = "protection unverified"

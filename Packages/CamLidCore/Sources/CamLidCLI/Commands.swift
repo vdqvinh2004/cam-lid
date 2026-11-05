@@ -134,6 +134,7 @@ public enum Commands {
     /// config/simulate read real files, legacy integration commands refuse, and logs
     /// export honestly reports unavailable instead of inventing success.
     public static func runWithRealIO(argv: [String], channel: (any IPCChannel)?) -> CLIResult {
+        if argv.first == "run" { return CommandRun.execute(arguments: Array(argv.dropFirst()), channel: channel) }
         let (name, options) = parse(argv: argv)
         var context = CommandContext(
             channel: channel,
@@ -223,7 +224,7 @@ public enum Commands {
             return helperCommand(name: name, options: options)
         case "helper": return fail(2, command: name, reason: "missingSubcommand")
         case "simulate": return simulate(options: options, context: context)
-        case "event", "bridge", "run":
+        case "event", "bridge":
             return fail(3, command: name, reason: "externalObservationOnly")
         default: return fail(2, command: name.isEmpty ? "none" : name, reason: "unknownCommand")
         }
@@ -699,6 +700,7 @@ public enum Commands {
         guard let path = options.flags["scenario"] else {
             return fail(2, command: "simulate", reason: "missingScenario")
         }
+        let useCurrent = options.flags["use-current-config"] == "true"
         let data: Data
         do {
             data = try readFileData(atPath: path, context: context)
@@ -706,6 +708,8 @@ public enum Commands {
             return fail(2, command: "simulate", reason: "invalidScenario", detail: path)
         }
         if let fixture = try? JSONDecoder().decode(FixtureFile.self, from: data) {
+            // A fixture carries its own configuration, so the saved settings cannot apply to it.
+            if useCurrent { return fail(2, command: "simulate", reason: "fixtureHasOwnConfig", detail: path) }
             let result = Simulator(fakeNow: context.nowMonotonic).runFixture(fixture)
             let trace: [[String: Any]] = result.steps.map { step in
                 ["at": step.at, "state": step.actual, "reasons": step.actualReasons,
@@ -721,14 +725,42 @@ public enum Commands {
             SimulationScenario.self, from: data) else {
             return fail(2, command: "simulate", reason: "invalidScenario", detail: path)
         }
-        let result = Simulator(fakeNow: context.nowMonotonic).run(scenario: scenario, config: context.config)
+        var config = context.config
+        var source: String?
+        if useCurrent {
+            guard let saved = savedConfiguration(context: context) else {
+                return fail(2, command: "simulate", reason: "invalidSettings", detail: PersistedSettings.defaultURL.path)
+            }
+            config = saved.config
+            source = saved.source
+        }
+        let result = Simulator(fakeNow: context.nowMonotonic).run(scenario: scenario, config: config)
         let trace: [[String: Any]] = result.transitions.map { transition in
             ["at": transition.at, "state": transition.state.rawValue, "reasons": transition.reasons]
         }
-        return cliJSON(0, [
+        var fields: [String: Any] = [
             "command": "simulate", "scenario": result.scenarioName,
             "simulated": true, "transitions": trace,
-        ])
+        ]
+        if let source {
+            fields["configSource"] = source
+            fields["config"] = configDict(config)
+        }
+        return cliJSON(0, fields)
+    }
+
+    /// Saved settings for `simulate --use-current-config`. No saved file means the defaults, as the app uses.
+    /// Nil when the file is present but is not a valid saved configuration.
+    static func savedConfiguration(context: CommandContext) -> (config: Configuration, source: String)? {
+        do {
+            let data = try readFileData(atPath: PersistedSettings.defaultURL.path, context: context)
+            guard let saved = PersistedSettings.validated(data) else { return nil }
+            return (saved.configuration, "saved")
+        } catch CLIFileReadError.notFound(path: _) {
+            return (try! Configuration(), "defaults")
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Helpers

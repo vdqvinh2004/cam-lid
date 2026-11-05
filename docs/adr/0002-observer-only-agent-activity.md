@@ -1,7 +1,8 @@
 # ADR 0002: Agents are observed from outside only; activity is inferred
 
-- **Status:** Accepted (owner decision, 2026-10-31)
-- **Affects:** spec 004 (agent integration), spec 015 (agent activity observer)
+- **Status:** Accepted (owner decision, 2026-10-31). Amended by [ADR 0006](0006-command-wrapper-amends-observer-only.md)
+  (2026-11-05): `camlid run -- <command>` may keep the Mac awake for a command the user starts; agents stay observed.
+- **Affects:** spec 004 (agent integration), spec 015 (agent activity observer), spec 018 (`camlid run`)
 
 ## Context
 Auto needs to know whether an agent is working or finished. Orca reports this; agents run directly in a terminal

@@ -185,10 +185,16 @@ public struct RenewCommandRequest: Codable, Sendable, Equatable {
 public struct FinishCommandRequest: Codable, Sendable, Equatable {
     public let schemaVersion: Int
     public let receipt: CommandReceipt
+    /// How the command ended and how long it ran. Recorded in Activity; never the command, its arguments or output.
+    public let exitStatus: Int32?
+    public let durationSeconds: Double?
 
-    public init(receipt: CommandReceipt, schemaVersion: Int = 1) {
+    public init(receipt: CommandReceipt, exitStatus: Int32? = nil, durationSeconds: Double? = nil,
+                schemaVersion: Int = 1) {
         self.schemaVersion = schemaVersion
         self.receipt = receipt
+        self.exitStatus = exitStatus
+        self.durationSeconds = durationSeconds
     }
 
     public func validate() throws(IPCError) {

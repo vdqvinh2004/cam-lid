@@ -6,7 +6,7 @@ Only metadata is read. The prompt must not need tools. Usage:
       --prompt-at 30 --observe 150 > timeline.csv
   python3 scripts/agent-activity-calibrate.py --agent claude --mode print --model claude-haiku-5-5 --prompt "..."
 """
-import argparse, os, pty, select, signal, subprocess, sys, tempfile, time
+import argparse, fcntl, os, pty, select, signal, struct, subprocess, sys, tempfile, termios, time
 
 SESSION_DIRS = {"claude": "~/.claude/projects", "codex": "~/.codex/sessions", "opencode": "~/.local/share/opencode"}
 
@@ -49,14 +49,17 @@ def main():
     a.add_argument("--model", default=None); a.add_argument("--prompt", required=True)
     a.add_argument("--prompt-at", type=float, default=30); a.add_argument("--observe", type=float, default=150)
     a.add_argument("--log", default=None, help="write the agent's terminal output here (for debugging the harness)")
+    a.add_argument("--arg", action="append", default=[], help="extra argument for the agent CLI; repeat, e.g. --arg=--effort --arg=low")
+    a.add_argument("--submit-delay", type=float, default=0.3, help="seconds between the prompt text and Enter in tui mode; raise it for agents that read fast input as a paste")
     args = a.parse_args()
     work = tempfile.mkdtemp(prefix="camlid-calibrate-")
-    cmd = [args.agent] + (["--model", args.model] if args.model else [])
+    cmd = [args.agent] + (["--model", args.model] if args.model else []) + args.arg
     events = []
     start = time.time()
     if args.mode == "tui":
         pid, fd = pty.fork()
         if pid == 0:
+            fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))  # a 0x0 pty draws nothing in some TUIs
             os.chdir(work); os.environ.setdefault("TERM", "xterm-256color"); os.execvp(cmd[0], cmd)
         sent_trust = sent_prompt = False
     else:
@@ -77,7 +80,7 @@ def main():
                 except OSError: break
             if not sent_trust and t >= 5 and exit_seen is None: os.write(fd, b"\x1b[B"); time.sleep(0.3); os.write(fd, b"\r"); sent_trust = True; event = "trustAccepted"  # Claude Code defaults to "No, exit"
             if not sent_prompt and t >= args.prompt_at and exit_seen is None:
-                os.write(fd, args.prompt.encode()); time.sleep(0.3); os.write(fd, b"\r"); sent_prompt = True; event = "promptSent"
+                os.write(fd, args.prompt.encode()); time.sleep(args.submit_delay); os.write(fd, b"\r"); sent_prompt = True; event = "promptSent"
         if fd is not None and exit_seen is None:
             try:
                 if os.waitpid(pid, os.WNOHANG)[0] == pid: exit_seen = t; event = event or "exited"

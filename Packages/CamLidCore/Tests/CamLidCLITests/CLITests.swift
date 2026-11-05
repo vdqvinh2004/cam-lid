@@ -223,14 +223,40 @@ struct CLITests {
         let dict = try jsonDict(result)
         #expect(dict["simulated"] as? Bool == true)
         #expect((dict["transitions"] as? [Any])?.count == 2)
+        #expect(dict["configSource"] == nil)
     }
 
-    @Test("legacy run is excluded before attempting a missing command")
-    func runLaunchFailure() throws {
+    @Test("simulate --use-current-config uses the saved settings and names them")
+    func simulateUsesSavedSettings() throws {
         var context = try ownedContext()
-        let result = dispatch(["run", "--", "/nonexistent-camlid-probe"], context: &context)
-        #expect(result.exitCode == 3)
-        #expect(try jsonDict(result)["reason"] as? String == "externalObservationOnly")
+        var saved = try Configuration()
+        saved.mode = .timed
+        let file = PersistedSettings(schemaVersion: 1, revision: 2, configuration: saved)
+        context.files[PersistedSettings.defaultURL.path] = String(decoding: try JSONEncoder().encode(file), as: UTF8.self)
+        let result = dispatch(["simulate", "--scenario", "scenario.json", "--use-current-config"], context: &context)
+        #expect(result.exitCode == 0)
+        let dict = try jsonDict(result)
+        #expect(dict["configSource"] as? String == "saved")
+        #expect((dict["config"] as? [String: Any])?["mode"] as? String == "timed")
+    }
+
+    @Test("simulate --use-current-config uses the defaults when nothing is saved and refuses a broken file")
+    func simulateUseCurrentConfigFallbacks() throws {
+        var context = try ownedContext()
+        let missing = dispatch(["simulate", "--scenario", "scenario.json", "--use-current-config"], context: &context)
+        #expect(missing.exitCode == 0)
+        #expect(try jsonDict(missing)["configSource"] as? String == "defaults")
+        context.files[PersistedSettings.defaultURL.path] = "not json"
+        let broken = dispatch(["simulate", "--scenario", "scenario.json", "--use-current-config"], context: &context)
+        #expect(broken.exitCode == 2)
+        #expect(try jsonDict(broken)["reason"] as? String == "invalidSettings")
+    }
+
+    @Test("run without the app is refused before attempting a missing command")
+    func runLaunchFailure() throws {
+        let result = Commands.runWithRealIO(argv: ["run", "--", "/nonexistent-camlid-probe"], channel: nil)
+        #expect(result.exitCode == 4)
+        #expect(try jsonDict(result)["reason"] as? String == "appUnavailable")
     }
 
     @Test("parse router handles flags, equals, and double-dash")
