@@ -9,7 +9,7 @@ feature folders and one selected feature context; it does not itself require mil
 > agents, one persistent helper, GitHub releases). Their task lists now mark tasks `[x]` when evidence exists, `[~]`
 > when [ADR 0002](../docs/adr/0002-observer-only-agent-activity.md), [0003](../docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md)
 > or [0004](../docs/adr/0004-distribution-through-github-releases.md) replaced them (the reason is on the line), and
-> leave `[ ]` only for work that is still valid. Current work is specs 014, 015 and 016.
+> leave `[ ]` only for work that is still valid. Current work is spec 016 (remaining trials) and spec 017 (release readiness for v0.1.0). Specs 018–020 plan later versions.
 
 - [M0: Project Planning](001-project-planning/spec.md) — Complete: documentation only.
 - [M1: Power and Detection Feasibility](002-power-feasibility/spec.md) — **Closed for this design:** the backend question was answered by the persistent helper (014) and Strict (016), qualified on one Mac by attended trials.
@@ -33,6 +33,10 @@ Experimental feature spec (not a milestone; no gate change):
 
 - [Agent Activity Observer (015)](015-agent-activity-observer/spec.md) — Phases 0–3 done and trial 8 passed (T402, 10/11); calibration of Codex and OpenCode (T401) pending. Observer-only working/idle inference for agents run directly in a terminal (Claude Code, Codex, OpenCode) so Auto works without Orca; no hooks or configuration edits.
 - [Strict Mode, Lid-Only (016)](016-strict-lid-only/spec.md) — Phases 1–2 (helper, app) done; trials S1–S4 passed and recorded in ADR 0003 (14/16); Standard on battery and the optional E5 observation remain. Strict runs the lid-only clamshell bit on the persistent helper (ADR 0003); experimental, AC only, per-row qualified.
+- [Release readiness for v0.1.0 (017)](017-release-readiness/spec.md) — **Planned:** the first public release; owner decisions recorded; blocks publication.
+- [Lid-open keep-awake, command wrapper, shortcut (018)](018-lid-open-and-run/spec.md) — **Planned** for v0.2; needs ADR 0006.
+- [Coverage, Vietnamese, maintenance (019)](019-coverage-and-localization/spec.md) — **Planned** for v0.3.
+- [v1.0 gates (020)](020-v1-gates/spec.md) — **Planned:** conditions for 1.0; adds no features.
 
 Each folder contains its scoped spec/plan/tasks; supporting research/model/quickstart/checklists
 exist where applicable (012 uses the linked decision memo and runbooks). Base runtime contracts reside with M2/M3; M8 adds scoped automation extensions while consuming the existing policy/transport/backend contracts.
