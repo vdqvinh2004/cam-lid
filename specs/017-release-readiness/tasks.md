@@ -4,7 +4,7 @@
 
 ## Phase 0 — Decisions
 - [x] T001 Owner decides Q-A: Strict stays visible, labelled experimental. — 2026-11-05.
-- [ ] T002 Run the measurement gate (User Story 2); record the result in the QA addendum; choose window or no window.
+- [x] T002 Run the measurement gate (User Story 2); record the result in the QA addendum; choose window or no window. — 2026-11-06: no window; the result is in `specs/017-release-readiness/qa-addendum.md`.
 
 ## Phase 1 — Readiness and wording (US1)
 - [x] T010 [US1] Build kind comes from the build configuration: `ProtectionBuildKind.current` (DEBUG → development, otherwise release). The hardcoded `.preview` is gone. — 2026-11-05.
@@ -26,7 +26,7 @@
   `protected` to `unavailable` whenever the helper lease is unverified, even with the lid open. Decided by the owner: a verified
   lid-open keep-awake shows "Keeping awake (lid open)", never "Protected". Fixed in code 2026-11-05. Installed 2026-11-05
   (CDHash `0068507b…`): with the closed-lid lease verified, the Dashboard showed Protected, matching status. The new label
-  has not been seen live; it needs an unverified lease with the lid open. Still open: the checkpoint when an Auto session ends.
+  has not been seen live; it needs an unverified lease with the lid open. 2026-11-06: the checkpoint after the Auto session ended matched (Ready, no session, no selected mode, no working task). Still open: the lid-open label on the live app, which needs an unverified lease with the lid open.
 
 ## Phase 2 — Sensor timing (US2)
 - [x] T020 [US2] Measure sensor-call time and scheduling delay under 100 % CPU for three minutes (the gate). — 2026-11-05,
