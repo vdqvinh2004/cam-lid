@@ -835,12 +835,20 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         // Owner decision (trial 8, option A): Orca's idle report counts as completion while its metadata is fresh;
         // without metadata consent or with stale metadata, completion stays uncertain.
         (config.adapterEnrollment.contains("orca")
-            && !(config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= 15)) || badgeStates().contains {
-            // An enabled agent with nothing running has nothing to finish (trial 8: idle Codex and OpenCode read
-            // "Unknown" and blocked every completion). A failed scan (nil count) stays uncertain.
-            guard $0.detectionEnabled, ($0.processCount ?? 1) > 0 else { return false }
+            && !(config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= 15))
+            || Self.badgesLeaveCompletionUnproven(badgeStates()) { activityClassified($0) }
+    }
+
+    /// An enabled agent with nothing running has nothing to finish (trial 8: idle Codex and OpenCode read "Unknown" and
+    /// blocked every completion). A failed scan (nil count) stays uncertain. Orca is decided by the metadata rule in
+    /// `agentCompletionUncertain`: its app process runs whenever Orca is open, so "Unknown" (a process with no task
+    /// reported) would otherwise block every completion, even with fresh metadata.
+    nonisolated static func badgesLeaveCompletionUnproven(_ badges: [AgentBadgeState],
+                                                          activityClassified: (String) -> Bool) -> Bool {
+        badges.contains {
+            guard $0.provider != "orca", $0.detectionEnabled, ($0.processCount ?? 1) > 0 else { return false }
             return $0.observedState == "Unknown"
-                || (Self.activityProviders.contains($0.provider) && !activityClassified($0.provider))
+                || (activityProviders.contains($0.provider) && !activityClassified($0.provider))
         }
     }
 

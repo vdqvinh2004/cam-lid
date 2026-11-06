@@ -80,6 +80,18 @@ struct AgentActivityIntegrationTests {
         #expect(AgentActivityClassifier.unknownHoldDeadline(memory) == deadline)   // not pushed out by unknown readings
     }
 
+    @Test func orcaUnknownDoesNotBlockCompletionButAnUnknownCodexDoes() {
+        // Orca's app process runs whenever Orca is open and reports "Unknown" with no task: its completion is the
+        // metadata rule's. A Codex process with no task reported is still uncertain.
+        let orca = AgentBadgeState(provider: "orca", enabled: true, tasks: [], processCount: 1)
+        let idleCodex = AgentBadgeState(provider: "codex", enabled: true, tasks: [], processCount: 0)
+        let unknownCodex = AgentBadgeState(provider: "codex", enabled: true, tasks: [], processCount: 1)
+        #expect(orca.observedState == "Unknown")
+        #expect(!AppCoordinator.badgesLeaveCompletionUnproven([orca], activityClassified: { _ in true }))
+        #expect(!AppCoordinator.badgesLeaveCompletionUnproven([idleCodex], activityClassified: { _ in true }))
+        #expect(AppCoordinator.badgesLeaveCompletionUnproven([unknownCodex], activityClassified: { _ in true }))
+    }
+
     @Test func claudeCodeIsBackWithItsOfficialMark() {
         let info = AgentProviderCatalog.info(for: "claude")
         #expect(info?.title == "Claude Code" && info?.assetName == "agent-claude" && info?.processNames == ["claude"])
