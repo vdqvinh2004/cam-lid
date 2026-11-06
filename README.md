@@ -38,6 +38,9 @@ notes say so. An app you sign ad hoc yourself needs **Reinstall helper…** afte
 - **Safety stops** on low battery, high thermal pressure, unplugged charger (unless "Allow on battery" is on),
   sustained CPU load (optional) and session time limits. Missing readings never count as healthy.
 - **When a session ends with the lid closed, the Mac sleeps** (unless an external display is connected).
+- **Lid open.** A session keeps the Mac awake while the lid is open, through a verified power assertion, without the
+  helper. The closed-lid option still needs the helper.
+- **Shortcut ⌃⌥⌘K** starts or stops Auto from any app. It needs no Accessibility permission.
 
 ## How closed lid works
 
@@ -111,6 +114,7 @@ camlid config get --json
 camlid helper status            # install | uninstall | trust need administrator rights
 camlid diagnose --json          # "Why is my Mac awake?"
 camlid logs export --redacted --output events.json
+camlid simulate --scenario scenario.json --use-current-config   # offline run with your saved settings
 ```
 
 Full contract: [CLI](specs/003-native-foundation/contracts/cli.md).
@@ -144,3 +148,4 @@ account, cookies or system profile).
 - Unsigned: macOS asks you to approve the first launch, and the app cannot update itself.
 - Apple silicon only.
 - No fan or charging control.
+- The lid-open hold and `camlid run` were checked on one Mac only.

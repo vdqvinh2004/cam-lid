@@ -113,12 +113,29 @@ cat > "dist/RELEASE_NOTES-$VERSION$SUFFIX.md" <<NOTES
 
 ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and lets it sleep when they are done.
 
+### What is in this release
+- **Auto and Timed.** Auto keeps the Mac awake while the agents you selected are working, then waits for "Sleep when
+  done". Timed keeps it awake for a chosen time.
+- **Lid open (new).** A session keeps the Mac awake with the lid open through a verified power assertion, without the
+  helper. If you keep the closed-lid option off, this hold is new to you.
+- **Closed lid.** Needs the helper (Settings › Closed Lid), and only on tested Macs unless you accept an untested
+  configuration.
+- **`camlid run -- <command>` (new).** Keeps the Mac awake while the command runs and returns its exit status. It needs
+  CamLid to be running; otherwise it exits with code 4 and runs nothing.
+- **Shortcut ⌃⌥⌘K (new).** Starts or stops Auto from any app. It needs no Accessibility permission.
+- **Dashboard.** Says "Keeping awake (lid open)" when the Mac is held awake with the lid open and closed-lid protection
+  is not verified.
+- **Sleep diagnostics.** CamLid's own power assertion is labelled "CamLid is active" and is not counted as another app.
+- **Agents.** Claude Code, Codex and OpenCode in a terminal are estimated from CPU activity. Orca is read from its CLI.
+
 ### Known limits
 - **Tested on one Mac:** Mac17,3, macOS 26A434, Apple silicon. On any other Mac or macOS build, closed-lid operation
   stays off until you accept "untested configuration" in Settings › Closed Lid.
 - **Strict mode is experimental**, limited to tested Macs. The README says what it changes.
 - **Not notarized by Apple.** The project has no Apple Developer account, so the first launch needs the steps below.
 - Apple silicon only, macOS 14 or later.
+- The lid-open hold and `camlid run` were checked on one Mac only.
+- Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
 
 ### Build and signing
 | Item | Value |

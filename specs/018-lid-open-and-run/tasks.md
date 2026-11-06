@@ -58,7 +58,7 @@
 - [x] T042 [US4] Fixture: a CPU-busy process that is not a recognised agent is not Working (ADR 0002). — 2026-11-05: reading agreed with the owner; `BusyNonAgentProcessTests`.
 
 ## Phase 5 — Release and regression
-- [ ] T050 Release note for the behaviour change (lid-open holds for closed-lid-off users).
-- [ ] T051 Full test run in all packages.
+- [x] T050 Release note for the behaviour change (lid-open holds for closed-lid-off users). — 2026-11-06: in the 0.1.0 release notes (the template in `scripts/release.sh`).
+- [x] T051 Full test run in all packages. — 2026-11-06: CamLidCore 325, CamLidPowerWire 11, CamLidPowerHelper 94, LidRecoveryJournal 21, LidNativeAdapter 22 and LidRecoveryBroker 33 pass.
 - [ ] T052 Closed-lid regression: subset of S1–S4 on the installed build.
 - [ ] T053 Owner approves release.

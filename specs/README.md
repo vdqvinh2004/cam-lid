@@ -34,7 +34,7 @@ Experimental feature spec (not a milestone; no gate change):
 - [Agent Activity Observer (015)](015-agent-activity-observer/spec.md) — Phases 0–3 done and trial 8 passed (T402, 10/11); calibration of Codex and OpenCode (T401) pending. Observer-only working/idle inference for agents run directly in a terminal (Claude Code, Codex, OpenCode) so Auto works without Orca; no hooks or configuration edits.
 - [Strict Mode, Lid-Only (016)](016-strict-lid-only/spec.md) — Phases 1–2 (helper, app) done; trials S1–S4 passed and recorded in ADR 0003 (14/16); Standard on battery and the optional E5 observation remain. Strict runs the lid-only clamshell bit on the persistent helper (ADR 0003); experimental, AC only, per-row qualified.
 - [Release readiness for v0.1.0 (017)](017-release-readiness/spec.md) — **Planned:** the first public release; owner decisions recorded; blocks publication.
-- [Lid-open keep-awake, command wrapper, shortcut (018)](018-lid-open-and-run/spec.md) — **Planned** for v0.2; needs ADR 0006.
+- [Lid-open keep-awake, command wrapper, shortcut (018)](018-lid-open-and-run/spec.md) — **Included in v0.1.0** (owner decision, 2026-11-06); open items are in its tasks file.
 - [Coverage, Vietnamese, maintenance (019)](019-coverage-and-localization/spec.md) — **Planned** for v0.3.
 - [v1.0 gates (020)](020-v1-gates/spec.md) — **Planned:** conditions for 1.0; adds no features.
 
