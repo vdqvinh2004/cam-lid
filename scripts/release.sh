@@ -120,7 +120,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
   helper. If you keep the closed-lid option off, this hold is new to you.
 - **Closed lid.** Needs the helper (Settings › Closed Lid), and only on tested Macs unless you accept an untested
   configuration.
-- **`camlid run -- <command>` (new).** Keeps the Mac awake while the command runs and returns its exit status. It needs
+- **\`camlid run -- <command>\` (new).** Keeps the Mac awake while the command runs and returns its exit status. It needs
   CamLid to be running; otherwise it exits with code 4 and runs nothing.
 - **Shortcut ⌃⌥⌘K (new).** Starts or stops Auto from any app. It needs no Accessibility permission.
 - **Dashboard.** Says "Keeping awake (lid open)" when the Mac is held awake with the lid open and closed-lid protection
@@ -134,7 +134,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - **Strict mode is experimental**, limited to tested Macs. The README says what it changes.
 - **Not notarized by Apple.** The project has no Apple Developer account, so the first launch needs the steps below.
 - Apple silicon only, macOS 14 or later.
-- The lid-open hold and `camlid run` were checked on one Mac only.
+- The lid-open hold and \`camlid run\` were checked on one Mac only.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
 
 ### Build and signing
