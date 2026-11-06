@@ -60,9 +60,24 @@ struct AgentActivityIntegrationTests {
         app.receiveActivity([codex(cpu: nil)], at: t)
         let unknown = try #require(app.sleepRelevantTasksForTesting(provider: "codex").first)
         #expect(unknown.state == .unknown && unknown.evidenceKind == .activity && unknown.confidence == .inferred)
-        #expect(unknown.unknownUntilMonotonic == t + AgentActivityClassifier.unknownHoldSeconds)
+        #expect(unknown.unknownUntilMonotonic == nil)   // never seen working: an unreadable first sample holds nothing
         app.receiveActivity([], at: t + 5)
         #expect(app.sleepRelevantTasksForTesting(provider: "codex").isEmpty)
+    }
+
+    @Test func repeatedUnknownReadingsDoNotExtendTheHoldPastTheLastWork() {
+        var memory = AgentActivityMemory()
+        let t = 1_000.0
+        func sample(_ at: Double, _ cpu: Double?) -> TaskState {
+            AgentActivityClassifier.step(&memory, AgentActivitySample(at: at, alive: true, cpuSeconds: cpu, processAgeSeconds: 600)).state
+        }
+        _ = sample(t, 0)
+        _ = sample(t + 5, 1)
+        #expect(sample(t + 10, 2) == .working)
+        let deadline = t + 10 + AgentActivityClassifier.unknownHoldSeconds
+        #expect(AgentActivityClassifier.unknownHoldDeadline(memory) == deadline)
+        for offset in [15.0, 20, 30] { #expect(sample(t + offset, nil) == .unknown) }
+        #expect(AgentActivityClassifier.unknownHoldDeadline(memory) == deadline)   // not pushed out by unknown readings
     }
 
     @Test func claudeCodeIsBackWithItsOfficialMark() {

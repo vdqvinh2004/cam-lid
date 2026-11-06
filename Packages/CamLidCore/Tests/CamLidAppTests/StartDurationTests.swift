@@ -41,4 +41,24 @@ struct StartDurationTests {
         coordinator.changeMode(.off)
         #expect(await coordinator.flushHistory())
     }
+
+    @Test @MainActor func statusReportsTheRunningSessionState() async throws {
+        let root = URL(fileURLWithPath: "/tmp/cl-status-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        let suite = "camlid-status-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        let coordinator = AppCoordinator(historyDirectory: root, preferences: defaults,
+            healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) })
+        coordinator.changeMode(.timed)
+        func status() throws -> [String: Any] {
+            let reply = try JSONDecoder().decode(CLIResult.self, from: coordinator.handleControl(.status, payload: Data()))
+            return try #require(JSONSerialization.jsonObject(with: Data(reply.json.utf8)) as? [String: Any])
+        }
+        await coordinator.startPreviewSession()
+        // While the session runs, status shows the session's state, the same one start and the Dashboard report.
+        #expect(try status()["effectiveState"] as? String == "protected")
+        coordinator.changeMode(.off)
+        #expect(await coordinator.flushHistory())
+    }
 }

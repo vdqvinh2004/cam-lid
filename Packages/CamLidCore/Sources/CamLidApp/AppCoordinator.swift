@@ -1365,7 +1365,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             memory[key] = state
             guard let task = try? AgentTask(id: key, sessionID: "activity-\(process.provider)", runID: key,
                 state: result.state, evidenceKind: .activity, confidence: .inferred,
-                unknownUntilMonotonic: result.state == .unknown ? at + AgentActivityClassifier.unknownHoldSeconds : nil) else { continue }
+                unknownUntilMonotonic: result.state == .unknown ? AgentActivityClassifier.unknownHoldDeadline(state) : nil) else { continue }
             tasks[process.provider, default: []].append(task)
             // History keeps the start and end of work only (sampling noise between idle and unknown is not news).
             if (previous[key] == .working) != (result.state == .working) {
@@ -1538,7 +1538,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 "keepAwakeApps": helper.keepAwakeApps.map { ["name": $0.name, "resetsSleepSetting": $0.resetsSleepSetting] },
                 "restoration": holdReconciler.status == .inactive && holdReconciler.restoration == .verified
                     ? "noPowerResourcesOwned" : "\(holdReconciler.restoration)",
-                "mode": config.mode.rawValue, "effectiveState": readiness.state.rawValue, "policyState": sessionStateForRecord().rawValue,
+                // While a session runs, its state is what the Mac is doing (the Dashboard and `start` report it too);
+                // readiness only describes whether a session could start.
+                "mode": config.mode.rawValue, "effectiveState": session?.effectiveState.rawValue ?? readiness.state.rawValue, "policyState": sessionStateForRecord().rawValue,
                 "revision": revision, "reasonCodes": readiness.blockerCodes,
                 "settingsCommitPending": hasPendingSettingsWork,
                 "historyError": history.lastError as Any? ?? NSNull(),

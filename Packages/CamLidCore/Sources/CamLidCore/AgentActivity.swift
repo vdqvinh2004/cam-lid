@@ -39,6 +39,12 @@ public enum AgentActivityClassifier {
     }
     /// How long an unknown result keeps holding (the policy bounds unknown holds with this).
     public static let unknownHoldSeconds = 15.0
+    /// An unknown reading holds for `unknownHoldSeconds` after the process was last seen working. Repeated unknown
+    /// readings do not extend it, so an agent that stays unreadable cannot keep the Mac awake indefinitely. Nil when
+    /// the process was never seen working.
+    public static func unknownHoldDeadline(_ memory: AgentActivityMemory) -> Double? {
+        memory.lastActiveAt.map { $0 + unknownHoldSeconds }
+    }
     /// Launching costs CPU without any work (calibration: 0.054–0.34 of a core for about 20 s); owner saw a freshly
     /// opened Claude Code read as working before any prompt. CPU in this window is not counted as activity, and the
     /// process reads idle (not unknown, which would hold the Mac and make every completion uncertain meanwhile).

@@ -42,7 +42,8 @@ struct BackendReadinessIntegrationTests {
             #expect(status["backendVerified"] as? Bool == false)
             #expect(status["leaseVerified"] as? Bool == false)
             let readiness = status["protection"] as? [String: Any]
-            #expect(status["effectiveState"] as? String == "Needs setup")
+            // The top-level effectiveState is the session's while one runs; readiness itself is what is unavailable here.
+            #expect(readiness?["readinessState"] as? String == "Needs setup")
             #expect(status["restoration"] as? String == "noPowerResourcesOwned")
             #expect(status["reasonCodes"] as? [String] == readiness?["blockerCodes"] as? [String])
         }
