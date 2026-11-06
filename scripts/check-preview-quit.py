@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Request quit over the preview CLI and prove the exact owned process exited."""
+"""Request quit over the CLI and prove the exact owned process exited."""
 import argparse
 import json
 import os
@@ -23,11 +23,11 @@ assert initial and initial.split()[0] == str(os.getuid()) and initial.endswith(a
 env = dict(os.environ, CAMLID_CONTROL_DIRECTORY=a.control_directory)
 if not a.already_requested:
     status = json.loads(subprocess.check_output([a.cli, "status", "--json"], env=env, timeout=2))
-    assert status["preview"] and status["powerActuation"] is False, "Not a zero-actuation preview"
+    assert status["powerActuation"] is False, "Not a zero-actuation session"
     reply = json.loads(subprocess.check_output([a.cli, "quit", "--json"], env=env, timeout=2))
     assert reply["accepted"] and reply["cleanupOutcome"] == "noPowerResourcesOwned"
 start = time.monotonic()
 while identity() == initial and time.monotonic() - start < 5:
     time.sleep(0.05)
-assert identity() != initial, "Quit accepted but owned preview process did not exit within 5 seconds"
+assert identity() != initial, "Quit accepted but the owned process did not exit within 5 seconds"
 print(json.dumps({"quitConfirmed": True, "elapsedSeconds": time.monotonic() - start, "powerActuation": False}))

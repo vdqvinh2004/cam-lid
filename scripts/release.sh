@@ -40,7 +40,10 @@ SUFFIX=""
 if [ "$ADHOC" = 1 ]; then SUFFIX="-ADHOC"; fi
 NAME="CamLid-$VERSION-macos-arm64$SUFFIX"
 BUILD="$(mktemp -d)"
-trap 'rm -rf "$BUILD"' EXIT
+# Building registers the product with LaunchServices. Drop that record with its folder, or a later launch by bundle
+# id can pick a copy that no longer exists.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister
+trap '"$LSREGISTER" -u "$BUILD/Build/Products/Release/CamLid.app" >/dev/null 2>&1 || true; rm -rf "$BUILD"' EXIT
 mkdir -p dist
 
 echo "== Building $VERSION ($COMMIT)"
