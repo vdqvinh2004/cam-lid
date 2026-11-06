@@ -1682,10 +1682,18 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
         var minutes: Int?
         if let raw = options.flags["duration"] {
-            let value = raw.hasSuffix("h") ? Double(raw.dropLast()).map { $0 * 60 }
-                : raw.hasSuffix("m") ? Double(raw.dropLast()) : Double(raw)
-            guard let value, value.isFinite, value >= 1, value <= 24 * 60 else { return reply(2, ["accepted": false, "reason": "invalidDuration"]) }
-            minutes = Int(value)
+            // The Dashboard's timer offers Infinite (requested as "infinite") and the steps 5 to 480 minutes. Anything
+            // else is refused before a session starts, rather than accepted and left unapplied.
+            if raw == "infinite" {
+                minutes = 0
+            } else {
+                let value = raw.hasSuffix("h") ? Double(raw.dropLast()).map { $0 * 60 }
+                    : raw.hasSuffix("m") ? Double(raw.dropLast()) : Double(raw)
+                guard let value, let whole = Int(exactly: value), whole > 0, ProtectionSession.isTimerMinutes(whole) else {
+                    return reply(2, ["accepted": false, "reason": "invalidDuration"])
+                }
+                minutes = whole
+            }
         }
         guard session == nil else { return reply(3, ["accepted": false, "reason": "sessionAlreadyActive"]) }
         // The requested mode applies to this session only. The saved mode changes only through `config set`.
@@ -1704,7 +1712,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             "closedLid": config.closedLidOptIn, "closedLidPermit": closedLidPermit().statusCode,
             "powerMode": config.powerMode.rawValue,
             "powerActuation": holdReconciler.leaseVerified(now: uptime()),
-            "note": "Power is held once the helper confirms; check `camlid status` for leaseVerified."])
+            "note": "Check camlid status: keepAwake.verified shows the lid-open hold, leaseVerified the closed-lid hold."])
     }
 
     // MARK: - camlid run admissions (ADR 0006)
@@ -1949,11 +1957,14 @@ private final class ControlReplyBox: @unchecked Sendable {
 
 // Explicit session edits; routine policy evaluation never renews a deadline.
 extension ProtectionSession {
+    /// The timer's steps, the Dashboard's choices: Infinite (0) or 5 to 480 minutes.
+    static func isTimerMinutes(_ minutes: Int) -> Bool { minutes == 0 || (5...480).contains(minutes) }
+
     mutating func restartTimer(minutes: Int, maximumMinutes: Int, now: Double) -> Int? {
         guard requestedMode == .timed || requestedMode == .manual,
               !latchedSafetyStop, effectiveState != .expired,
               capDeadlineMonotonic.map({ now < $0 }) ?? true,
-              minutes == 0 || (5...480).contains(minutes) else { return nil }
+              ProtectionSession.isTimerMinutes(minutes) else { return nil }
         let duration = minutes == 0 ? 0 : min(minutes, maximumMinutes)
         capDeadlineMonotonic = duration == 0 ? nil : now + Double(duration) * 60
         return duration
