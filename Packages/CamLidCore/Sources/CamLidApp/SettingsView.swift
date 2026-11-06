@@ -586,6 +586,10 @@ private struct SettingsClosedLidSection: View {
                 .help("Lets sessions keep this Mac awake with the lid closed, within the safety limits")
                 .accessibilityLabel(Text("Keep awake with the lid closed"))
                 .accessibilityIdentifier("camlid.settings.closedLid.enabled")
+            Text("With the lid open, a session keeps this Mac awake whether or not this is on. This option also keeps it awake with the lid closed, which needs the helper.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             SettingsFieldOutcome(editor: editor, key: "closedLidOptIn")
             VStack(alignment: .leading, spacing: 4) {
                 Picker("Mode", selection: Binding(get: { editor.draft.powerMode }, set: editor.setPowerMode)) {

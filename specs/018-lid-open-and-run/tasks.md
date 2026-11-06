@@ -14,7 +14,7 @@
   path `holdDesired`, which is unchanged.
 - [~] T013 [US1] Deviation: readiness stays closed-lid only. Lid-open evidence is reported as `keepAwake`
   (`held`, `verified`, `issue`) in `camlid status`, and counts toward the Dashboard's `powerActuationAvailable`.
-- [ ] T014 [US1] Dashboard and Settings copy for the lid-open and lid-closed cases.
+- [x] T014 [US1] Dashboard and Settings copy for the lid-open and lid-closed cases. — 2026-11-06: the Dashboard says "Keeping awake (lid open)" when that applies; the Closed Lid section of Settings says the lid-open hold does not depend on the option.
 - [x] T015 [US1] Sleep diagnostics label CamLid's own assertion and exclude it from "another app". — 2026-11-05: the rule
   reads "CamLid is active" (the old title repeated itself in the headline); test `camLidsOwnAssertionsAreCamLidNotAnotherApp`
   passes (12 tests in the suite). Not yet seen on screen.
