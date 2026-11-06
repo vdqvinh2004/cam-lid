@@ -444,7 +444,7 @@ enum ActivityPresentation {
         if code.hasPrefix("durationSeconds:") { return "Command ran for \(code.dropFirst("durationSeconds:".count)) s" }
         switch code {
         case "agentToolFailed": return "Agent tool failed; turn outcome is separate"
-        case "backendUnverified", "previewOnly": return "Closed-lid backend unavailable"
+        case "backendUnverified": return "Closed-lid backend unavailable"
         case "agentEvent": return "Agent activity updated"
         case "sleepBlocked": return "Sleep request blocked"
         case "configApplied": return "Settings updated"
@@ -452,9 +452,9 @@ enum ActivityPresentation {
         case "appLaunched": return "CamLid opened"
         case "appQuitNoOwnedPower": return "CamLid quit without a session"
         case "onboardingComplete": return "Welcome completed"
-        case "sessionStarted", "previewSessionStarted": return "Session started"
-        case "sessionStopped", "previewSessionStopped": return "Session stopped"
-        case "modeOff", "modeOffPreview": return "Mode turned off"
+        case "sessionStarted": return "Session started"
+        case "sessionStopped": return "Session stopped"
+        case "modeOff": return "Mode turned off"
         case "agentStateChanged": return "Agent state changed"
         case "agentObservation": return "Agent checked"
         case "sessionTimerChanged": return "Timer changed"
