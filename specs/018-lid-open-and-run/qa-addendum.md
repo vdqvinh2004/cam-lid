@@ -59,3 +59,23 @@ The first 10 s are left out of the idle column: they hold the start-up spike (Cl
   The column is not used to decide anything.
 - Negative `cpu_rate` values: the subtree total drops when a child process exits (spec 015 records this too). Codex had
   one such sample in each of the first two phases; its subtree had up to 14 processes.
+
+## Final check on the lightest model (Haiku 5.5, low effort)
+
+Three terminal-mode Claude Code runs: `scripts/agent-activity-calibrate.py --agent claude --mode tui --model
+claude-haiku-5-5 --arg=--effort --arg=low --prompt-at 30 --observe 150`, one plain-text prompt each (about 200 words).
+The raw timelines are not committed.
+
+| Run | First busy pair (work starts) | Last busy pair (work ends) | Busy samples after 60 s, of 90, at 0.03 |
+|---|---|---|---|
+| 1 | 31.7 s | 112.8 s (a late busy pair after the answer) | 4 |
+| 2 | 31.8 s | 37.0 s | 4 |
+| 3 | 31.8 s | 47.4 s | 3 |
+
+- Idle 25–30 s, after the 25 s start-up window the app ignores: 0 of 15 seconds read as working at every threshold from
+  0.02 to 0.08 (a short window, 5 seconds per run).
+- Answering 30–60 s: 84 of 87 seconds read as working at 0.02–0.04 and 82 of 87 at 0.06–0.08.
+- Threshold decision: unchanged (`busyCPUFraction` 0.03). Raising it to 0.04 or 0.05 removes at most one or two busy
+  samples after the answer, and run 1's late pair stays at 0.04 and 0.05. Nothing here justifies a change under T041.
+- Not covered: `claude -p` (print mode). A one-shot print run wrote its whole answer and was never read as working,
+  because it spends little CPU while it streams. The app detects terminal sessions in TUI mode.
