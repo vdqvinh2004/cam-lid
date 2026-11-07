@@ -60,6 +60,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private let permissions: AppPermissions
     private var latestHealth: HealthSnapshot?
     private var latestReason: String?
+    /// The last change to ready ended with an unclear agent state, so the Mac was released without a countdown.
+    private var lastStopUncertain = false
     private var sensorAvailability: [String: String] = [:]
     private var omittedHistoryRecords = 0
     private var lastReportedEvidenceRejection: String?
@@ -372,6 +374,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             ?? (health.powerSource == .ac ? config.runCapMinutes : min(config.runCapMinutes, config.batteryCapMinutes))
         sessionTimerMinutes = config.timedDurationMinutes == 0 ? 0 : min(config.timedDurationMinutes, startTimerMaximum)
         sessionSleepDelayMinutes = config.completionDelayMinutes
+        lastStopUncertain = false
         record(category: .enrollment, newState: created.effectiveState, reasons: ["sessionStarted"])
         refresh()
     }
@@ -388,6 +391,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     public func menuBarStopProtection() {
         guard session != nil, !terminationFlowActive else { return }
         record(category: .stateTransition, newState: .ready, reasons: ["sessionStopped"])
+        lastStopUncertain = false
         session = nil
         refresh()
     }
@@ -748,6 +752,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 lifetimeCompletionSuppressed: lifetime?.suppressesAutoCompletion ?? hasLifetimeRules,
                 nowMonotonic: now)
             let changed = decision.state != active.effectiveState
+            if changed { lastStopUncertain = decision.state == .ready && decision.reasons.contains("workUncertain") }
             active = decision.session
             session = active
             if changed {
@@ -1040,6 +1045,16 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         var notices: [String] = []
         if let notice = refusalNotice { notices.append(notice) }
         if let notice = closedLidMessage() { notices.append(notice) }
+        if active != nil, !config.closedLidOptIn {
+            notices.append("Closing the lid sleeps this Mac. Turn on Keep awake with the lid closed in Settings › Closed Lid.")
+        }
+        if active?.effectiveState == .ready, latestHealth?.lidState == .closed,
+           sleepRelevantTasks(now: now).contains(where: { PolicyEngine.holdsSession($0, now: now) }) {
+            notices.append("Agent work is waiting until the lid opens.")
+        }
+        if lastStopUncertain, active?.effectiveState == .ready {
+            notices.append("Agent state was unclear when its work ended, so the Mac was released without a countdown.")
+        }
         let health = latestHealth
         let summary = health.map(HealthSummary.from) ?? .unknown
         if let failure = history.lastError { notices.append("History unavailable: " + failure + ".") }
@@ -1051,7 +1066,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let taskSummary = summaryParts.isEmpty ? "No selected agents reporting work" : summaryParts.joined(separator: " · ")
         let data = DashboardData(
             mode: active?.requestedMode ?? config.mode, state: state,
-            reasonText: latestReason ?? "",
+            reasonText: latestReason ?? "", sessionRunning: active != nil,
             leaseVerified: holdReconciler.leaseVerified(now: now),
             powerActuationAvailable: holdReconciler.leaseVerified(now: now) || keepAwake.verified,
             lidDisplayText: summary.lidDisplay,

@@ -42,6 +42,24 @@ struct StartDurationTests {
         #expect(await coordinator.flushHistory())
     }
 
+    @Test @MainActor func dashboardSaysWhenAutoIsWaitingAndWarnsWhenClosingTheLidSleepsTheMac() async throws {
+        let root = URL(fileURLWithPath: "/tmp/cl-dash-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        let suite = "camlid-dash-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        let coordinator = AppCoordinator(historyDirectory: root, preferences: defaults,
+            healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) })
+        coordinator.changeMode(.auto)
+        #expect(coordinator.dashboardData().statusTitle == "Not running")
+        await coordinator.startPreviewSession()
+        #expect(coordinator.dashboardData().statusTitle == "Waiting for agents")
+        // Closed-lid keep-awake is off by default, so a running session says that closing the lid sleeps the Mac.
+        #expect(coordinator.dashboardData().bannerMessage?.contains("Closing the lid sleeps this Mac") == true)
+        coordinator.changeMode(.off)
+        #expect(await coordinator.flushHistory())
+    }
+
     @Test @MainActor func statusReportsTheRunningSessionState() async throws {
         let root = URL(fileURLWithPath: "/tmp/cl-status-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
