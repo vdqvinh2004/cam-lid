@@ -16,11 +16,19 @@ APP="${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}"
 SCRATCH="${DERIVED_FILE_DIR}/helper-build"
 CONFIG=release
 [ "${CONFIGURATION:-Debug}" = "Debug" ] && CONFIG=debug
-env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "${SRCROOT}/Packages/CamLidPowerHelper" \
-  --product camlid-power-helper --scratch-path "$SCRATCH"
+# Release binaries must not carry this Mac's checkout path (#filePath, debug info): map it to "." in those builds.
+build_swift() {
+  pkg="$1"; shift
+  if [ "$CONFIG" = release ]; then
+    env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "$pkg" "$@" \
+      -Xswiftc -file-prefix-map -Xswiftc "$SRCROOT=." -Xswiftc -debug-prefix-map -Xswiftc "$SRCROOT=."
+  else
+    env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "$pkg" "$@"
+  fi
+}
+build_swift "${SRCROOT}/Packages/CamLidPowerHelper" --product camlid-power-helper --scratch-path "$SCRATCH"
 CLI_SCRATCH="${DERIVED_FILE_DIR}/cli-build"
-env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "${SRCROOT}/Packages/CamLidCore" \
-  --product camlid --scratch-path "$CLI_SCRATCH"
+build_swift "${SRCROOT}/Packages/CamLidCore" --product camlid --scratch-path "$CLI_SCRATCH"
 DEST="${APP}/Contents/Library/LaunchServices"
 mkdir -p "$DEST"
 cp "$SCRATCH/$CONFIG/camlid-power-helper" "$DEST/camlid-power-helper"

@@ -47,8 +47,10 @@ trap '"$LSREGISTER" -u "$BUILD/Build/Products/Release/CamLid.app" >/dev/null 2>&
 mkdir -p dist
 
 echo "== Building $VERSION ($COMMIT)"
+# Release binaries must not carry this checkout's path (#filePath, debug info): the flags map it to "." (no spaces in the path).
 xcodebuild -project CamLid.xcodeproj -scheme CamLid -configuration Release -destination 'platform=macOS,arch=arm64' \
-  -derivedDataPath "$BUILD" CODE_SIGNING_ALLOWED=NO ARCHS=arm64 MARKETING_VERSION="$VERSION" build >"$BUILD/build.log" 2>&1 \
+  -derivedDataPath "$BUILD" CODE_SIGNING_ALLOWED=NO ARCHS=arm64 MARKETING_VERSION="$VERSION" \
+  OTHER_SWIFT_FLAGS="\$(inherited) -file-prefix-map $PWD=. -debug-prefix-map $PWD=." build >"$BUILD/build.log" 2>&1 \
   || { tail -30 "$BUILD/build.log" >&2; exit 1; }
 APP="$BUILD/Build/Products/Release/CamLid.app"
 HELPER="$APP/Contents/Library/LaunchServices/camlid-power-helper"
@@ -121,8 +123,8 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
   done". Timed keeps it awake for a chosen time.
 - **Lid open (new).** A session keeps the Mac awake with the lid open through a verified power assertion, without the
   helper. If you keep the closed-lid option off, this hold is new to you.
-- **Closed lid.** Needs the helper (Settings › Closed Lid), and only on tested Macs unless you accept an untested
-  configuration.
+- **Closed lid.** Needs the helper (Settings › Closed Lid). It works on tested Macs; on any other, first choose
+  "Allow on this untested Mac" there.
 - **\`camlid run -- <command>\` (new).** Keeps the Mac awake while the command runs and returns its exit status. It needs
   CamLid to be running; otherwise it exits with code 4 and runs nothing.
 - **Shortcut ⌃⌥⌘K (new).** Starts or stops Auto from any app. It needs no Accessibility permission.
@@ -132,8 +134,8 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - **Agents.** Claude Code, Codex and OpenCode in a terminal are estimated from CPU activity. Orca is read from its CLI.
 
 ### Known limits
-- **Tested on one Mac:** Mac17,3, macOS 26A434, Apple silicon. On any other Mac or macOS build, closed-lid operation
-  stays off until you accept "untested configuration" in Settings › Closed Lid.
+- **Tested on one Mac:** Mac17,3, macOS build 26A434, Apple silicon. On any other Mac or macOS build, closed-lid operation
+  stays off until you choose "Allow on this untested Mac" in Settings › Closed Lid.
 - **Strict mode is experimental**, limited to tested Macs. The README says what it changes.
 - **Not notarized by Apple.** The project has no Apple Developer account, so the first launch needs the steps below.
 - Apple silicon only, macOS 14 or later.
