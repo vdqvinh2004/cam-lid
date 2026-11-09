@@ -54,13 +54,13 @@ Trials run with the LidRun helper booted out.
 | 5 | 2026-10-31 | PASS, with finding | Lease acquired 01:55:41; helper stopped (SIGSTOP) 01:56:03; the independent recovery job restored at 01:56:55 (`independentRecovery`, 52 s) and the owner saw `SleepDisabled` 0 at 01:56:57. Finding: when the stale helper resumed (01:57:21) its in-memory journal revision was behind, so its own restore failed the revision check and it reported `recoveryRequired / restorationFailed` (no write was made; `SleepDisabled` stayed 0); a restart (01:57:24, new pid) returned it to `ready`. To fix: reload the journal on a revision conflict and adopt an acknowledged restore. |
 | 6 | 2026-10-31 | PASS | Lease acquired 01:59:49; charger unplugged 02:00:04; helper `poll stop reason=safetyStop` and verified restore at 02:00:10 (6 s); app session `safetyStopped` with `notCharging`; `SleepDisabled` 0. |
 | 9 | 2026-10-31 | PASS, with UI finding | `SleepDisabled` set to 1 by hand; Timed started; helper refused (`acquire` → `preexistingOverride`, 02:02:36) and wrote nothing; `SleepDisabled` stayed 1 until the owner reset it. The dashboard showed only "Stopped — safety" without the reason, because the banner read the reconciler, which resets once the session stops. Fixed after the trial: the banner now reads the session's helper stop reason (test added); not yet re-checked in the app. |
-| 7 | 2026-10-31 | **FAIL** (fixed in `7606e1c`, re-run pending) | Lease held, then `sudo shutdown -r now` at about 02:05:41. During shutdown the helper's restore failed (`monitorFailed`, then `restoreFailed`, error not logged by that build), leaving the journal at `restoreLidPolicy / pending`. After boot the helper started `recoveryRequired / uncertainPreviousMutation` and did not clear it, so **`SleepDisabled` was 1 after reboot** until reset by hand. |
+| 7 | 2026-10-31 | **FAIL** (fixed in `36705dd`, re-run pending) | Lease held, then `sudo shutdown -r now` at about 02:05:41. During shutdown the helper's restore failed (`monitorFailed`, then `restoreFailed`, error not logged by that build), leaving the journal at `restoreLidPolicy / pending`. After boot the helper started `recoveryRequired / uncertainPreviousMutation` and did not clear it, so **`SleepDisabled` was 1 after reboot** until reset by hand. |
 | 7 (reinstall) | 2026-10-31 | finding, fixed | After reinstalling, the helper and the recovery job started together (RunAtLoad). The recovery job finished the interrupted restore first (`recovery outcome=restored`, 02:14:39); the helper's own commit then hit a journal revision conflict and it stayed `recoveryRequired / startupInspectionFailed` until restarted. Fixed: on a revision conflict the helper reloads the journal and adopts an acknowledged restore that reads back cleared. |
 | 7 (rerun) | 2026-10-31 | PASS on outcome, three findings fixed | `SleepDisabled` was 0 after reboot. During shutdown the restore failed because `pmset -g` returned unusable output (`invalidOutput`) and the code read before writing, so it never wrote. At boot the helper's own restore timed out (`pmset` slow while powerd started), which poisons its pmset runner for the rest of the process; the write had evidently landed, since the value was 0. The recovery job did not step in because the pending restore carried the previous boot's deadline. Fixed: restore writes 0 before reading; the recovery job always finishes a pending restore; a helper whose start fails exits so launchd restarts it with a fresh runner. Re-run pending. |
 | 7 (third run) | 2026-10-31 | PASS | Lease acquired 02:29:33, reboot. Shutdown restore wrote 0 first but its read-back failed (`invalidOutput`), so it was unverified. After boot (powerd started 02:31:48) the helper and recovery job contended (`busy`, `timeout` while pmset was slow); the helper exited twice as designed and on its third start restored with verification at 02:32:15 (27 s after powerd started). `SleepDisabled` 0 at login. |
 
 Owner decision (2026-10-31): the trial set above is sufficient; no re-runs. Trials 1–6 and 9 ran on builds before the
-restore-path fixes made during trial 7 (`7606e1c`, `d2d9170`, `53730cc`); those fixes are covered by unit tests only.
+restore-path fixes made during trial 7 (`36705dd`, `261592a`, `cea6f4d`); those fixes are covered by unit tests only.
 Trial 8 (Auto with a real agent) ran later the same day, below.
 
 ## Trial 8: Auto with Claude Code, lid closed (2026-10-31)
@@ -74,8 +74,8 @@ Orca observation on; "Sleep when done" 1 min; AC power.
 | 2 (13:33) | Partial, fixed | Hold 13:33:14, lid closed, released 13:36:32 still `workUncertain` (no grace); **Mac slept 13:36:37** (`Software Sleep`, CamLid). On wake, sensors read unknown and latched "Stopped — safety". Causes: idle Codex/OpenCode read Unknown, every process scan was "incomplete" (root processes unreadable). |
 | 3 (14:13) | **PASS** | Prompt 14:13:40, hold 14:13:43, lid closed 14:13; Claude finished 14:14:09; `completionGrace` 14:14:56 (47 s quiet); `graceExpired, sleepRequested` 14:15:57; helper restored, logged `sleep requested reason=clientRelease`, and **the Mac slept at 14:16:02** (`Software Sleep pid=55009`, the helper). Lid opened 14:19:18: Dashboard "Ready", no safety stop. |
 
-Fixes between runs: `0cdf84e`, `b3157d3` (owner option A: fresh idle Orca metadata is completion), `4aab9e4`,
-`b0e8dfe` (the helper sleeps the Mac after every restore with the lid closed and no external display).
+Fixes between runs: `52b25cc`, `eb387c6` (owner option A: fresh idle Orca metadata is completion), `4015082`,
+`5993ff0` (the helper sleeps the Mac after every restore with the lid closed and no external display).
 Not covered by trial 8 itself: app kill and helper kill during an Auto session. They were run separately on
 2026-11-03 (below).
 
@@ -85,7 +85,7 @@ Timed sessions (the kill paths do not depend on the agent), lid closed, battery 
 | Run | Result | Evidence |
 |---|---|---|
 | App kill (SIGKILL) | **PASS** | Hold 11:28:53 (`SleepDisabled` 1), app killed 11:30:27; helper `restore … clientDisconnected`, `sleep requested`, `SleepDisabled` 0; **`Software Sleep pid=16414` (the helper) 11:30:32**. |
-| Helper kill (SIGKILL), first run | **FAIL**, fixed in `0d48656` | Hold 11:35:21, helper killed 11:36:34; launchd restarted it and the new helper restored `SleepDisabled` to 0 but did not sleep the Mac (`helperRestart` was on the no-sleep list): lid closed, Mac awake, no sleep in `pmset -g log` until the lid was opened. |
+| Helper kill (SIGKILL), first run | **FAIL**, fixed in `a189f38` | Hold 11:35:21, helper killed 11:36:34; launchd restarted it and the new helper restored `SleepDisabled` to 0 but did not sleep the Mac (`helperRestart` was on the no-sleep list): lid closed, Mac awake, no sleep in `pmset -g log` until the lid was opened. |
 | Helper kill, second run | **PASS** | Hold 11:42:50, helper killed 11:44:04; the new helper logged `restore … helperRestart` and `sleep requested`; **`Software Sleep pid=30077` 11:44:09**; `SleepDisabled` 0. |
 
 The recovery job was not the actor in either kill (launchd brought the helper back first); its branch is covered by

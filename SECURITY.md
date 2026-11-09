@@ -10,7 +10,9 @@ problem. Include the version, what you did, and what happened. This is a one-per
 within about a week.
 
 ## What is in scope
-- The helper accepting a caller it should refuse (it is meant to obey only the exact app code hash it was installed with).
+- The helper accepting a caller it should refuse. It is meant to obey only an app signed with the project's release
+  certificate under the identifier `com.camlid.CamLid`, or, for an ad-hoc local build, only the exact code hashes it
+  was installed with.
 - A way to leave the sleep setting changed after a session, an app crash, a helper crash or a restart.
 - The installer or uninstaller doing more than its fixed operations, or touching files it should not.
 - Anything that makes the app send data off the Mac (it should not; the only request is the update check you click).
@@ -24,8 +26,9 @@ recovery job restores it if the helper itself is gone; and a restart clears the 
 [specs/014-persistent-helper/g2-trial.md](specs/014-persistent-helper/g2-trial.md).
 
 ## Verifying a download
-Releases are ad-hoc signed, not notarized. Compare the SHA-256 of the zip and the code hashes of the app and helper
-with the release notes (commands are in each release), or build it yourself from the tagged commit.
+Releases are signed with the project's own certificate, not an Apple Developer ID, and are not notarized. Compare the
+SHA-256 of the zip, the certificate fingerprint and the code hashes of the app and helper with the release notes
+(commands are in each release), or build it yourself from the tagged commit.
 
 ## Supported versions
 Only the newest release.

@@ -1,104 +1,53 @@
-# CamLid competitor-style power helper candidate
+# CamLid power helper
 
-**Current handoff — 2026-10-21:** [reproducible M9 preparation](../../docs/qa/reproducible-m9-handoff-2026-10-21.md).
-The source supports the lid-specific M9 path; prior installed/staged v3/v8/v9 statements below
-are dated history, not current-host inventory. The owner completed the
-[exact auth-only M9 installation and one positive IPC inspect](../../docs/qa/m9-lock-only-install-packet-2026-10-21.md).
-The receipt reports `ready/noPendingIntent`, no mutation/lease, preserved original locks and
-no journal deletion. Read-only disk hashing independently matches the frozen M9 helper.
-This consumes the install/one-inspect scope; no further IPC or native session is authorized. Do not run historical reset/upgrade
-packets. `camlid-power-qa --readiness` reads unprivileged safety metadata only, before any XPC
-client is constructed; it does not authorize a session or qualify the root helper.
+The root helper that CamLid installs once, with an administrator password. It changes the Mac's sleep setting only while
+the signed app holds a lease, and restores the setting when the lease ends.
 
-Original implementation of the persistent SleepDisabled + authenticated recovery-helper architecture documented by LidRun and Amphetamine Power Protect. No competitor code copied. No Apple contact needed or proposed.
+## What ships
 
-**Not wired into CamLid, qualified or shippable.** A frozen v3 QA helper was subsequently installed under exact owner approval; its short closed-work and client-failure tests succeeded, but an owner-performed Apple-menu Sleep test was blocked. Therefore the pmset candidate fails the retained manual-Sleep criterion and must not be promoted into the main app. Chronological evidence/permissions: [QA report](../../docs/qa/power-helper-candidate-2026-10-16.md).
+- `camlid-power-helper`, the daemon. The app copies it to `/Library/PrivilegedHelperTools/com.camlid.power-helper` and
+  writes two launchd jobs to `/Library/LaunchDaemons/` (`HelperInstaller.swift`):
+  - `com.camlid.power-helper`: started with `--standard-v1`, kept alive, serves the app over XPC.
+  - `com.camlid.power-recovery`: started with `--recover-v1` every 15 seconds. It restores the setting when the daemon
+    is gone.
+- `CamLidPowerService`, the library the daemon links: the XPC listener, the lease service and the mechanisms. It uses
+  `LidRecoveryJournal` for durable intent records and `LidNativeAdapter` for the pmset, power assertion and lid-control
+  bindings.
+- `camlid-power-qa`, a QA tool. It is part of this package but not of the app bundle.
+- `Support/`: reference copies of the daemon plists, and `stage-local-candidate.py`, a script for QA builds. The app does
+  not read these files; it writes its own plists.
 
-The original increment also contained an unselected lid-specific IOKit primitive reusing `LidNativeAdapter`, with process-owned timed idle assertion and distinct shared clamshell control, no global pmset mutation. It is deliberately not adapted to a Boolean global-setting getter or claimed restoration guarantee. Mechanism-specific journal/lease integration and separately approved native testing remain necessary; compilation does not change the already-installed frozen v3 helper. That original restriction was superseded by the explicitly selected lid-specific QA modes documented below; the shipping app remains unconnected. Tests inject fake boundaries. Existing main app remains Preview; do not install/update/activate native code without exact approval.
+## Behaviour
 
-## Implemented path
+- **Standard** (default): while a lease is held, sets the system `SleepDisabled` setting with
+  `/usr/bin/pmset -a disablesleep 1`, reads it back with `pmset -g`, and sets it back to 0 when the lease ends.
+- **Strict** (experimental): a lease that asks for Strict uses the clamshell control instead of the global setting. A
+  restart clears it ([ADR 0003](../../docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md)).
+- **Lease:** 30 seconds, renewed by the app every 10 seconds (`PowerLeaseService.leaseSeconds` and `heartbeatSeconds`).
+  A session lasts at most 4 hours. When the client disconnects, its lease is released.
+- **Journal:** the helper records what it will change before it changes it, so a crash, a restart or a lapsed lease
+  leaves a record that the recovery job or the next start can act on.
+- **Safety:** admission and monitoring use the helper's own readings (power source, battery, thermal state, lid and
+  console user). A client cannot supply sensor evidence.
+- **Who may talk to it:** the XPC listener accepts only the pinned app. The requirement comes from `PowerHelperIdentity`
+  in `CamLidPowerWire`. With an Apple Team ID, it is the exact app identifier and team, anchored to Apple. Otherwise the
+  pins in `/Library/Application Support/CamLidPowerHelper/identity.json` decide: version 2 pins the release
+  certificate's SHA-1, and version 1 pins the exact code hash.
 
-- Root launchd daemon over a fixed named XPC service. No arbitrary commands, paths, pmset keys, shell, sudo or sudoers changes.
-- Kernel-enforced XPC signing requirements at listener and connection. Production: exact app identifier plus the helper's validated Team ID and Apple certificate anchor. Local development without a developer certificate: distinct exact app/helper CDHash pins must first be installed by root at the fixed protected identity path. No UID-only/unsigned/debug-entitled bypass, no caller-provided requirements. Both local executables must have valid hardened-runtime signatures; client authenticates the helper in reverse and checks root EUID. Missing local trust refuses before storage/power setup.
-- One lease bound to its authenticated connection and UID; random token, increasing renewal sequence, 30-second heartbeat deadline, non-extendable session cap (at most 4 hours), disconnection cleanup.
-- Durable journal **before** enable/restore; existing tested `LidRecoveryJournal` storage reused, not a second persistence framework. Root-owned 0700 directory and lifetime single-instance lock.
-- Native fixed `/usr/bin/pmset -g` readback and `-a disablesleep 1/0` writes. Explicit command completion/exit, output limits, no shell interpolation. Two-second subprocess wait; timeout poisons runner and prevents a racing reset. This bounds application waiting, not accepted OS work or process teardown.
-- Initial candidate is deliberately **AC-only**, battery at least 20%, nominal thermal state, current console user, known lid, no online external display. Admission requires lid open; monitoring permits lid closed. Native helper collects its own readings; clients cannot supply sensor evidence. Battery-enabled sessions are not supported by this candidate yet.
-- Acknowledged same-boot enable may be restored after helper restart. Uncertain enable, interrupted restoration or another boot's still-enabled setting refuses blind reset. Readback already off can be acknowledged without a write.
-- `qualifiedClosedLidProtection` remains false in replies. No GUI/CLI success badge or readiness gate is upgraded by compilation/tests.
-
-## Retained limits, not guarantees
-
-`SleepDisabled` is global/persistent and may block manual/low-battery/thermal software Sleep while set. Healthy helper safety policy reduces exposure but does not replace OS safeguards. A helper/watchdog cannot supply OS-owned expiry, atomic ownership, cancellation of accepted OS writes, bounded kernel calls, or recovery while all local executors are hung/dead. Same-value foreign writers are indistinguishable; journal/compare/readback do not solve that. No independent power-resource ownership is claimed. Existing LidRun/other keep-awake resources must not be changed during QA.
-
-The existing stronger product requirement remains unmet. This implementation makes the competitor-style path concrete without silently turning it into the stronger guarantee. Manual Sleep preservation, app/helper crash/hang, AC transitions, thermal/battery exits, continuity and restoration still need separately reviewed real-host qualification. Internal panel reduced-power proof remains deferred; it is not a substitute for workload progress.
-
-## Build/test (no host power actions)
+## Build and test
 
 ```sh
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  swift test --package-path Packages/CamLidPowerHelper \
-  --scratch-path .pi/qa-builds/power-helper-2026-10-16 --jobs 2 --no-parallel
+swift test --package-path Packages/CamLidPowerHelper
 ```
 
-Use `--configuration release` for Release. Executable `--version` is inert. No-argument execution as non-root refuses before opening storage or creating bindings. Do not run no-argument execution as root, `launchctl`, service registration or pmset writes as part of software tests.
+The app build embeds the helper through `scripts/embed-helper.sh`.
 
-`Support/com.camlid.power-helper.plist` is an uninstalled **production SMAppService reference only**: current SDK requires apps containing LaunchDaemons to be notarized. It is not the deployment path for an ad-hoc local QA app. `Support/com.camlid.power-helper.local.plist` instead names a fixed root-installed legacy daemon executable at `/Library/PrivilegedHelperTools/com.camlid.power-helper`, with fixed label/Mach service and argv. Root installation/bootstrap still requires separate exact approval; no notarization bypass or OS security change is attempted.
+## Limits
 
-`Support/stage-local-candidate.py` prepares a new, ad-hoc hardened-runtime signed QA app inside repository `.pi/qa-builds`, derives distinct role pins after signing and writes an external `identity.json`, local-daemon plist and manifest. Signing is offline (`--timestamp=none`); deep verification includes the nested helper. It never installs, registers or executes the bundle. Its `--self-test` performs no signing/power calls. Local trust later requires root-owned, non-writable ancestor directories and root-owned 0644 `/Library/Application Support/CamLidPowerHelper/identity.json`; each endpoint verifies its own pin before accepting the opposite role. Pins stay outside the signed app to avoid circular mutual-CDHash dependencies. Updates need an explicit new root pin installation, never a silent trust relaxation.
-
-The staged QA bundle has its own `com.camlid.PowerCandidate` identity and must be addressed by exact path. Only root-installed exact pins admit that QA identity; the production Team-ID policy still accepts only the real CamLid app. Staging never registers it with Launch Services or replaces the running/installed CamLid. Root identity/helper/plist installation, daemon bootstrap consent and exact action approval are still required before native QA. The QA client has no `--register` command; `--registration-status` only reads legacy service status. Do not use the superseded first SMAppService-oriented staged bundle. Use only the latest frozen manifest. There is no installer or registration side effect in the package build.
-
-## Recovery and release modes (spec 014)
-
-`--recover-v1` is run every 15 s by the separate `com.camlid.power-recovery` LaunchDaemon (`Support/com.camlid.power-recovery.plist`). It takes no helper lock, so a hung helper cannot block it, and restores an acknowledged enable only after its lease deadline plus 10 s grace (or from another boot). `--release-v1` restores an owned acknowledged enable immediately and is used by `camlid helper uninstall`. Both only touch the `pmset-global-v1` journal.
-
-## Lid-specific modes and the frozen best-effort candidate
-
-The daemon accepts exactly three argv forms: `--standard-v1` (`pmset-global-v1`; no argument is refused), `--lid-specific-v1`
-(24 s cap) and `--lid-specific-best-effort-v1` (900 s cap, 24 s leases, 10 s heartbeats).
-Only the best-effort form constructs `RootDomainGeneralInterestObserver`, so a qualified
-`kIOMessageSystemWillSleep` terminates the current session and latches no-resume through
-wake. That mapping is passive general-interest subscription only: this daemon never
-registers for system power, never calls `IOAllowPowerChange`/`IOCancelPowerChange` and never
-vetoes OS intent. Synthetic or unobserved sleep events are not qualified evidence.
-
-`camlid-power-qa` exposes two fixed bounded runs, `--acquire-24s` and
-`--acquire-best-effort-900s`, described by one `BoundedRunPlan` type. Each acquires exactly
-once, renews on a 10 s timer, issues exactly one release and never re-arms or resumes. The
-hard client deadline is a backstop only; it cannot extend the helper's session cap. Both
-commands are inert until a separate approved root install of a frozen packet exists, and
-`--self-test` touches no service, journal, assertion or selector.
-
-The frozen v8 best-effort bundle, its manifest/CDHashes, the exact upgrade packet and the
-attended recorder are recorded in
-[docs/qa/best-effort-frozen-candidate-2026-10-19.md](../../docs/qa/best-effort-frozen-candidate-2026-10-19.md).
-One attended closed-lid episode ran on 2026-10-19 (boot `7180E052-…`) after the separately
-approved root install; outcome and limits:
-[docs/qa/closed-lid-best-effort-episode-2026-10-19.md](../../docs/qa/closed-lid-best-effort-episode-2026-10-19.md).
-The current staging is the v9 freeze (same helper/service sources; QA client run-loop fix;
-helper payload `3d268478…`): the upgrade packet, the instrumented closed-lid recorder, the
-new manual-Sleep recorder, and a host observation that the v8 episode's acknowledged cleanup
-left clamshell sleep disabled until reboot are recorded in
-[docs/qa/best-effort-v9-increment-2026-10-19.md](../../docs/qa/best-effort-v9-increment-2026-10-19.md).
-The first manual-Sleep episode on the v9 lab ran on 2026-10-19 (boot `CC935B3A-…`) and
-closed honestly as `MANUAL_SLEEP_NOT_ESTABLISHED` — the machine's own wifi/BT maintenance
-wake surfaced it from a ≈0.79 s suspend; the helper path (`willSleep` →
-`restore(sleepObserved)` → acknowledged cleanup), the owned-assertion journal attribution
-and the real-run client run-loop confirmation are recorded in
-[docs/qa/manual-sleep-v9-adjudication-2026-10-19.md](../../docs/qa/manual-sleep-v9-adjudication-2026-10-19.md).
-A same-day retry chain (two fresh boots; operator radios off before the cue) reached the
-first full-gate manual-Sleep observation — a 16.577 s suspended interval with zero darkwakes,
-`cleanupAcknowledged`/`sleepObserved`, owned assertion released — recorded in
-[docs/qa/manual-sleep-v9-retry-adjudication-2026-10-19.md](../../docs/qa/manual-sleep-v9-retry-adjudication-2026-10-19.md).
-The optional instrumented closed-lid episode (increment §6 step 4) then ran on a further
-fresh boot (`A3994FA4-…`) under separate one-use approvals and reached
-`CLOSED_INTERVAL_CANDIDATE_OBSERVED`: 114 lid samples (max cadence 176.9 ms), a conservative
-8.42 s observed-closed interval with `AppleClamshellCausesSleep = false` in all 58 closed
-rows, 29 independent workload samples inside (7.118 s), zero sleep/wake/dark-wake lines in
-the 24-line `pmset` window, the owned assertion present at the cue and in every closed
-snapshot and absent after cleanup, client exit 5, final `cleanupAcknowledged`/`userStop`.
-The acknowledged cleanup left the shared bit `No`, so lid-close sleep must be re-established
-by a reboot before normal use; the post-reboot baseline must be re-read. Record:
-[docs/qa/closed-lid-best-effort-episode-v9-2026-10-19.md](../../docs/qa/closed-lid-best-effort-episode-v9-2026-10-19.md).
-Nothing in this paragraph qualifies closed-lid protection, manual Sleep or restoration.
+- `SleepDisabled` is global and persistent. While it is set, a manual Sleep request, or a sleep caused by low battery or
+  high temperature, may be blocked. The helper's safety checks reduce that exposure; they do not make the OS expire the
+  setting.
+- If launchd cannot run the daemon or the recovery job, nothing restores the setting until it can.
+- A write that sets the same value as another program's write cannot be told apart from CamLid's own write.
+- Lid-closed and manual-Sleep results on real hardware are in [spec 014](../../specs/014-persistent-helper/g2-trial.md)
+  and [spec 016](../../specs/016-strict-lid-only/tasks.md). Unit tests use injected fakes and do not qualify a Mac.

@@ -2,7 +2,7 @@
 
 One scoped Spec Kit feature folder per milestone; requested project convention. Spec Kit uses
 feature folders and one selected feature context; it does not itself require milestones as folders.
-[Shared roadmap](../docs/planning/roadmap.md) defines cross-feature gates and detailed procedures.
+The shared roadmap (kept outside this repository) defines cross-feature gates and detailed procedures.
 
 
 > **2026-11-03 reconciliation.** The milestone folders 002-011 were written before the design changed (observer-only
@@ -27,22 +27,21 @@ Experimental feature spec (not a milestone; no gate change):
 
 - [Closed-lid best-effort mode (012)](012-closed-lid-best-effort/spec.md) — Offline model implemented; R0 accepted historically. Full-Sleep/continuity/failure-class G2 qualification and separately approved G3 integration remain open. Manual, finite, attended, AC-only scope; no verified-restoration claim. **Review 2026-10-31:** all remaining tasks closed as superseded by spec 014 or moved to M5/M6/M7.
 
-- [M9: Closed-Lid Best-Effort Hardening (013)](013-closed-lid-hardening/spec.md) — Original offline scope plus reproducibility follow-up complete (22/23 current tasks checked, including auth-only install-packet preparation and T501 foreign-policy row PASS with operator attestation); overall G2 and G3 T502 remain blocked. [Current reproducibility/handoff work](../docs/qa/reproducible-m9-handoff-2026-10-21.md) preserves those gates. **Review 2026-10-31:** T502 closed as superseded by spec 014 (sign-off is 014 T601).
+- [M9: Closed-Lid Best-Effort Hardening (013)](013-closed-lid-hardening/spec.md) — Original offline scope plus reproducibility follow-up complete (22/23 current tasks checked, including auth-only install-packet preparation and T501 foreign-policy row PASS with operator attestation); overall G2 and G3 T502 remain blocked. Current reproducibility/handoff work (kept outside this repository) preserves those gates. **Review 2026-10-31:** T502 closed as superseded by spec 014 (sign-off is 014 T601).
 
 - [Persistent Helper, Standard mode (014)](014-persistent-helper/spec.md) — Implemented, 31/31 tasks, signed off by the owner 2026-11-03 for Mac17,3 / macOS 26A434. Replaces the blocked exclusive-create/one-use admission with a root LaunchDaemon installed once through administrator authentication ([ADR 0001](../docs/adr/0001-persistent-helper-and-strict-experimental-mode.md)). Strict now runs on this helper (see 016). Native actions on other Macs still need explicit owner approval and a qualified row.
 
 - [Agent Activity Observer (015)](015-agent-activity-observer/spec.md) — Phases 0–3 done and trial 8 passed (T402, 10/11); calibration of Codex and OpenCode (T401) pending. Observer-only working/idle inference for agents run directly in a terminal (Claude Code, Codex, OpenCode) so Auto works without Orca; no hooks or configuration edits.
 - [Strict Mode, Lid-Only (016)](016-strict-lid-only/spec.md) — Phases 1–2 (helper, app) done; trials S1–S4 passed and recorded in ADR 0003 (14/16); Standard on battery and the optional E5 observation remain. Strict runs the lid-only clamshell bit on the persistent helper (ADR 0003); experimental, AC only, per-row qualified.
-- [Release readiness for v0.1.0 (017)](017-release-readiness/spec.md) — **Planned:** the first public release; owner decisions recorded; blocks publication.
+- [Release readiness for v0.1.0 (017)](017-release-readiness/spec.md) — **In progress:** the first public release; owner decisions recorded; blocks publication until private vulnerability reporting is on (T033) and the owner approves (T035).
 - [Lid-open keep-awake, command wrapper, shortcut (018)](018-lid-open-and-run/spec.md) — **Included in v0.1.0** (owner decision, 2026-11-06); open items are in its tasks file.
 - [Coverage, Vietnamese, maintenance (019)](019-coverage-and-localization/spec.md) — **Planned** for v0.3.
 - [v1.0 gates (020)](020-v1-gates/spec.md) — **Planned:** conditions for 1.0; adds no features.
 
 Each folder contains its scoped spec/plan/tasks; supporting research/model/quickstart/checklists
 exist where applicable (012 uses the linked decision memo and runbooks). Base runtime contracts reside with M2/M3; M8 adds scoped automation extensions while consuming the existing policy/transport/backend contracts.
-Shared [product spec](../docs/planning/product-spec.md), [architecture](../docs/planning/architecture.md),
-[limitations](../docs/planning/limitations.md) and [domain model](../docs/planning/domain-model.md)
-are sources of truth, shared references rather than additional milestone features. Local task IDs restart; [migration map](../docs/planning/task-migration.md)
+The shared product spec, architecture, limitations and domain model (kept outside this repository)
+are sources of truth, shared references rather than additional milestone features. Local task IDs restart; the migration map (kept outside this repository)
 preserves all 60 future tasks once. M0's four completed tasks are document work only.
 
 ## Feature Selection

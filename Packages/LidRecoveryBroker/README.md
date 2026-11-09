@@ -1,6 +1,9 @@
 # Isolated recovery broker
 
-Non-actuating macOS Swift package. Depends only on the sibling experimental journal; no shipping app dependency, power API, assertion, helper registration, launchd job or installed monitor. Owned finite-lived fixtures exercise independent recovery scheduling.
+Non-actuating macOS Swift package. It depends on the sibling experimental journal (`LidRecoveryJournal`). The app and the
+helper do not import it; `LidNativeAdapter` depends on it, so it builds with that package. It has no power API,
+assertion, helper registration, launchd job or installed monitor. Owned finite-lived fixtures exercise independent
+recovery scheduling.
 
 ## Public seam
 
@@ -29,20 +32,15 @@ Replies always report `powerActuation=false` and `protectionAvailable=false`. `a
 ## Verification
 
 ```sh
-env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  swift test --no-parallel --package-path Tests/Experiments/LidRecoveryBroker
+swift test --no-parallel --package-path Packages/LidRecoveryBroker
 
-env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  swift test --no-parallel --configuration release \
-  --package-path Tests/Experiments/LidRecoveryBroker
+swift test --no-parallel --configuration release --package-path Packages/LidRecoveryBroker
 ```
 
 Test-only executables: `LidBrokerFixture` (one-shot or persistent client), `LidBrokerServerFixture` (owned listener and polling loop), `LidRecoveryMonitorFixture` (separate journal-only executor). Tests own all private roots/sockets/processes; signals target only these explicitly launched children, never another app. Clock/filesystem injection is trusted SPI, not IPC configuration or an authentication bypass.
 
-See [initial broker QA](../../../docs/qa/lid-recovery-broker-2026-10-09.md) and [inert lease/recovery continuation](../../../docs/qa/inert-leases-recovery-2026-10-09.md).
-
 ## Remaining boundaries
 
-Inert leases and finite owned recovery fixtures are **not** a production power backend or installed watchdog. There is no physical setter/getter, writer fencing, sleep/panel acceptance, automatic restart supervision, helper installer, signed lifecycle or original milestone pass. Monitor readiness is not required for inert bookkeeping; a live adapter would need separately qualified readiness and supervision. Existing Preview refusal stays unchanged.
+Inert leases and finite owned recovery fixtures are **not** a production power backend or installed watchdog. There is no physical setter/getter, writer fencing, sleep/panel acceptance, automatic restart supervision, helper installer, signed lifecycle or original milestone pass. Monitor readiness is not required for inert bookkeeping; a live adapter would need separately qualified readiness and supervision.
 
 Exact main-executable pins plus code validity do not establish hardened-runtime/library integrity, defeat a compromised trusted process or cooperative descriptor passing, authenticate journal contents, prevent same-user filesystem tampering or create ownership/expiry for the shared lid bit. Signed production trust policy and host qualification remain separate work. A process or filesystem stall can prevent recovery regardless of the frame deadline.

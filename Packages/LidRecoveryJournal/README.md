@@ -1,13 +1,15 @@
 # Experimental lid-recovery journal
 
-First separately approved implementation slice of the [independent open-source path](../../../docs/research/open-source-closed-lid-path-2026-10-09.md). This is real disk-persistence infrastructure, not another inert recovery model and **not a power backend**.
+The first implementation slice of the experimental recovery path. This is real disk-persistence infrastructure, not
+another inert recovery model and **not a power backend**. The shipping helper (`CamLidPowerService`) uses it for durable
+intent records.
 
 ## Boundary
 
-- Standalone Swift 6 / macOS 13+ package, Foundation/CryptoKit/Darwin only; no third-party dependencies or connection to shipping targets.
+- Swift 6 / macOS 13+ package using Foundation, CryptoKit and Darwin only; no third-party dependencies.
 - No IOKit, assertions, lid/display/power setters, helpers, login registration, sudoers or Apple account/contact activity.
 - Tests create private temporary roots, run only the package's own fixture processes and remove those owned roots. SIGKILL targets an owned fixture, never installed CamLid, LidRun or a foreign process.
-- There is no IPC admission, authenticated broker, clock/boot identity provider, physical recovery, automatic rearm, production enable switch or schema migration here. Existing model and Preview refusal remain separate.
+- There is no IPC admission, authenticated broker, clock/boot identity provider, physical recovery, automatic rearm, production enable switch or schema migration here.
 
 ## API
 
@@ -43,19 +45,16 @@ The parent must already exist. A missing final journal directory is created 0700
 - Cooperative locking depends on participants preserving the lock inode. It does not defeat a same-user process that rewrites a record, replaces lock files or replays an older valid envelope. A test deliberately demonstrates a forged identity with a recomputed valid checksum being accepted as data.
 - POSIX metadata/last-component no-follow checks are not a complete ACL, ancestor-path or malicious-same-user security audit. The caller must choose a trusted private storage parent; a production storage policy remains pending.
 - Claimed boot/deadline values need a real provider and restart reconciliation. A previous-boot deadline or valid old record must never silently rearm a session. None of those policies is implemented by this storage API.
-- No kernel ownership/TTL, panel-sleep verification, preserved manual Sleep or joint-failure cleanup is supplied. No M1/M2 completion follows from these tests.
+- No kernel ownership/TTL, panel-sleep verification, preserved manual Sleep or joint-failure cleanup is supplied. These tests do not qualify the helper.
 
 ## Verification
 
 ```sh
-env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  swift test --no-parallel --package-path Tests/Experiments/LidRecoveryJournal
+swift test --no-parallel --package-path Packages/LidRecoveryJournal
 
-env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  swift test --no-parallel --configuration release \
-  --package-path Tests/Experiments/LidRecoveryJournal
+swift test --no-parallel --configuration release --package-path Packages/LidRecoveryJournal
 ```
 
 The test-only `LidJournalFixture` executable supports load/commit and a bounded pause immediately before publication for deterministic process contention/crash tests. It receives only owned temporary paths. It is not an installed helper, recovery monitor or production service. Tests locate it from the test bundle rather than assuming Swift Testing's `CommandLine.arguments[0]` is an `.xctest` executable.
 
-See [journal development evidence](../../../docs/qa/lid-recovery-journal-2026-10-09.md): 21 test declarations / 36 scenarios, 11 behavioral red/green cycles, real cross-process reopen/contention/crash and controlled filesystem faults. Release/Debug test results qualify this seam only. Licensing selection and any experimental actuation/hardware lane remain separate decisions.
+The tests cover cross-process reopen, contention and crash, and controlled filesystem faults. Release and Debug test runs qualify this seam only. Any experimental actuation or hardware lane remains a separate decision.

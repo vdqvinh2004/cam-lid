@@ -4,15 +4,15 @@ A native macOS menu bar app that keeps a Mac awake with the lid closed while AI 
 sleep when they are done.
 
 **Status: signed with the project's own release certificate, not notarized by Apple, tested on one Mac.** Closed-lid operation has passed attended trials on
-Mac17,3 with macOS 26A434 only ([trial record](specs/014-persistent-helper/g2-trial.md)). On any other model or
-macOS build it stays off unless you explicitly accept "untested configuration" in Settings › Closed Lid. Releases are
+Mac17,3 with macOS build 26A434 only ([trial record](specs/014-persistent-helper/g2-trial.md)). On any other model or
+macOS build it stays off unless you explicitly choose "Allow on this untested Mac" in Settings › Closed Lid. Releases are
 signed with a self-signed certificate, not an Apple Developer ID, and not notarized ([why](docs/adr/0004-distribution-through-github-releases.md)).
 
 ## Download
 
 Get `CamLid-<version>-macos-arm64.zip` from the [Releases](https://github.com/vdqvinh2004/cam-lid/releases) page
-(Apple silicon, macOS 14 or later). Each release lists the SHA-256 of the zip and the code hashes of the app and its
-root helper; check them before you run it.
+(Apple silicon, macOS 14 or later). Each release's notes list the zip's SHA-256, the certificate fingerprint, the helper
+version and the code hashes of the app, its root helper and its command-line tool; check them before you run it.
 
 1. Unzip it and move **CamLid.app** to `/Applications`.
 2. macOS refuses the first launch because the app is not notarized. Open it once, then *System Settings › Privacy &
@@ -27,13 +27,15 @@ notes say so. An app you sign ad hoc yourself needs **Reinstall helper…** afte
 ## What it does
 
 - **Auto** keeps the Mac awake while the agents you selected are working, then waits for "Sleep when done" and lets
-  the Mac sleep. **Timed** keeps it awake for a chosen time (or until you stop it, on the charger).
+  the Mac sleep. **Timed** keeps it awake for a chosen time, or until you stop it when you pick Infinite. Battery and
+  thermal safety stops still apply.
 - **Agents are observed from outside only** ([ADR 0002](docs/adr/0002-observer-only-agent-activity.md)). CamLid
   installs no hooks, plugins or wrappers and never edits an agent's configuration.
   - Orca: read-only `orca` CLI status of its panes.
   - Claude Code, Codex, OpenCode run in a terminal: working or idle is estimated from the CPU activity of the agent
     and its child processes, shown as "(estimated)"
-    ([spec 015](specs/015-agent-activity-observer/spec.md)). Launching an agent without a prompt does not count.
+    ([spec 015](specs/015-agent-activity-observer/spec.md)). CPU in an agent's first 25 seconds after launch is not
+    counted as work.
   - Watched programs: optional rules that keep the Mac awake while a given program runs.
 - **Safety stops** on low battery, high thermal pressure, unplugged charger (unless "Allow on battery" is on),
   sustained CPU load (optional) and session time limits. Missing readings never count as healthy.
@@ -54,15 +56,16 @@ administrator password ([ADR 0001](docs/adr/0001-persistent-helper-and-strict-ex
   that the app renews every 10 seconds, and restores the setting when the lease lapses (app quit, crash or hang).
 - An independent recovery job runs every 15 seconds and restores the setting if the helper itself is gone.
 - A journal records what CamLid changed, so the setting is restored after a crash or restart.
-- **Strict (experimental, in progress)** will block only lid-close sleep through a kernel setting that a restart
-  clears ([ADR 0003](docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md),
+- **Strict (experimental)** blocks only lid-close sleep, through a kernel setting that a restart clears, and is
+  offered only on Macs that passed its trials ([ADR 0003](docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md),
   [spec 016](specs/016-strict-lid-only/spec.md)).
 
-Known conflict: LidRun's helper resets the sleep setting and interrupts closed lid; CamLid warns when it is present.
+Known conflict: LidRun's helper resets the sleep setting and interrupts closed lid. While LidRun is running,
+Settings › Closed Lid warns about it.
 
 ## Requirements
 
-- macOS 14 or later on Apple silicon; tested on macOS 26.
+- macOS 14 or later on Apple silicon. Closed-lid tests so far: Mac17,3 with macOS build 26A434 (see Status above).
 - Xcode 27 (Swift 6.4, macOS 27 SDK) to build it yourself.
 
 ## Build
@@ -80,12 +83,15 @@ updates keep the installed helper), run `scripts/make-signing-identity.sh` once,
 `scripts/release.sh --adhoc` makes a local test build named `-ADHOC`, not for publication. `project.yml` is the XcodeGen source
 (`xcodegen generate` after changing targets).
 
-Tests (each package):
+Tests, one command per package:
 
 ```sh
 swift test --package-path Packages/CamLidCore
 swift test --package-path Packages/CamLidPowerHelper
 swift test --package-path Packages/CamLidPowerWire
+swift test --package-path Packages/LidRecoveryJournal
+swift test --package-path Packages/LidNativeAdapter
+swift test --package-path Packages/LidRecoveryBroker
 ```
 
 ## Install and use
@@ -96,8 +102,10 @@ swift test --package-path Packages/CamLidPowerWire
 3. Settings › Agents: select the agents that may keep the Mac awake.
 4. In the menu bar Dashboard, click **Auto** or **Timed**. Click the active mode again to stop.
 
-Every new build or release changes the app's code hash: click **Reinstall helper…** afterwards. To remove the helper (restoring
-the sleep setting first), click **Remove helper…** or run `sudo camlid helper uninstall`.
+A release signed with the project's certificate keeps the installed helper working; the release notes say when a helper
+reinstall is needed. An ad-hoc local build changes the app's code hash, so click **Reinstall helper…** after each such
+build. To remove the helper (restoring the sleep setting first), click **Remove helper…** or run
+`sudo camlid helper uninstall`.
 
 ## Command line
 
@@ -127,9 +135,10 @@ CamLid has no third-party code dependencies.
 
 ## Privacy
 
-History stays on the Mac (14 days or 20 MiB) and records mode changes, safety stops and agent states, never prompts,
-code or transcripts. Exports hide identifiers. The only network use is the update check you start yourself (one request to GitHub's public releases API, with no
-account, cookies or system profile).
+History stays on the Mac (14 days or 20 MiB). It records mode changes, safety stops and agent states, never prompts,
+code or transcripts. Exports replace session IDs with salted pseudonyms and keep only the provider kind. The only
+network use is the update check you start yourself: one request to GitHub's public releases API, with no account,
+cookies or system profile.
 
 ## Project documents
 
@@ -139,13 +148,13 @@ account, cookies or system profile).
   [ADR 0003](docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md),
   [ADR 0004](docs/adr/0004-distribution-through-github-releases.md).
 - [Security policy](SECURITY.md) and [contributing](CONTRIBUTING.md); `scripts/release.sh` builds a release.
-- [Constitution](.specify/memory/constitution.md).
 
 ## Limits
 
 - Qualified on one Mac model and macOS build; other combinations are untested.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
-- Unsigned: macOS asks you to approve the first launch, and the app cannot update itself.
+- Not notarized: macOS asks you to approve the first launch, and the app cannot update itself.
 - Apple silicon only.
 - No fan or charging control.
 - The lid-open hold and `camlid run` were checked on one Mac only.
+- Strict is experimental and offered only on tested Macs.

@@ -1,13 +1,28 @@
-# Native OS bindings — code and fake tests only
+# Native OS bindings
 
-Owner approved isolated native bindings, fixed-flow integration/review, then typed read-only safety and a hard-disabled attended entry point/recovery plan—**not power execution**. No service, CLI native-power mode, shipping dependency or default native power binding. `LidAttendedPreflight` is a read-only executable: default/`--readiness` observes public sensors; any action flag refuses before sensor/power setup. Tests invoke only refusal flags or fake sensor/power OS functions. No executable selects a native power SDK factory.
+Swift bindings to the macOS power interfaces that the CamLid power helper uses: the `pmset` runner, an owned idle power
+assertion, the shared lid (clamshell) control with its root-domain calls, and a conservative safety sampler (battery,
+AC, thermal state, lid, displays and topology).
 
-`NativeEpisodeCalls` implements the experimental broker's `OneEpisodePowerCalls` seam. It produces an opaque `EpisodeIdleAssertion` wrapping `NativeOwnedIdleAssertion`; raw IDs never travel between writer and monitor. Public idle-system assertion uses 1–30 whole seconds (floor remaining budget) and explicit OS Release. Unsupported root-domain selector 12 takes one scalar, enable 1/clear 0; known service/client references are disposed with separate error observations. Connection close is not shared-bit rollback; idle assertion timeout is not lid-bit expiry.
+- `NativeHelperEnvironment` (in `CamLidPowerService`) composes these bindings for the shipping daemon.
+- `NativeSafetySampler` gates on fresh readings: a missing or stale reading counts as unsafe.
+- `NativeEpisodeCalls` adapts the assertion and the lid control to the `OneEpisodePowerCalls` seam of `LidRecoveryBroker`.
+- `LidAttendedPreflight` is a read-only executable. With no arguments or `--readiness` it reads sensors and reports; any
+  other argument is refused before any sensor or power call.
 
-Fixed controller now accepts the boundary explicitly, preserving one dispatch/terminal Stop, post-safety freshness and independently retained authenticated completion. Monitor commits exact-op durable restore intent before one clear attempt; failed/missing/lost completion never supplies cleanup authority. Native SDK mode now requires typed `EpisodeSafetySource`; the legacy Boolean callback admits recorder tests only. Read-only `NativeSafetySampler` conservatively gates fresh battery/AC/nominal thermal/lid/panel/topology. Independent monitor checks this source on readiness and periodic polling; unsafe/Unknown terminates, but cannot authorize clear without exact retained successful completion. No executable power selector, destructor power call or release/rearm retry. A PID check is only a fork guard, not peer authentication. System callback injection is trusted test input, never IPC configuration.
+Platform: macOS 13 or later. Depends on `LidRecoveryBroker`.
 
-Execution mode is immutable at construction. Injected fake OS mode reports powerActuation=false; native SDK mode preserves unknown before retained dispatch observation. Any returned selector/close/release code is distinct from physical effect/restoration. No supported backend, owner/OS bit TTL, in-flight cancellation, bounded OS IO or joint-failure cleanup follows.
+## Build and test
 
-[Previous integration/review](../../../docs/qa/native-flow-integration-2026-10-10.md); [current typed-safety evidence](../../../docs/qa/native-safety-readiness-2026-10-11.md) and [disabled attended plan](../../../docs/qa/attended-episode-recovery-plan-2026-10-11.md). Compile/fake-test: `swift test` and `swift test -c release`. Any real assertion, shared lid call, native power smoke test, helper installation, shipping wiring or physical study requires separate exact approval. Typed safety source is implemented but actual-host sensor/rollback qualification and native executable power path remain incomplete.
+```sh
+swift test --package-path Packages/LidNativeAdapter
+```
 
-Installed SDK `IOPMLib.h`/`IOPMLibDefs.h`, pinned XNU `f6217f891ac0bb64f3d375211650a4c1ff8ca1ea` and PowerManagement `d415e45501842834a280930c3eed9186544a67f0` are source references, not current-kernel or supported API qualification. No utility code was copied.
+Tests use fake OS boundaries. They do not assert power or change the lid control.
+
+## Boundaries
+
+- The shared lid control is not rolled back when a connection closes, and an idle assertion's timeout does not expire the
+  lid bit.
+- Behaviour on real hardware is qualified by the closed-lid trials in [spec 014](../../specs/014-persistent-helper/g2-trial.md)
+  and [spec 016](../../specs/016-strict-lid-only/tasks.md), not by these tests.

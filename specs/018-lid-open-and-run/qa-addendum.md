@@ -80,7 +80,7 @@ The raw timelines are not committed.
 - Not covered: `claude -p` (print mode). A one-shot print run wrote its whole answer and was never read as working,
   because it spends little CPU while it streams. The app detects terminal sessions in TUI mode.
 
-## Grace and `camlid run`, on the installed 0.1.0 build (commit 338c147)
+## Grace and `camlid run`, on the installed 0.1.0 build (commit 5097217)
 
 Setup: the sleep-when-done delay was 1 minute for the test and is back to 2 minutes; claude, pi and Orca were unenrolled
 for the test because they were working on this Mac; the agent was a stand-in process named `codex` (an enrolled
@@ -92,5 +92,5 @@ provider); freebuff and opencode stayed enrolled. The full enrollment was restor
   the hold ended about 67 s after the stop (session `ready`, not held, no CamLid assertion).
 - `camlid run -- /bin/sleep 20`: the hold was present during the command. The hold ended 61.9 s after the command
   finished, which is the one-minute grace.
-- Before the unknown-hold fix (commit 1f0ecc1) an unreadable OpenCode process kept refreshing its hold and held for more
+- Before the unknown-hold fix (commit b64a837) an unreadable OpenCode process kept refreshing its hold and held for more
   than 10 minutes; the same idle probe with the fix showed no hold for the first 15 s.
