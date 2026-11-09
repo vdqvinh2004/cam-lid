@@ -106,7 +106,7 @@ public struct DashboardData: Codable, Sendable, Equatable {
     public let mode: RequestedMode
     public let state: EffectiveState
     public let reasonText: String
-    /// Whether a session exists. Auto with no session reads "Not running"; an armed Auto session reads "Waiting for agents".
+    /// Whether a session exists. Auto with no session reads "Ready"; an armed Auto session reads "Waiting for agents".
     public let sessionRunning: Bool
     /// False (or unverified display sleep) downgrades Protected presentation.
     public let powerActuationAvailable: Bool
@@ -463,7 +463,7 @@ public extension DashboardData {
     var showsLidOpenAwake: Bool { keepingAwakeWithLidOpen && state == .protected && !leaseVerified }
     var statusTitle: String {
         if showsLidOpenAwake { return CamLidAccessibility.StatusStyle.keepingAwakeWithLidOpen.text }
-        if presentedState == .ready, mode == .auto { return sessionRunning ? "Waiting for agents" : "Not running" }
+        if presentedState == .ready, mode == .auto, sessionRunning { return "Waiting for agents" }
         if presentedState == .completionGrace && !powerActuationAvailable { return "Waiting after work" }
         return CamLidAccessibility.StatusStyle.style(for: presentedState).text
     }

@@ -51,7 +51,7 @@ struct StartDurationTests {
         let coordinator = AppCoordinator(historyDirectory: root, preferences: defaults,
             healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) })
         coordinator.changeMode(.auto)
-        #expect(coordinator.dashboardData().statusTitle == "Not running")
+        #expect(coordinator.dashboardData().statusTitle == "Ready")
         await coordinator.startPreviewSession()
         #expect(coordinator.dashboardData().statusTitle == "Waiting for agents")
         // Closed-lid keep-awake is off by default, so a running session says that closing the lid sleeps the Mac.
