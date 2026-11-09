@@ -4,8 +4,12 @@ CamLid installs a small **root helper** (a LaunchDaemon) that changes the Mac's 
 more than in an ordinary menu bar app. Please report problems privately.
 
 ## Reporting a vulnerability
-Send the report by email to vdqvinh2004@gmail.com. Please do not open a public issue for a security
-problem. Include the version, what you did, and what happened. This is a one-person project: expect a first answer
+Use either private channel:
+- GitHub's private vulnerability reporting: **Security › Report a vulnerability** on the repository
+  (<https://github.com/vdqvinh2004/cam-lid/security/advisories/new>).
+- Email to vdqvinh2004@gmail.com.
+
+Please do not open a public issue for a security problem. Include the version, what you did, and what happened. This is a one-person project: expect a first answer
 within about a week.
 
 ## What is in scope
