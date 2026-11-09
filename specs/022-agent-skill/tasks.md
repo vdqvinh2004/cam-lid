@@ -10,15 +10,15 @@
 - [x] T010 [FR-001] `.agents/skills/camlid/SKILL.md`, in English, 51 lines (under 80), no secrets.
 - [x] T011 [FR-002] Covers `status --json`, `run --`, `start` (auto and timed), `stop`, `diagnose --json` and `helper status --json`. The last one was missing and was added on 2026-11-09.
 - [x] T012 [FR-003] Rules: no settings changes, no stopping a session it did not start, no retry loops, helper admin commands go to the user.
-- [~] T013 [FR-004] Each command is run or parsed against the installed binary before each release. Checked 2026-11-09 (run, stop, status, helper status, diagnose and a refused start); on the same day `status --json` and `helper status --json` were run again against the installed 0.1.0 build. Repeat before each release.
+- [x] T013 [FR-004] Each command is run or parsed against the installed binary before each release. Checked 2026-11-09 on the installed build (run, stop, status, helper status, diagnose and a refused start); the same day the release zip's CLI ran the same commands against the isolated QA instance, including exit 4 when CamLid is not running ([qa-evidence.md](../024-release-readiness-v0.2/qa-evidence.md)). Run again before each release.
 
 ## Phase 2 — Settings button and writer (FR-005 to FR-008, FR-010)
 - [x] T020 [FR-005] Toggle "Let AI agents use CamLid" in Settings › General, off by default. `SettingsView.swift`.
-- [x] T021 [FR-006] The folder is chosen in an open panel, and the file is written only after the button is pressed. Never at launch. `UtilityUICoordinator.swift` (`setAgentSkill`), `AgentSkillInstaller.swift` (`install`).
+- [x] T021 [FR-006] The file goes to `~/.agents/skills/camlid/SKILL.md` in the home folder, and is written only after the button is pressed. Never at launch. Changed 2026-11-09 from an open panel that picked a project folder. `UtilityUICoordinator.swift` (`setAgentSkill`), `AgentSkillInstaller.swift` (`install`).
 - [x] T022 [FR-007] Never overwrites a SKILL.md CamLid did not write, and asks first. `aSkillFileCamLidDidNotWriteIsReplacedOnlyWithConsent`.
 - [x] T023 [FR-008] Off removes only the file CamLid wrote, and only while its contents are unchanged. `removeDeletesOnlyTheFileItWrote`, `aFileChangedSinceInstallIsLeftInPlace`, `aFileCamLidNeverWroteIsNotRemovedEvenWhenIdentical`, `aFileDeletedByHandIsReportedAndNotRecreated`.
 - [x] T024 [FR-010] The only file written is the skill file. No hooks, plugins, wrappers or agent settings. `installWritesExactlyOneFileAndRemembersIt`.
-- [x] T025 The record survives a relaunch, and only one installation is allowed at a time. `theRecordSurvivesARelaunchAndOnlyOneFolderIsAllowed`.
+- [x] T025 The record survives a relaunch, and an unchanged file CamLid wrote is updated without asking. `theRecordSurvivesARelaunchAndAnUnchangedOwnFileIsUpdatedWithoutAsking`.
 
 ## Phase 3 — Bundle and release (FR-009)
 - [x] T030 [FR-009] The build copies the skill into the app (`scripts/embed-helper.sh`). Checked 2026-11-09: the Release build's `Contents/Resources/SKILL.md` is identical to the repository file.

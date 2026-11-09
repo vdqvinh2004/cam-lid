@@ -36,7 +36,7 @@ Severity is the harm to a user or to the release if the risk happens. "Closed" m
 | R13 | The privacy wording in README and SECURITY.md is wrong or not approved | The daily request changes what the docs promise | High: trust and accuracy | Open: owner review (021 T032). Nothing is published before it |
 | R14 | A closed-lid session with the replacement build does not hold or restore | The helper pins the release certificate; the replacement is signed with it. Not exercised in a session | High: safety | Open: owner runs one short closed-lid session before release |
 | R15 | Launch at login needs approval again after the app was replaced | Not tested | Medium | Open: owner check |
-| R16 | Writing the skill into Documents or Desktop triggers a macOS privacy prompt | Not tested | Low to medium | Open: owner check. A refused write shows a message, not a silent failure |
+| R16 | Writing `~/.agents/skills/camlid/SKILL.md` triggers a macOS privacy prompt, or fails silently | The home folder is not Documents, Desktop or Downloads, so no prompt is expected. Not run on the installed build | Low | Open: owner check (G17). A refused write shows a message, not a silent failure |
 | R17 | The installed app still carries the old skill text in its bundle | The bundle is copied at build time | Low | Closed by the next build. The release build copies the current file |
 | R18 | The helper changed without a version bump | `check-helper-version.sh` passes; helper version 1; no helper source changed in this release | Low | Closed by the guard |
 | R19 | The daily update check makes too many requests, or shows errors when offline | Unit tests cover once a day, sessions, relaunches | Low | Closed by tests. Open: the toggle on the installed build (021 T051) |
@@ -45,6 +45,7 @@ Severity is the harm to a user or to the release if the risk happens. "Closed" m
 | R22 | The agent-run success criterion (022 SC-001) is untested | Needs an agent on the owner's Mac | Medium | Open: owner |
 | R23 | v0.1.0 carry-over verifications stay open (018 T016, T022 to T024, T031; 017 T015) | Tasks files | Medium | Accepted for v0.2 as known limits; decision D4 |
 | R24 | The Dashboard does not say why the Mac stays awake during an audio hold | `statusReason` | Low | Closed: "A Chromium browser is playing audio." |
+| R25 | The skill sits in `~/.agents/skills`, where a skill manager keeps `.skill-lock.json` for 49 skills. The CamLid folder is not in that file | 16 of the 65 folders there were already untracked, so untracked folders are normal here. Whether the manager's update or removal touches an untracked folder is not tested | Medium | Open: owner check after the next update of the manager. CamLid never edits `.skill-lock.json` |
 
 ## Decisions the owner must make
 

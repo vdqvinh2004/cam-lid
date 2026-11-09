@@ -127,8 +127,9 @@ camlid simulate --scenario scenario.json --use-current-config   # offline run wi
 
 Full contract: [CLI](specs/003-native-foundation/contracts/cli.md).
 
-AI agents can learn the command from a skill file, `.agents/skills/camlid/SKILL.md`. Settings › General › *Let AI agents
-use CamLid* writes that one file into a project folder you choose, and turning it off removes it again unless you have
+AI agents can learn the command from a skill file. Settings › General › *Let AI agents
+use CamLid* writes that one file, `~/.agents/skills/camlid/SKILL.md`, in your home folder, where agents on this Mac can read
+it. Turning it off removes it again unless you have
 changed it. It is off by default; CamLid never writes it at launch.
 
 ## License

@@ -32,4 +32,4 @@ privacy wording, release notes and the installed-build check. Sources: [spec.md]
 
 ## Phase 5 — Release
 - [ ] T050 Release notes for v0.2 mention the setting. The template in `scripts/release.sh` still needs an owner pass before publishing.
-- [ ] T051 On the installed build: switch Check on, confirm one request in the day, switch Off. Owner, before release.
+- [~] T051 On the installed build: switch Check on, confirm one request in the day, switch Off. Owner, before release. QA build (2026-11-09): on writes the setting and off clears it; the first scheduled request and the deferred manual check were not observed ([qa-evidence.md](../024-release-readiness-v0.2/qa-evidence.md)).
