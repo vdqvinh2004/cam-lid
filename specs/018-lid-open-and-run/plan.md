@@ -1,4 +1,4 @@
-# Plan: v0.2 — lid-open keep-awake, wrapper, shortcut, calibration
+# Plan: lid-open keep-awake, wrapper, shortcut, calibration (shipped in v0.1.0)
 
 ## Layers
 

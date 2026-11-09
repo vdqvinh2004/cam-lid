@@ -1,7 +1,7 @@
 # Feature Specification: Automatic update setting
 
-**Status:** Decided 2026-11-09 for the release after 0.1.0. Not implemented yet. Off by default. When on, one check per
-day. Install mode is deferred. [ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md) is amended for
+**Status:** Decided 2026-11-09; implemented for v0.2, the release after 0.1.0, not released yet. Off by default. When on,
+one check per day. Install mode is deferred. Plan: [plan.md](plan.md). Tasks: [tasks.md](tasks.md). [ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md) is amended for
 the daily check (see its Amendment).
 
 ## Context (0.1.0)
@@ -66,8 +66,8 @@ for everyone who does not turn the setting on.
 
 ## Remaining before release
 
-- Owner review of the privacy wording in the README and SECURITY.md (FR-006).
-- Implementation, with tests for SC-001 to SC-003.
+- Owner review of the privacy wording in the README and SECURITY.md (FR-006). Drafted; [tasks](tasks.md) T032.
+- Implementation and tests for SC-001 to SC-003 are done ([tasks](tasks.md)). Open: the GUI check and the installed-build check.
 
 ## Out of scope
 

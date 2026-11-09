@@ -19,8 +19,8 @@ version and the code hashes of the app, its root helper and its command-line too
    Security › Open Anyway*, or run `xattr -dr com.apple.quarantine /Applications/CamLid.app`.
 3. Continue with [Install and use](#install-and-use).
 
-Updating: *Check for Updates…* asks GitHub for the newest release when you click it and opens the Releases page; it
-never downloads or installs anything. A release is signed with CamLid's own certificate, so the installed helper keeps
+Updating: *Check for Updates…* asks GitHub for the newest release when you click it and opens the Releases page. Settings
+› General can also check once a day (off by default). Either way CamLid never downloads or installs anything. A release is signed with CamLid's own certificate, so the installed helper keeps
 working with the new app; CamLid asks you to reinstall the helper only when the helper itself changed, and the release
 notes say so. An app you sign ad hoc yourself needs **Reinstall helper…** after every rebuild.
 
@@ -127,6 +127,10 @@ camlid simulate --scenario scenario.json --use-current-config   # offline run wi
 
 Full contract: [CLI](specs/003-native-foundation/contracts/cli.md).
 
+AI agents can learn the command from a skill file, `.agents/skills/camlid/SKILL.md`. Settings › General › *Let AI agents
+use CamLid* writes that one file into a project folder you choose, and turning it off removes it again unless you have
+changed it. It is off by default; CamLid never writes it at launch.
+
 ## License
 
 MIT, see [LICENSE](LICENSE). The agent marks bundled for identification remain the trademarks of their owners
@@ -137,8 +141,9 @@ CamLid has no third-party code dependencies.
 
 History stays on the Mac (14 days or 20 MiB). It records mode changes, safety stops and agent states, never prompts,
 code or transcripts. Exports replace session IDs with salted pseudonyms and keep only the provider kind. The only
-network use is the update check you start yourself: one request to GitHub's public releases API, with no account,
-cookies or system profile.
+network use is the update check: one request to GitHub's public releases API, with no account, cookies or system
+profile, when you click *Check for Updates…* or, if you turn on the daily check (off by default), once a day. The agent
+skill writes a file on your Mac and sends nothing.
 
 ## Project documents
 

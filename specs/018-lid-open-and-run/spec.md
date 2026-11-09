@@ -1,4 +1,4 @@
-# Feature Specification: v0.2 — keep awake with the lid open, command wrapper, shortcut
+# Feature Specification: keep awake with the lid open, command wrapper, shortcut (shipped in v0.1.0)
 
 **Status:** Included in v0.1.0 (owner decision, 2026-11-06). Open items are in tasks.md.
 **Needs:** [ADR 0006](../../docs/adr/0006-command-wrapper-amends-observer-only.md), to be written before the code for User Story 2. It amends [ADR 0002](../../docs/adr/0002-observer-only-agent-activity.md).

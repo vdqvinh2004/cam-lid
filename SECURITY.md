@@ -18,7 +18,7 @@ within about a week.
   was installed with.
 - A way to leave the sleep setting changed after a session, an app crash, a helper crash or a restart.
 - The installer or uninstaller doing more than its fixed operations, or touching files it should not.
-- Anything that makes the app send data off the Mac (it should not; the only request is the update check you click).
+- Anything that makes the app send data off the Mac (it should not; the only request is the update check, which you click or, if you turn it on, once a day).
 
 ## What the helper is meant to guarantee
 It accepts a fixed set of operations (inspect, acquire, renew, release) from the pinned app only; it holds a 30-second

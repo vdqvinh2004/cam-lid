@@ -1,4 +1,4 @@
-# Tasks: v0.2 — lid-open keep-awake, wrapper, shortcut, calibration
+# Tasks: lid-open keep-awake, wrapper, shortcut, calibration (shipped in v0.1.0)
 
 **Feature context:** `018-lid-open-and-run` · **Status:** 16/23 checked (6 partly, T041 open). Sources: [spec.md](spec.md), [plan.md](plan.md).
 

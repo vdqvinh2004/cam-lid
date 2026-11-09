@@ -1,6 +1,6 @@
 # Tasks: v0.3 — coverage, Vietnamese, maintenance
 
-**Feature context:** `019-coverage-and-localization` · **Status:** 1/27 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `019-coverage-and-localization` · **Status:** 7/27 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [x] T001 Owner decides Q-E: build audio holds, after research. — 2026-11-05.

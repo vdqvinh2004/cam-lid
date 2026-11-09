@@ -1,7 +1,8 @@
 # Feature Specification: Agent skill for the CamLid command
 
-**Status:** Decided 2026-11-09. The skill file is in the repository now. The Settings button and the app side ship in the
-release after 0.1.0. No app code yet.
+**Status:** Decided 2026-11-09; implemented for v0.2, the release after 0.1.0, not released yet. The skill file, the Settings
+button, the bundled copy and the release check are in place. Open: SC-001 (an agent run) and the GUI check. Plan:
+[plan.md](plan.md). Tasks: [tasks.md](tasks.md).
 
 ## Context
 
@@ -19,7 +20,7 @@ their project.
 ## Requirements
 
 - **FR-001** The skill lives at `.agents/skills/camlid/SKILL.md` at the repository root. It is in English, under 80 lines,
-  and has no secrets. Done: 49 lines.
+  and has no secrets. Done: 51 lines.
 - **FR-002** It covers `camlid status --json`, `camlid run -- <command>`, `camlid start --mode auto|timed --duration <value>`,
   `camlid stop`, `camlid diagnose --json` and `camlid helper status --json`. It does not cover installing or removing the
   helper.
