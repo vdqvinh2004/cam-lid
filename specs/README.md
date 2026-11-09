@@ -38,6 +38,7 @@ Experimental feature spec (not a milestone; no gate change):
 - [Coverage, Vietnamese, maintenance (019)](019-coverage-and-localization/spec.md) — **Planned** for v0.3.
 - [v1.0 gates (020)](020-v1-gates/spec.md) — **Planned:** conditions for 1.0; adds no features.
 - [Automatic update setting (021)](021-automatic-updates/spec.md) — **Planned** for the release after 0.1.0, decided 2026-11-09: Off by default, one check a day when on. ADR 0004 is amended; install is deferred.
+- [Agent skill for the CamLid command (022)](022-agent-skill/spec.md) — **Planned** for the release after 0.1.0: a short SKILL.md that tells AI agents how to use the `camlid` CLI. No MCP.
 
 Each folder contains its scoped spec/plan/tasks; supporting research/model/quickstart/checklists
 exist where applicable (012 uses the linked decision memo and runbooks). Base runtime contracts reside with M2/M3; M8 adds scoped automation extensions while consuming the existing policy/transport/backend contracts.
