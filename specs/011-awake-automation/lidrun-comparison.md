@@ -1,5 +1,8 @@
 # LidRun vs CamLid — feature decisions
 
+> **Superseded for planning on 2026-11-09** by the [comparison with LidRun and LidWalk](../023-feature-parity/comparison.md),
+> which covers the current app and LidWalk. This file stays as the 2026-10-08 CLI review.
+
 Reviewed **2026-10-08**. Yes, earlier comparisons existed in [M4b](../010-qa-ux-sensors/lidrun-comparison.md) and mode QA. This replaces their feature-gap baseline for M8 planning, not their historical test results.
 
 **Evidence boundary**: Installed LidRun CLI 1.2.25 was inspected using help, status and patterns only. No power, watch-list, notification or fan setting changed. Published features below are vendor claims, not independent physical verification. CamLid is still **Preview: no live power backend**. “Implemented” below means the named UI/policy/read-only function exists, not physical protection.

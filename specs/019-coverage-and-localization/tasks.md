@@ -1,6 +1,6 @@
 # Tasks: v0.3 — coverage, Vietnamese, maintenance
 
-**Feature context:** `019-coverage-and-localization` · **Status:** 7/27 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `019-coverage-and-localization` · **Status:** 8/27 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [x] T001 Owner decides Q-E: build audio holds, after research. — 2026-11-05.
@@ -47,10 +47,12 @@
   so it does not tell playback apart. Brave held `NoIdleSleepAssertion` named "Playing audio" for as long as a page
   played audio. So only Chromium-based browsers show a named playback signal. Music apps and other browsers were not
   tested.
-- [ ] T071 Go or no-go for the audio hold. Needs the owner: a browser-only rule covers web audio, not music apps.
-  Build it for browsers only, or wait until another signal is found?
+- [x] T071 Go or no-go for the audio hold. Decided 2026-11-09: go, Chromium-based browsers only; music apps are not covered
+  (spec 023, D3). Tasks T080–T083 moved to spec 023, User Story 3.
 
 ## Phase 8 — Audio hold (US7, Q-E)
+
+> Moved to [spec 023](../023-feature-parity/tasks.md), Phase 3, on 2026-11-09. Track T080–T083 there.
 - [ ] T080 [US7] Implement the signal reader chosen in T070, behind a protocol with a fake for tests.
 - [ ] T081 [US7] Add an audio-playback rule type next to watched programs, for Auto sessions.
 - [ ] T082 [US7] Tests: the rule holds while audio plays; ends after the quiet period (proposed 60 s); never holds without an audio source; Activity records start and end only.
