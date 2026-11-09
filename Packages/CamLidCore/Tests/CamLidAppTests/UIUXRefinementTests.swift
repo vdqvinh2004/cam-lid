@@ -57,7 +57,7 @@ struct UIUXRefinementTests {
     @Test @MainActor func welcomeReplayPreservesConsentAndRecordsCompletionOnce() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
-        var patch = ConfigPatch(); patch.closedLidOptIn = true; patch.telemetryEnabled = true
+        var patch = ConfigPatch(); patch.closedLidOptIn = true
         guard case .saved = await app.applySettingsPatchAsync(patch, expectedRevision: 1) else {
             Issue.record("Could not prepare consent fixture"); return
         }
@@ -70,7 +70,6 @@ struct UIUXRefinementTests {
         let json = try #require(JSONSerialization.jsonObject(with: persisted) as? [String: Any])
         let config = (json["configuration"] as? [String: Any]) ?? json
         #expect(config["closedLidOptIn"] as? Bool == true)
-        #expect(config["telemetryEnabled"] as? Bool == true)
     }
 
     @Test @MainActor func helperMenuUsesProjectedCommandAvailability() throws {

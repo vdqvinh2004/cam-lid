@@ -53,7 +53,6 @@ public struct SettingsDraft: Sendable, Equatable {
     public var orcaMetadataConsent: Bool?
     public var notificationCategories: [NotificationCategory]?
     public var launchAtLogin: Bool
-    public var telemetryEnabled: Bool
     public var lifetimeRules: [LifetimeRule]?
 
     public init(configuration: Configuration) {
@@ -75,7 +74,6 @@ public struct SettingsDraft: Sendable, Equatable {
         orcaMetadataConsent = configuration.orcaMetadataConsent
         notificationCategories = configuration.notificationCategories
         launchAtLogin = configuration.launchAtLogin
-        telemetryEnabled = configuration.telemetryEnabled
         lifetimeRules = configuration.lifetimeRules
     }
 
@@ -136,7 +134,6 @@ public struct SettingsDraft: Sendable, Equatable {
         patch.orcaMetadataConsent = orcaMetadataConsent
         patch.notificationCategories = notificationCategories
         patch.launchAtLogin = launchAtLogin
-        patch.telemetryEnabled = telemetryEnabled
         patch.lifetimeRules = lifetimeRules
         let base = try Configuration()
         return try base.applying(patch)

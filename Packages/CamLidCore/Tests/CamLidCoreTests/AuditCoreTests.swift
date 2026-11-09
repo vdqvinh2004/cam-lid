@@ -238,7 +238,8 @@ struct AuditDecodeValidationTests {
                     field: "batteryFloorPercent", value: 0, allowed: "10...50"))
         }
         // The same holds for a JSON-decoded Configuration: decoding succeeds
-        // (synthesis is unchanged) but validation rejects the payload.
+        // (synthesis is unchanged) but validation rejects the payload. The payload still carries a
+        // telemetryEnabled key from before that setting was removed: an old preferences file must still decode.
         let payload = """
             {"mode":"off","closedLidOptIn":false,"completionDelayMinutes":2,\
             "waitRetentionMinutes":5,"batteryFloorPercent":0,"chargingOnly":true,\

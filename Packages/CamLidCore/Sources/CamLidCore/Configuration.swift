@@ -31,7 +31,6 @@ public struct Configuration: Sendable, Codable, Equatable {
     public var notificationCategories: [NotificationCategory]?
     /// Missing for older preference files means no lifetime rules.
     public var lifetimeRules: [LifetimeRule]?
-    public var telemetryEnabled: Bool
     /// Missing for older preference files means Standard.
     public var powerMode: PowerMode
 
@@ -54,7 +53,6 @@ public struct Configuration: Sendable, Codable, Equatable {
         launchAtLogin: Bool = false,
         notificationCategories: [NotificationCategory]? = nil,
         lifetimeRules: [LifetimeRule]? = nil,
-        telemetryEnabled: Bool = false,
         powerMode: PowerMode = .standard
     ) throws(ConfigError) {
         self.mode = mode
@@ -75,7 +73,6 @@ public struct Configuration: Sendable, Codable, Equatable {
         self.launchAtLogin = launchAtLogin
         self.notificationCategories = notificationCategories
         self.lifetimeRules = lifetimeRules
-        self.telemetryEnabled = telemetryEnabled
         self.powerMode = powerMode
         try validate()
     }
@@ -134,7 +131,6 @@ public struct Configuration: Sendable, Codable, Equatable {
         if let value = patch.launchAtLogin { next.launchAtLogin = value }
         if let value = patch.notificationCategories { next.notificationCategories = value }
         if let value = patch.lifetimeRules { next.lifetimeRules = value }
-        if let value = patch.telemetryEnabled { next.telemetryEnabled = value }
         if let value = patch.powerMode { next.powerMode = value }
         try next.validate()
         return next
@@ -185,7 +181,6 @@ public struct Configuration: Sendable, Codable, Equatable {
         if let rules = dictionary["lifetimeRules"] {
             next.lifetimeRules = try ConfigPatch(jsonDictionary: ["lifetimeRules": rules]).lifetimeRules
         }
-        if let value = dictionary["telemetryEnabled"] as? Bool { next.telemetryEnabled = value }
         if let value = dictionary["orcaMetadataConsent"] as? Bool { next.orcaMetadataConsent = value }
         if let value = (dictionary["powerMode"] as? String).flatMap(PowerMode.init(rawValue:)) { next.powerMode = value }
         // Never silently arm after upgrade, regardless of stored values.
@@ -220,7 +215,7 @@ public struct Configuration: Sendable, Codable, Equatable {
         case mode, closedLidOptIn, completionDelayMinutes, waitRetentionMinutes
         case batteryFloorPercent, chargingOnly, batteryModeAllowed, batteryEntryPercent, batteryCapMinutes
         case runCapMinutes, timerMinutes, cpuStopEnabled, allowDisplaySleep, adapterEnrollment
-        case orcaMetadataConsent, launchAtLogin, notificationCategories, lifetimeRules, telemetryEnabled, powerMode
+        case orcaMetadataConsent, launchAtLogin, notificationCategories, lifetimeRules, powerMode
     }
 
     public init(from decoder: Decoder) throws {
@@ -243,7 +238,6 @@ public struct Configuration: Sendable, Codable, Equatable {
         launchAtLogin = try values.decode(Bool.self, forKey: .launchAtLogin)
         notificationCategories = try values.decodeIfPresent([NotificationCategory].self, forKey: .notificationCategories)
         lifetimeRules = try values.decodeIfPresent([LifetimeRule].self, forKey: .lifetimeRules)
-        telemetryEnabled = try values.decode(Bool.self, forKey: .telemetryEnabled)
         powerMode = try values.decodeIfPresent(PowerMode.self, forKey: .powerMode) ?? .standard
     }
 }
@@ -258,7 +252,7 @@ private func unknownKeysRemoved(_ dictionary: [String: Any]) -> Set<String> {
     let known: Set<String> = [
         "mode", "closedLidOptIn", "completionDelayMinutes", "waitRetentionMinutes",
         "batteryFloorPercent", "chargingOnly", "batteryModeAllowed", "batteryEntryPercent", "batteryCapMinutes", "runCapMinutes", "timerMinutes", "cpuStopEnabled", "allowDisplaySleep",
-        "adapterEnrollment", "orcaMetadataConsent", "launchAtLogin", "notificationCategories", "lifetimeRules", "telemetryEnabled", "powerMode", "schemaVersion",
+        "adapterEnrollment", "orcaMetadataConsent", "launchAtLogin", "notificationCategories", "lifetimeRules", "powerMode", "schemaVersion",
     ]
     return Set(dictionary.keys).subtracting(known)
 }
@@ -282,7 +276,6 @@ public struct ConfigPatch: Codable, Sendable, Equatable {
     public var notificationCategories: [NotificationCategory]?
     public var lifetimeRules: [LifetimeRule]?
     public var launchAtLogin: Bool?
-    public var telemetryEnabled: Bool?
     public var powerMode: PowerMode?
 
     public init() {}
@@ -392,10 +385,6 @@ public struct ConfigPatch: Codable, Sendable, Equatable {
         if let raw = jsonDictionary["launchAtLogin"] {
             guard let number = raw as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID(), let value = raw as? Bool else { throw .invalidType(key: "launchAtLogin") }
             self.launchAtLogin = value
-        }
-        if let raw = jsonDictionary["telemetryEnabled"] {
-            guard let number = raw as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID(), let value = raw as? Bool else { throw .invalidType(key: "telemetryEnabled") }
-            self.telemetryEnabled = value
         }
     }
 }
