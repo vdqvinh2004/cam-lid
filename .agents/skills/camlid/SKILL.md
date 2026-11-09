@@ -38,8 +38,10 @@ Example: `camlid run -- make test`
 ## 4. Diagnose
 
     camlid diagnose --json
+    camlid helper status --json
 
-Use it to explain why the Mac is awake. Read `protection`, `activeSessionMode` and `errors`.
+Use `diagnose` to explain why the Mac is awake. Read `protection`, `activeSessionMode` and `errors`. Use `helper status`
+for the closed-lid helper: only `status` = `installed` means it is ready. Otherwise tell the user; do not install it yourself.
 
 ## Rules
 

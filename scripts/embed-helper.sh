@@ -39,6 +39,9 @@ sign --options runtime --identifier com.camlid.power-helper "$DEST/camlid-power-
 mkdir -p "${APP}/Contents/Helpers"
 cp "$CLI_SCRATCH/$CONFIG/camlid" "${APP}/Contents/Helpers/camlid"
 sign --options runtime --identifier com.camlid.cli "${APP}/Contents/Helpers/camlid"
+# The agent skill ships inside the app, so the Settings button also works for a downloaded build (spec 022).
+mkdir -p "${APP}/Contents/Resources"
+cp "${SRCROOT}/.agents/skills/camlid/SKILL.md" "${APP}/Contents/Resources/SKILL.md"
 # Only a Debug build needs the library-validation exception (Xcode's debug dylib carries another ad-hoc signature);
 # a Release app has no nested code, so it is signed with no entitlements at all.
 if [ "${CONFIGURATION:-Debug}" = "Debug" ]; then

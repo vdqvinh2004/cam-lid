@@ -30,6 +30,8 @@ struct UtilityUIState: Codable, Sendable {
     var systemBuild = ""
     var keepAwakeApps: [KeepAwakeApp] = []
     var capabilityText = ""
+    var automaticUpdateChecks = false
+    var agentSkillFolder: String?
 }
 enum UtilityUICommand: Codable, Sendable {
     case show(UtilitySurface, UtilityUIState)
@@ -42,6 +44,7 @@ enum UtilityUICommand: Codable, Sendable {
     case historyLoading(UUID)
     case history(UUID, [StoredTransition], error: String?, outcome: String?)
     case onboardingResult(UUID, Bool)
+    case agentSkillResult(AgentSkillOutcome)
 }
 enum UtilityUIEvent: Codable, Sendable {
     case visibility(dashboard: Bool, settings: Bool)
@@ -68,6 +71,8 @@ case settings(SettingsSection)
     case setUntestedAcknowledgement(Bool)
     case authorizeAccessibility, refreshPermissions
     case openPermissionSettings(AppPermission)
+    case setAutomaticUpdateChecks(Bool)
+    case agentSkill(AgentSkillRequest)
 }
 
 /// Anonymous pipes are accessible only to this parent and its owned child.

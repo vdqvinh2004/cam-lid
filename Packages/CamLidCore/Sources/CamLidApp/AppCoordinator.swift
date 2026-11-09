@@ -117,9 +117,12 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     private var utilityUI: UtilityUIProcess?
     private var activityOutcome: String?
-    private lazy var updates = UpdateController(safety: { [weak self] in
+    private lazy var updates = UpdateController(defaults: preferences, safety: { [weak self] in
         guard let self else { var state = UpdateSafetyContext(); state.recoveryRequired = true; return state }
         return self.updateSafetyContext()
+    })
+    private lazy var agentSkill = AgentSkillInstaller(defaults: preferences, bundled: {
+        Bundle.main.url(forResource: "SKILL", withExtension: "md").flatMap { try? Data(contentsOf: $0) }
     })
     private var refusalNotice: String?
     private var authorityUnavailable = false
@@ -941,7 +944,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             helperState: helper.state, helperMessage: helper.message, helperBusy: helper.busy,
             closedLidPermit: closedLidPermit().statusCode, strictTested: strictRow != nil,
             systemModel: systemIdentity().model ?? "unknown", systemBuild: systemIdentity().osBuild ?? "unknown",
-            keepAwakeApps: helper.keepAwakeApps, capabilityText: closedLidCapabilityText)
+            keepAwakeApps: helper.keepAwakeApps, capabilityText: closedLidCapabilityText,
+            automaticUpdateChecks: updates.automaticChecks, agentSkillFolder: agentSkill.installedFolder)
     }
     private func showUtility(_ surface: UtilitySurface) {
         if surface == .settings { loginItem.refresh(); Task { await outcomeNotifications.refresh() } }
@@ -1017,6 +1021,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case .onboarding: showOnboarding()
         case .updates: menuBarOpenUpdates()
         case .checkUpdates: updates.check(); refresh()
+        case .setAutomaticUpdateChecks(let on): updates.setAutomaticChecks(on); refresh()
+        case .agentSkill(let request):
+            utilityUI?.send(.agentSkillResult(agentSkill.perform(request)))
+            refresh()
         case .notice(let message): refusalNotice = message; refresh()
         case .restoreStatusFocus: menuBar.restoreFocusToStatusItem()
         case .quit:

@@ -75,6 +75,7 @@ verify() {
   [ ! -d "$1/Contents/Frameworks" ] || fail "unexpected nested frameworks"
   [ -x "$1/Contents/Library/LaunchServices/camlid-power-helper" ] || fail "helper missing"
   [ -x "$1/Contents/Helpers/camlid" ] || fail "command-line tool missing"
+  cmp -s "$1/Contents/Resources/SKILL.md" .agents/skills/camlid/SKILL.md || fail "bundled agent skill differs from .agents/skills/camlid/SKILL.md"
   [ "$(lipo -archs "$1/Contents/Helpers/camlid")" = "arm64" ] || fail "command-line tool is not arm64 only"
   codesign -dvvv "$1/Contents/Helpers/camlid" 2>&1 | grep -q 'Identifier=com.camlid.cli' || fail "command-line tool identifier"
   [ "$(lipo -archs "$1/Contents/MacOS/CamLid")" = "arm64" ] || fail "not arm64 only"
@@ -132,6 +133,8 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
   is not verified.
 - **Sleep diagnostics.** CamLid's own power assertion is labelled "CamLid is active" and is not counted as another app.
 - **Agents.** Claude Code, Codex and OpenCode in a terminal are estimated from CPU activity. Orca is read from its CLI.
+- **Update check (new, off by default).** Settings › General can ask GitHub once a day whether a newer release exists. It never downloads or installs anything.
+- **Agent skill (new).** Settings › General › *Let AI agents use CamLid* writes one skill file into a project folder you choose. Turning it off removes that file unless you changed it.
 
 ### Known limits
 - **Tested on one Mac:** Mac17,3, macOS build 26A434, Apple silicon. On any other Mac or macOS build, closed-lid operation

@@ -295,6 +295,32 @@ private struct SettingsGeneralPane: View {
         } header: {
             Text("Notifications")
         }
+        Section {
+            Toggle("Check for new releases once a day", isOn: Binding(get: { editor.automaticUpdateChecks },
+                set: { editor.setAutomaticUpdateChecks($0) }))
+                .help("Ask GitHub once a day whether a newer release exists")
+                .accessibilityLabel("Check for new releases once a day")
+                .accessibilityIdentifier("camlid.settings.updateChecks")
+        } header: {
+            Text("Updates")
+        } footer: {
+            Text("Off by default. When on, CamLid asks GitHub’s public releases API once a day, with no account, cookies or system profile. It only tells you that a newer release exists; it never downloads or installs anything.")
+        }
+        Section {
+            Toggle("Let AI agents use CamLid", isOn: Binding(get: { editor.agentSkillFolder != nil },
+                set: { editor.onSetAgentSkill?($0) }))
+                .help("Write the CamLid skill file into a project folder you choose")
+                .accessibilityLabel("Let AI agents use CamLid")
+                .accessibilityIdentifier("camlid.settings.agentSkill")
+            if let folder = editor.agentSkillFolder {
+                Text("Installed in \(folder)/.agents/skills/camlid/SKILL.md")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(2).truncationMode(.middle)
+            }
+        } header: {
+            Text("AI agents")
+        } footer: {
+            Text("Off by default. When on, CamLid asks for a project folder and writes one file, .agents/skills/camlid/SKILL.md. Turning it off removes that file unless you have changed it. CamLid never writes it at launch.")
+        }
     }
 }
 

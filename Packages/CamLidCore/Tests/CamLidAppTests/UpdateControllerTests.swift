@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import CamLidApp
 
-@MainActor private final class ProbeStub: UpdateProbeDriver {
+@MainActor final class ProbeStub: UpdateProbeDriver {
     var checks = 0
     var failToStart = false
     var completion: (@MainActor (UpdateProbeOutcome) -> Void)?

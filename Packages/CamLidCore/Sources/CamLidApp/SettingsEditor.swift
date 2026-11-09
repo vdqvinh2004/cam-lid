@@ -78,6 +78,15 @@ public final class SettingsEditor: ObservableObject {
     public var onRefreshPermissions: (() -> Void)?
     public var onAuthorizeNotifications: (() -> Void)?
     public var onApplyLogin: (() -> Void)?
+    /// Specs 021 and 022: the persistent app owns these choices; the window only shows them and asks.
+    @Published public var automaticUpdateChecks = false
+    @Published public var agentSkillFolder: String?
+    public var onSetAutomaticUpdateChecks: ((Bool) -> Void)?
+    public var onSetAgentSkill: ((Bool) -> Void)?
+    public func setAutomaticUpdateChecks(_ on: Bool) {
+        automaticUpdateChecks = on
+        onSetAutomaticUpdateChecks?(on)
+    }
     private var original: SettingsDraft
     private var originalNumbers: [SettingsFieldError.Field: String]
     private var latest: (Configuration, Int)?
