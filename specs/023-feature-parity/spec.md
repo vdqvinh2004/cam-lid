@@ -1,6 +1,7 @@
 # Feature Specification: display option and copyable diagnostics
 
-**Status:** Decided 2026-11-09: D1–D4 accepted as recommended. In progress for v0.2. Tasks: [tasks.md](tasks.md).
+**Status:** Decided 2026-11-09: D1–D4 accepted as recommended. Implemented for v0.2 on 2026-11-09, not released, not
+committed. Open: the live checks in [tasks.md](tasks.md) (T034 and the parts marked partly).
 Comparison: [comparison.md](comparison.md).
 
 ## Context

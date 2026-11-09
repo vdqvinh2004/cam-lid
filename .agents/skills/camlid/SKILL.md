@@ -20,6 +20,7 @@ Read `effectiveState` and `activeSessionMode`. If the command fails because CamL
     camlid run -- <command> [arguments]
 
 - The Mac stays awake while the command runs. The exit code is the command's exit code.
+- `run` uses an Auto session. When the command ends, the Mac may stay awake a little longer while agents are still working, then it sleeps as usual.
 - If CamLid is not running, the exit code is 4 and the command does not run.
 
 Example: `camlid run -- make test`
