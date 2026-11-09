@@ -33,7 +33,7 @@ Pre-research and post-design review: **PASS for planning**; physical gates remai
 | Private/explainable | FR-004/009/021; bounded read-only collection, no argv/output capture, redacted exports |
 | Platform/delivery constraints | M1/M2 own backend; fan/charging excluded; M5/M6/M7 remain required |
 
-Lease guarantees are limited to healthy executor timing. Joint app/helper failure, OS hangs and foreign global setting conflicts retain [L01–L20 limitations](../../docs/planning/limitations.md).
+Lease guarantees are limited to healthy executor timing. Joint app/helper failure, OS hangs and foreign global setting conflicts retain L01–L20 limitations.
 
 ## Project Structure
 
@@ -88,4 +88,4 @@ No constitution exception or new third-party dependency proposed. Additional bou
 
 ## Implementation disposition — 2026-10-08
 
-[Evidence](../../docs/qa/awake-automation-report.md) records 31 of 43 tasks complete and 12 open. T030–031 remain partial pending an accepted sleep backend and requested/observed evidence; T041 remains open for keyboard-focus, hover, diagnostic loading/error, and full menu/icon coverage. US1 read-only MVP is implemented; US6/7 adapters and settings exist with native permission and signed login acceptance pending. T011–014 and T018–020 still depend on an accepted M1/M2 backend. No duplicate backend, helper, or arbitrary automation framework is introduced. Requirement checklists remain unchanged; integrated M8/M5/M6 acceptance is open.
+Evidence records 31 of 43 tasks complete and 12 open. T030–031 remain partial pending an accepted sleep backend and requested/observed evidence; T041 remains open for keyboard-focus, hover, diagnostic loading/error, and full menu/icon coverage. US1 read-only MVP is implemented; US6/7 adapters and settings exist with native permission and signed login acceptance pending. T011–014 and T018–020 still depend on an accepted M1/M2 backend. No duplicate backend, helper, or arbitrary automation framework is introduced. Requirement checklists remain unchanged; integrated M8/M5/M6 acceptance is open.

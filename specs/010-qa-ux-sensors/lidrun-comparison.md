@@ -41,4 +41,4 @@ CUA list_apps misreported LSUIElement PID=0; list_windows located actual LidRun 
 
 ## Baseline label clarification
 
-Any CamLid Settings AX observation containing section labels, checkbox detection or Save Changes describes the pre-M4b baseline. Current controls are recorded in [QA refinement evidence](../../docs/qa/qa-refinement-report.md). Unresolved LidRun native surfaces remain unresolved; no layout/design parity is inferred from CLI status.
+Any CamLid Settings AX observation containing section labels, checkbox detection or Save Changes describes the pre-M4b baseline. Current controls are recorded in QA refinement evidence. Unresolved LidRun native surfaces remain unresolved; no layout/design parity is inferred from CLI status.

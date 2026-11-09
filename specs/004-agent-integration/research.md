@@ -6,9 +6,9 @@
 copy every shared contract into every feature (drifting defaults); execute future work during
 planning (outside authorization). Scoped features reference single shared product/limitation sources.
 
-Inherited evidence: [research decisions](../../docs/planning/research-decisions.md),
-[power sources](../../docs/research/macos-power.md), [agent sources](../../docs/research/agent-detection.md),
-[UX investigation](../../docs/research/ui-ux.md). No new API/hardware behavior inferred by migration.
+Inherited evidence: research decisions,
+power sources, agent sources,
+UX investigation. No new API/hardware behavior inferred by migration.
 
 **Evidence still required**: Version-pinned provider/Orca event fixtures and installed-agent runs. L14–L16, L18; desktop attach remains unverified; remote/untracked detached work disclosed.
 M0 is documentation completion; all future implementation/physical/quality/user-test evidence

@@ -8,9 +8,9 @@
 **Status:** Design + offline model implemented (T002–T007); gated by **R0** (behavioural
 same-boot clear effectiveness, native, separate approval). No app integration, native power
 action, shipping-gate change or qualification is authorized by this document.
-**Input:** [Owner decision A — best-effort product track](../../docs/planning/closed-lid-product-path-2026-10-19.md);
-[best-effort proposal](../../docs/planning/closed-lid-best-effort-proposal-2026-10-18.md) §5/§7C;
-[v9 lab evidence](../../docs/qa/best-effort-v9-increment-2026-10-19.md).
+**Input:** Owner decision A — best-effort product track;
+best-effort proposal §5/§7C;
+v9 lab evidence.
 
 ## User Scenarios & Testing
 

@@ -9,7 +9,7 @@ helper command, no power action, no install and no app integration.
 
 - [012 spec](../012-closed-lid-best-effort/spec.md) and
   [012 plan](../012-closed-lid-best-effort/plan.md).
-- [Closed-lid product path](../../docs/planning/closed-lid-product-path-2026-10-19.md).
+- Closed-lid product path.
 - `LidSpecificMechanism.swift`, `LeasePowerMechanism.swift`, `PowerLeaseService.swift`,
   `NativeHelperEnvironment.swift`.
 - `BestEffortProductModel.swift` and its fake tests.

@@ -96,7 +96,7 @@ Changed source still requires new matched-role identities/review and separately 
 ## Third-person observation reaffirmed — 2026-10-13
 
 Owner corrected the recent Codex bridge direction: CamLid is an outside observer, not an agent
-participant. [Binding scope and migration limits](../../docs/planning/third-person-agent-observation-2026-10-13.md)
+participant. Binding scope and migration limits
 reaffirm README/passive-supervision requirements already present. Older producer integration,
 installation and wrapper plans are superseded, not acceptance prerequisites. Archived bridge
 experiments retain actual verdicts but MUST NOT qualify passive product detection.

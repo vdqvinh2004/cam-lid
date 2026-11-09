@@ -140,7 +140,7 @@ clean-checkout/handoff gaps without authorizing T501/T502.
   existing destination/loaded job, validate ACL/role/signature/source inputs, publish exclusively
   without overwrite, report partial uncertainty, and test the root path with fakes/owned temps
   only. Packet prepared; owner subsequently approved and returned successful auth-only
-  install/bootstrap/one-inspect receipts. No native power action or G2 approval follows. Evidence: [auth-only packet](../../docs/qa/m9-lock-only-install-packet-2026-10-21.md).
+  install/bootstrap/one-inspect receipts. No native power action or G2 approval follows. Evidence: auth-only packet.
 
 ## Phase 5 — Native/G3 handoff (blocked; separate approvals)
 
@@ -150,7 +150,7 @@ clean-checkout/handoff gaps without authorizing T501/T502.
   state. *PASS with operator attestation:* separately approved retry `b81e0919a`
   acquired the frozen M9 helper, observed foreign-policy recovery without clearing the foreign
   flag, then fresh final recovery after operator cleanup. Evidence:
-  [row result](../../docs/qa/g2-m9-foreign-policy-result-2026-10-21.md). Owner reported reboot;
+  row result. Owner reported reboot;
   independent boot metadata confirms a new boot. The owner selected “Đúng, không có sai lệch”,
   confirming cue timing, AC/open-lid attendance and no unexpected Sleep/wake/anomaly.
   Driver disarmed; latch preserved, no further retry authority.
@@ -179,7 +179,7 @@ are outside M9.
 ## Completion Record — 2026-10-20
 
 Offline exit gate met at the model/helper/test level. Evidence:
-[offline QA note](../../docs/qa/m9-closed-lid-hardening-offline-2026-10-20.md).
+offline QA note.
 
 - Helper package: 49 tests / 5 suites pass in Debug and Release.
 - Best-effort package: 62 tests / 2 suites pass in Debug and Release.
@@ -199,7 +199,7 @@ restoration remain unqualified.
 
 ### Reproducibility completion — 2026-10-21
 
-T601–T604 complete; [handoff and exact evidence](../../docs/qa/reproducible-m9-handoff-2026-10-21.md).
+T601–T604 complete; handoff and exact evidence.
 Full Preview Swift Debug/Release (519 declarations/config, four explicit skips), both Xcode
 builds, actual CLI integration and packaging/read-only preflight pass. Final helper 49 and
 best-effort 62 tests pass per configuration; 25 fake hardware Python tests pass, including
@@ -213,7 +213,7 @@ and no journal was deleted. The one positive inspect reports `ready/noPendingInt
 mutation or lease. Independent read-only disk hashing matches the frozen helper. Post-install
 G2 metadata guidance/strict CLI-entry regressions bring the fake hardware suite to 47 tests.
 Those offline/auth-only checks performed no native power action. A later separately approved
-retry produced the [foreign-policy driver row PASS](../../docs/qa/g2-m9-foreign-policy-result-2026-10-21.md),
+retry produced the foreign-policy driver row PASS,
 with explicit operator attestation. Owner reboot is confirmed by a new boot ID. Driver is
 disarmed; latch retained, no repeat or reset authority. T501 complete, T502 remains
 blocked and all overall native/shipping qualification flags remain unchanged.

@@ -38,7 +38,7 @@ Replace generic “unavailable” with a concise capability row and blocker-spec
 
 Current preview supersession by user feedback: Safety shows Preview only and one sentence explaining that this build cannot keep the Mac awake or prevent lid-close sleep. Remove redundant engineering blocker/closed-lid preference disclosure. Preserve AC/battery/session/waiting/CPU controls and ventilation guidance. CLI readiness evidence remains available; no backend is enabled by this presentation change.
 
-Further dashboard feedback: working-provider rows use provider mark/name and icon/count, omitting redundant Active/positive summary. Duration and Activity use icons with native help/accessibility names; preserve important mode/Start/Stop/state/capability text. Omit only the redundant Ready-to-start subtitle. [Current icon UI/provenance/mode explanation](../../../docs/qa/icon-ui-2026-10-07.md). Timed/Manual behavior remains finite and unchanged; no infinite timer implemented.
+Further dashboard feedback: working-provider rows use provider mark/name and icon/count, omitting redundant Active/positive summary. Duration and Activity use icons with native help/accessibility names; preserve important mode/Start/Stop/state/capability text. Omit only the redundant Ready-to-start subtitle. Current icon UI/provenance/mode explanation. Timed/Manual behavior remains finite and unchanged; no infinite timer implemented.
 
 M1 selects backend only after physical evidence. This feature adds readiness presentation and acceptance integration, not an alternative shortcut around that gate. Do not issue LidRun start/stop/sleep/fan commands from badge/settings flows or take ownership of its helper.
 
@@ -58,4 +58,4 @@ Welcome has three read-only pages: purpose/capability, current agent observation
 
 Activity keeps search/Clear and Type/Reason/action rows at the top for populated, empty, no-match, loading and failure states. Reads have request IDs; ignore late/duplicate replies. Refresh retains rows and expansion/filter state, marks stale data on failure, offers Retry, and does not raise a background window. Export/delete require confirmed available records. Human reasons and state precede selectable raw codes.
 
-Updates is presented in the same owned transient UI helper as other surfaces. Parent UpdateController retains check/Sparkle authority and deferral guards. No installation action exists. Closing the last surface releases the helper. [Implementation evidence](../../../docs/qa/uiux-implementation-2026-10-07.md) records scoped passes and remaining matrix rows; no full milestone gate is implied.
+Updates is presented in the same owned transient UI helper as other surfaces. Parent UpdateController retains check/Sparkle authority and deferral guards. No installation action exists. Closing the last surface releases the helper. Implementation evidence records scoped passes and remaining matrix rows; no full milestone gate is implied.

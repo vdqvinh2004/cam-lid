@@ -11,8 +11,8 @@ complete; 22/23 current tasks checked. T501's native foreign-policy row PASS inc
 operator attestation; T502 remains blocked. The owner completed the separately approved
 auth-only install/inspect and native retry. No app integration, entitlement change or
 shipping-gate change was performed. This is not a qualification. Evidence:
-[offline QA note](../../docs/qa/m9-closed-lid-hardening-offline-2026-10-20.md).
-**Input:** Owner request following the LidRun REA review; [closed-lid product path](../../docs/planning/closed-lid-product-path-2026-10-19.md);
+offline QA note.
+**Input:** Owner request following the LidRun REA review; closed-lid product path;
 [012 spec](../012-closed-lid-best-effort/spec.md); [012 plan](../012-closed-lid-best-effort/plan.md).
 
 ## Reproducibility follow-up — 2026-10-21
@@ -22,7 +22,7 @@ cover committed regression fixtures, new candidate identity/staging, read-only Q
 fake G2 harness tests and allowlisted root-journal inspection preparation. These do not change
 FR-013's helper policy, actuator or shipping contract. T501 now has a row PASS
 with operator attestation; full G2/G3 remain incomplete. The earlier
-16/18 count describes the original task set. [Current evidence/handoff](../../docs/qa/reproducible-m9-handoff-2026-10-21.md).
+16/18 count describes the original task set. Current evidence/handoff.
 
 ## User Scenarios & Testing
 

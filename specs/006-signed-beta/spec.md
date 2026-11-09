@@ -4,7 +4,7 @@
 **Created**: 2026-10-04
 **Status**: Superseded 2026-11-03 by [ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md): no Developer ID, no notarization and no Sparkle; releases are ad-hoc signed zips on GitHub built by `scripts/release.sh`. History below is kept.
 **Input**: CamLid milestone M5: Sparkle update integration, signing/notarization, helper lifecycle, migrations and supported build revalidation. One scoped feature folder per user instruction.
-**Prerequisites**: M2, M3, M4, M4a. [Roadmap](../../docs/planning/roadmap.md).
+**Prerequisites**: M2, M3, M4, M4a. Roadmap.
 **Scope**: Sparkle update integration, signing/notarization, helper lifecycle, migrations and supported build revalidation.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -35,21 +35,21 @@ User or reviewer obtains verified milestone outcome: Fresh signed/notarized inst
 
 ### Edge Cases
 L07–L12, L17, L19; OS/helper change invalidates unsupported closed-lid capability. Failed prerequisites, unsupported versions, absent evidence and accidental
-simulation-as-hardware claims must remain visible. [Limitations](../../docs/planning/limitations.md).
+simulation-as-hardware claims must remain visible. Limitations.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 Stable FR identifiers refer to shared product requirements, not a second set of product defaults.
 Scope statements below narrow delivery ownership; complete invariants/values remain authoritative
-in [product specification](../../docs/planning/product-spec.md).
+in product specification.
 
-- **FR-013**: Deliver scoped behavior for [product FR-013](../../docs/planning/product-spec.md#functional-requirements): Release owned resources and verify restoration with failure-class timing. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-019**: Deliver scoped behavior for [product FR-019](../../docs/planning/product-spec.md#functional-requirements): Provide trusted signed update checks and defer installation during protected work. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-013**: Deliver scoped behavior for product FR-013: Release owned resources and verify restoration with failure-class timing. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-019**: Deliver scoped behavior for product FR-019: Provide trusted signed update checks and defer installation during protected work. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
 
 ### Key Entities
 Relevant evidence/state follows [data-model.md](data-model.md); shared runtime definitions
-remain in [domain model](../../docs/planning/domain-model.md).
+remain in domain model.
 
 ## Success Criteria *(mandatory)*
 

@@ -6,7 +6,7 @@ Requests: inspectCapabilities, acquireLease, renewLease, releaseLease, inspectRe
 No command string, arbitrary file path, arbitrary pmset key, or sensor spoofing accepted.
 
 Lease renewal every 10 seconds; deadline ≤30 seconds after last accepted renewal.
-[limitations.md](../../../docs/planning/limitations.md) defines failure classes: healthy executor starts release
+limitations.md defines failure classes: healthy executor starts release
 within 2 seconds of expiry detection, verified restoration target ≤35 seconds from last renewal;
 helper crash/hang/restart or OS/power-service failures have no inherited deadline guarantee. Helper validates session epoch, cap, approved
 policy limits and independently performs required health enforcement or expires on monitor loss.

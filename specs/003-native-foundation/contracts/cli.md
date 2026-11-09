@@ -69,7 +69,7 @@ admission and settles settings/history before stopping the transport; forced
 quit explicitly reports unconfirmed pending writes.
 
 Recovery/timing fields follow [power helper](power-helper.md) and
-[shared limitations](../../../docs/planning/limitations.md); the 30-second
+shared limitations; the 30-second
 lease deadline is never printed as guaranteed cleanup after helper/OS failure. recover returns
 verified/conflict/unknown/error with evidence and exit code 5 for unresolved recovery, 3 for
 unauthorized/conflicting application. Normal policy commands still require running app;

@@ -6,7 +6,7 @@
 **Created**: 2026-10-04
 **Status**: Planned; blocked on M1 PASS
 **Input**: CamLid milestone M2: Native targets, shared policy/entities/configuration, telemetry, conditional power/recovery helper, CLI/simulator. One scoped feature folder per user instruction.
-**Prerequisites**: M1. [Roadmap](../../docs/planning/roadmap.md).
+**Prerequisites**: M1. Roadmap.
 **Scope**: Native targets, shared policy/entities/configuration, telemetry, conditional power/recovery helper, CLI/simulator.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -49,47 +49,47 @@ User or reviewer obtains verified milestone outcome: CLI config/status use app p
 
 ### Edge Cases
 L02–L09, L11–L14, L16–L19; OS/joint failures remain residual. Failed prerequisites, unsupported versions, absent evidence and accidental
-simulation-as-hardware claims must remain visible. [Limitations](../../docs/planning/limitations.md).
+simulation-as-hardware claims must remain visible. Limitations.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 Stable FR identifiers refer to shared product requirements, not a second set of product defaults.
 Scope statements below narrow delivery ownership; complete invariants/values remain authoritative
-in [product specification](../../docs/planning/product-spec.md).
+in product specification.
 
-- **FR-001**: Deliver scoped behavior for [product FR-001](../../docs/planning/product-spec.md#functional-requirements): Provide native menu bar lifecycle and dashboard/options/settings interactions. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-002**: Deliver scoped behavior for [product FR-002](../../docs/planning/product-spec.md#functional-requirements): Keep requested mode separate from effective protection; safety overrides every mode. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-003**: Deliver scoped behavior for [product FR-003](../../docs/planning/product-spec.md#functional-requirements): Establish task continuity with lid closed and internal display asleep on verified combinations. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-004**: Deliver scoped behavior for [product FR-004](../../docs/planning/product-spec.md#functional-requirements): Apply configurable completion grace and cancel it on fresh work. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-005**: Deliver scoped behavior for [product FR-005](../../docs/planning/product-spec.md#functional-requirements): Restore owned state before closed-lid sleep request; distinguish requested, observed and blocked sleep. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-007**: Deliver scoped behavior for [product FR-007](../../docs/planning/product-spec.md#functional-requirements): Track run identity, activity states, concurrent enrolled tasks and evidence-backed children. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-008**: Deliver scoped behavior for [product FR-008](../../docs/planning/product-spec.md#functional-requirements): Bound waiting/unknown retention; process discovery alone cannot arm Auto. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-009**: Deliver scoped behavior for [product FR-009](../../docs/planning/product-spec.md#functional-requirements): Enforce battery floor/AC policy and bounded stop on missing safety data. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-010**: Deliver scoped behavior for [product FR-010](../../docs/planning/product-spec.md#functional-requirements): Apply thermal-pressure stop policy and explicit re-arm after safety stop. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-011**: Deliver scoped behavior for [product FR-011](../../docs/planning/product-spec.md#functional-requirements): Use normalized CPU advisory with optional stop; never infer task completion or thermal safety from CPU. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-012**: Deliver scoped behavior for [product FR-012](../../docs/planning/product-spec.md#functional-requirements): Enforce nonresetting runtime cap for every protection session. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-013**: Deliver scoped behavior for [product FR-013](../../docs/planning/product-spec.md#functional-requirements): Release owned resources and verify restoration with failure-class timing. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-014**: Deliver scoped behavior for [product FR-014](../../docs/planning/product-spec.md#functional-requirements): Expose effective reason, health/freshness, agent confidence, deadlines and cleanup outcome. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-015**: Deliver scoped behavior for [product FR-015](../../docs/planning/product-spec.md#functional-requirements): Validate preferences and preserve opt-in provider configuration with preview/removal. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-017**: Deliver scoped behavior for [product FR-017](../../docs/planning/product-spec.md#functional-requirements): Expose shared-policy inspection/configuration/simulation and enrolled command CLI. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-020**: Deliver scoped behavior for [product FR-020](../../docs/planning/product-spec.md#functional-requirements): Require AI contract/recovery/security/performance/native UI and physical evidence before user trials. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-021**: Deliver scoped behavior for [product FR-021](../../docs/planning/product-spec.md#functional-requirements): Refuse unsupported/uncertain closed-lid behavior; disclose safety and unsaved-work limits. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-022**: Deliver scoped behavior for [product FR-022](../../docs/planning/product-spec.md#functional-requirements): Separate lease deadlines from restoration and helper/OS failure guarantees. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-023**: Deliver scoped behavior for [product FR-023](../../docs/planning/product-spec.md#functional-requirements): Prefer compatible OS expiration; persistent backend needs independent single-helper-failure recovery and valid ownership. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-024**: Deliver scoped behavior for [product FR-024](../../docs/planning/product-spec.md#functional-requirements): Revalidate changed OS/model/backend/helper protocol before closed-lid arming. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-025**: Deliver scoped behavior for [product FR-025](../../docs/planning/product-spec.md#functional-requirements): Handle storage/journal/load faults, reject excess enrollment and preserve control/safety servicing. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
-- **FR-026**: Deliver scoped behavior for [product FR-026](../../docs/planning/product-spec.md#functional-requirements): Allow authenticated owned-only recovery when app policy is unavailable; never guess unknown original state. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-001**: Deliver scoped behavior for product FR-001: Provide native menu bar lifecycle and dashboard/options/settings interactions. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-002**: Deliver scoped behavior for product FR-002: Keep requested mode separate from effective protection; safety overrides every mode. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-003**: Deliver scoped behavior for product FR-003: Establish task continuity with lid closed and internal display asleep on verified combinations. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-004**: Deliver scoped behavior for product FR-004: Apply configurable completion grace and cancel it on fresh work. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-005**: Deliver scoped behavior for product FR-005: Restore owned state before closed-lid sleep request; distinguish requested, observed and blocked sleep. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-007**: Deliver scoped behavior for product FR-007: Track run identity, activity states, concurrent enrolled tasks and evidence-backed children. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-008**: Deliver scoped behavior for product FR-008: Bound waiting/unknown retention; process discovery alone cannot arm Auto. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-009**: Deliver scoped behavior for product FR-009: Enforce battery floor/AC policy and bounded stop on missing safety data. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-010**: Deliver scoped behavior for product FR-010: Apply thermal-pressure stop policy and explicit re-arm after safety stop. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-011**: Deliver scoped behavior for product FR-011: Use normalized CPU advisory with optional stop; never infer task completion or thermal safety from CPU. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-012**: Deliver scoped behavior for product FR-012: Enforce nonresetting runtime cap for every protection session. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-013**: Deliver scoped behavior for product FR-013: Release owned resources and verify restoration with failure-class timing. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-014**: Deliver scoped behavior for product FR-014: Expose effective reason, health/freshness, agent confidence, deadlines and cleanup outcome. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-015**: Deliver scoped behavior for product FR-015: Validate preferences and preserve opt-in provider configuration with preview/removal. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-017**: Deliver scoped behavior for product FR-017: Expose shared-policy inspection/configuration/simulation and enrolled command CLI. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-020**: Deliver scoped behavior for product FR-020: Require AI contract/recovery/security/performance/native UI and physical evidence before user trials. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-021**: Deliver scoped behavior for product FR-021: Refuse unsupported/uncertain closed-lid behavior; disclose safety and unsaved-work limits. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-022**: Deliver scoped behavior for product FR-022: Separate lease deadlines from restoration and helper/OS failure guarantees. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-023**: Deliver scoped behavior for product FR-023: Prefer compatible OS expiration; persistent backend needs independent single-helper-failure recovery and valid ownership. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-024**: Deliver scoped behavior for product FR-024: Revalidate changed OS/model/backend/helper protocol before closed-lid arming. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-025**: Deliver scoped behavior for product FR-025: Handle storage/journal/load faults, reject excess enrollment and preserve control/safety servicing. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
+- **FR-026**: Deliver scoped behavior for product FR-026: Allow authenticated owned-only recovery when app policy is unavailable; never guess unknown original state. Full numeric invariants remain in product source; delivery limited to stated milestone scope.
 
 ### Key Entities
 Relevant evidence/state follows [data-model.md](data-model.md); shared runtime definitions
-remain in [domain model](../../docs/planning/domain-model.md).
+remain in domain model.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
-- **SC-001**: Milestone evidence MUST establish [product SC-001](../../docs/planning/product-spec.md#measurable-outcomes) within its scope; downstream/integrated checks remain explicitly deferred.
-- **SC-002**: Milestone evidence MUST establish [product SC-002](../../docs/planning/product-spec.md#measurable-outcomes) within its scope; downstream/integrated checks remain explicitly deferred.
+- **SC-001**: Milestone evidence MUST establish product SC-001 within its scope; downstream/integrated checks remain explicitly deferred.
+- **SC-002**: Milestone evidence MUST establish product SC-002 within its scope; downstream/integrated checks remain explicitly deferred.
 
 **Milestone exit gate**: Safety, journal, recovery and CLI foundation verified; no unsafe live protection; full native dashboard parity deferred to M6.
 

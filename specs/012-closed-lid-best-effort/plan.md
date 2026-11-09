@@ -5,8 +5,8 @@
 
 **Feature context:** `012-closed-lid-best-effort`
 **Status:** Design only. Offline work may proceed; R0 and every native/integration step need
-separate approvals. See [decision memo](../../docs/planning/closed-lid-product-path-2026-10-19.md).
-**Scope source:** [spec.md](spec.md); [proposal](../../docs/planning/closed-lid-best-effort-proposal-2026-10-18.md) §5/§7C.
+separate approvals. See decision memo.
+**Scope source:** [spec.md](spec.md); proposal §5/§7C.
 
 ## 1. Technical context
 
@@ -178,7 +178,7 @@ kernel hangs.
 and [`observe-r0-post-cleanup-sleep.py`](../../Tests/Hardware/observe-r0-post-cleanup-sleep.py)
 (post-cleanup observer). A future attempt needs a new pinned reset packet and a new explicit
 one-use approval. Steps, operator actions and approval text are in the
-[R0 runbook](../../docs/qa/r0-behavioural-clear-runbook-2026-10-19.md).
+R0 runbook.
 
 **Attempt #1 (2026-10-19):** `R0_POST_CLEANUP_SLEEP_OBSERVED` on boot `1002AE9A-…` — the
 first post-cleanup lid close produced `Clamshell Sleep`; the property read `false` after the
@@ -215,7 +215,7 @@ and [`r0-owner-acceptance-2026-10-20.md`](../../docs/qa/r0-owner-acceptance-2026
   Invalid/incomplete procedures do not count as PASS and never authorize automatic retry.
   This policy decision is not native episode authority; wake/cue/window timing and each
   one-use live scope still need separate review/approval. The current
-  [offline timing/evidence packet](../../docs/qa/m9-manual-sleep-timing-draft-2026-10-21.md)
+  offline timing/evidence packet
   keeps qualification false and records the separately approved passive grammar snapshot.
 - Closed-lid continuity: sustained attended sessions with independent progress; no seconds-long
   claim; display behaviour within the current continuity-first scope.

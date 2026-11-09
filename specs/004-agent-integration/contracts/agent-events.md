@@ -3,7 +3,7 @@
 Normalized event: schemaVersion, provider, host optional, sessionID, runID, parentRunID optional,
 sequence, kind (runStarted/working/waitingForUser/idle/completed/failed/heartbeat), sourceTime,
 PID/startTime optional, evidenceKind, confidence. No prompt, tool args, transcript, environment,
-raw command line, or workspace text payload accepted. Limits/validation: [shared domain model](../../../docs/planning/domain-model.md).
+raw command line, or workspace text payload accepted. Limits/validation: shared domain model.
 
 Only authenticated same-user integrations enter ingestion. Client-authentication verifies sender,
 not truth of user-supplied activity; events cannot alter safety policy. Provider adapters map

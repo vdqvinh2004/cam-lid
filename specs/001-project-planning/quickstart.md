@@ -4,7 +4,7 @@
 exist yet. Future commands and test paths are proposed until scoped implementation occurs.
 
 1. Verify prerequisites: None; review their recorded gate evidence.
-2. Read [spec](spec.md), [plan](plan.md), [tasks](tasks.md), shared [limitations](../../docs/planning/limitations.md).
+2. Read [spec](spec.md), [plan](plan.md), [tasks](tasks.md), shared limitations.
 3. Execute authorized scoped work only after prerequisites. Validation: All required planning documents resolve, no unresolved template fields, no app implementation.
 4. Check independent story outcomes in spec.md; record expected/actual, source, environment and
    failure-class timing. No simulator result establishes lid/display behavior.

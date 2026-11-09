@@ -3,13 +3,13 @@
 **Current availability**: Native preview Updates window, CLI update status and local packaging audit/archive tool. Information-only check remains unavailable without signed release metadata.
 
 1. Verify prerequisites: M2, M3, M4; review their recorded gate evidence.
-2. Read [spec](spec.md), [plan](plan.md), [tasks](tasks.md), shared [limitations](../../docs/planning/limitations.md).
+2. Read [spec](spec.md), [plan](plan.md), [tasks](tasks.md), shared limitations.
 3. Execute authorized scoped work only after prerequisites. Validation: Signed candidate install/upgrade/remove and update trust tests on supported rows.
 4. Check independent story outcomes in spec.md; record expected/actual, source, environment and
    failure-class timing. No simulator result establishes lid/display behavior.
 5. Exit only when Distribution trust and owned-state cleanup verified before external test; unresolved recovery prevents installer/removal success claims.
 
-Future CLI usage and supervised end-to-end sequence: [shared guide](../../docs/planning/end-to-end-validation.md).
+Future CLI usage and supervised end-to-end sequence: shared guide.
 Use explicit feature context from repository root when invoking Spec Kit:
 ```
 SPECIFY_FEATURE_DIRECTORY=specs/006-signed-beta rtk .specify/scripts/bash/check-prerequisites.sh --json --require-spec --require-tasks --include-tasks

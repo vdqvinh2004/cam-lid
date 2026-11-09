@@ -70,7 +70,7 @@ Current authorization permits scoped preview implementation and QA; external pub
 ## Runtime refinement evidence (2026-10-05)
 
 - T009 partial: battery/thermal/normalized CPU/built-in display are live and read-only; lid stays unknown pending qualified collector/physical evidence.
-- T014 partial: bounded same-user framing/event enrollment and incomplete-peer/handler/export saturation regressions exist; integrated flood, health starvation and durable storage-fault acceptance still required. The 2026-10-09 [backend readiness reassessment](../../docs/qa/backend-readiness.md) adds real CLI/coordinator transport refusal checks for active Auto/Timed Preview, protected child non-launch, blocked sleep, and preserved session/deadline/revision. These guard regressions do not close T014 or qualify a backend.
+- T014 partial: bounded same-user framing/event enrollment and incomplete-peer/handler/export saturation regressions exist; integrated flood, health starvation and durable storage-fault acceptance still required. The 2026-10-09 backend readiness reassessment adds real CLI/coordinator transport refusal checks for active Auto/Timed Preview, protected child non-launch, blocked sleep, and preserved session/deadline/revision. These guard regressions do not close T014 or qualify a backend.
 - T019 partial: in-memory journal corruption/crash-point tests exist; durable helper journal/full-disk/stalled-writer evidence is conditional on M1.
 - T023 partial: actual app config/status/events/history and CLI binary tests exist; protection start deliberately denied until backend verified.
 - T024 partial: dry-run/restorable/unresolved semantics tested; restricted helper transport and physical confirming restoration await M1/M5.

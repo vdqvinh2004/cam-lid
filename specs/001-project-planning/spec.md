@@ -4,7 +4,7 @@
 **Created**: 2026-10-04
 **Status**: Complete: documentation only
 **Input**: CamLid milestone M0: Research, governance, UX direction, milestone specifications and backlog. One scoped feature folder per user instruction.
-**Prerequisites**: None. [Roadmap](../../docs/planning/roadmap.md).
+**Prerequisites**: None. Roadmap.
 **Scope**: Research, governance, UX direction, milestone specifications and backlog.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -23,21 +23,21 @@ User or reviewer obtains verified milestone outcome: Review linked product, arch
 
 ### Edge Cases
 All L01–L20 retained as unresolved evidence or residual-risk decisions. Failed prerequisites, unsupported versions, absent evidence and accidental
-simulation-as-hardware claims must remain visible. [Limitations](../../docs/planning/limitations.md).
+simulation-as-hardware claims must remain visible. Limitations.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 Stable FR identifiers refer to shared product requirements, not a second set of product defaults.
 Scope statements below narrow delivery ownership; complete invariants/values remain authoritative
-in [product specification](../../docs/planning/product-spec.md).
+in product specification.
 
 - **DOC-001**: Planning MUST provide eight scoped milestone folders, shared governance and traceable task ownership.
 - **DOC-002**: Planning MUST preserve all 26 product requirements, 8 outcomes and L01–L20 without starting app implementation.
 
 ### Key Entities
 Relevant evidence/state follows [data-model.md](data-model.md); shared runtime definitions
-remain in [domain model](../../docs/planning/domain-model.md).
+remain in domain model.
 
 ## Success Criteria *(mandatory)*
 

@@ -9,17 +9,17 @@ T601–T605 reproducibility/install-packet follow-up complete 2026-10-21 (22/23 
 The owner completed the separately approved auth-only install/inspect and one native
 foreign-policy retry. Row PASS with operator attestation completes T501; T502 remains
 blocked. No app integration or shipping-gate change was performed. This is not a qualification. Evidence:
-[offline QA note](../../docs/qa/m9-closed-lid-hardening-offline-2026-10-20.md).
+offline QA note.
 **Spec:** [spec.md](spec.md)
 **Inputs:** [012 spec](../012-closed-lid-best-effort/spec.md),
 [012 plan](../012-closed-lid-best-effort/plan.md),
-[closed-lid product path](../../docs/planning/closed-lid-product-path-2026-10-19.md),
+closed-lid product path,
 LidRun REA report (external path `<local>/cam-lid-v2/reports/`; not copied into
 CamLid).
 
 ## Reproducibility follow-up — 2026-10-21
 
-[Current handoff](../../docs/qa/reproducible-m9-handoff-2026-10-21.md) and tasks T601–T604
+Current handoff and tasks T601–T604
 extend the original offline work with clean-checkout fixtures, complete Preview regression,
 fresh signed candidate staging, a read-only QA `--readiness` command and G2 harness tests.
 The original no-executable/installer-change statements below describe the original M9 increment;
@@ -28,7 +28,7 @@ packet, not helper actuation, app/product CLI or G2/G3 authority. Actual root ex
 later only under the separate auth-only owner approval; it does not count as native qualification. The owner now confirms the root state directory has only two safe lock files/no journal.
 A fresh auth-only install packet is prepared under T605; its separate root installation/bootstrap/
 one-inspect scope was subsequently approved and completed per owner-returned receipts. No old journal was removed; a later separately approved native retry is recorded in the
-[current row result](../../docs/qa/g2-m9-foreign-policy-result-2026-10-21.md). The old upgrade packet stays historical.
+current row result. The old upgrade packet stays historical.
 
 ## Summary
 

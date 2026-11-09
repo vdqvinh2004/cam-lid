@@ -1,6 +1,6 @@
 # LidRun vs CamLid — feature decisions
 
-Reviewed **2026-10-08**. Yes, earlier comparisons existed in [M4b](../010-qa-ux-sensors/lidrun-comparison.md) and [mode QA](../../docs/qa/mode-disclosure-lidrun-2026-10-07.md). This replaces their feature-gap baseline for M8 planning, not their historical test results.
+Reviewed **2026-10-08**. Yes, earlier comparisons existed in [M4b](../010-qa-ux-sensors/lidrun-comparison.md) and mode QA. This replaces their feature-gap baseline for M8 planning, not their historical test results.
 
 **Evidence boundary**: Installed LidRun CLI 1.2.25 was inspected using help, status and patterns only. No power, watch-list, notification or fan setting changed. Published features below are vendor claims, not independent physical verification. CamLid is still **Preview: no live power backend**. “Implemented” below means the named UI/policy/read-only function exists, not physical protection.
 
@@ -49,4 +49,4 @@ The biggest gap is real keep-awake, already owned by M1/M2. More controls do not
 - **L9**: [Installation](https://lidrun.com/guide/install): login option; actual registration behavior not tested.
 - **L10**: [Weekly report](https://lidrun.com/blog/weekly-mac-workstation-report): on-demand summary, not proof of scheduled reporting.
 
-Current CamLid baseline: [sleep diagnostics QA](../../docs/qa/sleep-diagnostics-2026-10-08.md), [mode behavior QA](../../docs/qa/mode-disclosure-lidrun-2026-10-07.md), and source review of Configuration, PowerController, RunCommand, AppCoordinator and Settings. These distinguish read-only/policy implementation from missing live backend.
+Current CamLid baseline: sleep diagnostics QA, mode behavior QA, and source review of Configuration, PowerController, RunCommand, AppCoordinator and Settings. These distinguish read-only/policy implementation from missing live backend.

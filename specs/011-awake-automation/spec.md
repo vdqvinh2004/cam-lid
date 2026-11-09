@@ -1,7 +1,7 @@
 # Feature Specification: M8 Awake Automation & Diagnostics
 
 **Feature context**: `011-awake-automation`; documentation only, no branch created.
-**Owner correction — 2026-10-13:** [Third-person agent observation](../../docs/planning/third-person-agent-observation-2026-10-13.md) overrides the older agent integration/launch-wrapper path in this milestone. CamLid must not participate in agent workflow or wrap/relaunch an agent to obtain lifecycle evidence. Passive exact lifetime rules are not working/completion evidence. Existing diagnostics/notifications/safety/physical gates otherwise remain; legacy wrapper source is not claimed removed.
+**Owner correction — 2026-10-13:** Third-person agent observation overrides the older agent integration/launch-wrapper path in this milestone. CamLid must not participate in agent workflow or wrap/relaunch an agent to obtain lifecycle evidence. Passive exact lifetime rules are not working/completion evidence. Existing diagnostics/notifications/safety/physical gates otherwise remain; legacy wrapper source is not claimed removed.
 **Created**: 2026-10-08
 **Status**: Partial implementation; integrated acceptance and hardware gates remain open.
 **Input**: Compare LidRun with current CamLid, recommend useful gaps and better behavior, and create a milestone with all implementation tasks.

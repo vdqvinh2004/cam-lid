@@ -77,18 +77,18 @@ with newly compiled helper/client paths under `.pi/qa-builds` and `--lid-specifi
 It signs locally and never installs or registers the bundle. Every rebuild requires a new
 review/freeze; do not update pins automatically or reuse a prior approval.
 The current exact freeze, source manifest and human-only read-only root-journal gate are in
-[the handoff](../../docs/qa/reproducible-m9-handoff-2026-10-21.md). `--prepare-readonly` requires
+the handoff. `--prepare-readonly` requires
 that exact staging; `--run-approved` remains blocked with no approved boot pin.
 
 The owner-confirmed lock-only profile has a separate
-[auth-only installation packet](../../docs/qa/m9-lock-only-install-packet-2026-10-21.md).
+auth-only installation packet.
 Its `python3 Tests/Hardware/install-m9-lock-only-qa.py --self-test` only verifies staging;
 it never installs or contacts the helper. Do not run its approval flag/launcher as part of
 software verification. Root install/bootstrap/one-inspect consent is a separate human gate, now completed per the
 owner-returned receipts. Do not rerun that consumed launcher as a verification step. Native
 G2 still requires its own exact approval; software tests/metadata do not contact the helper.
 
-The [next G2 packet](../../docs/qa/g2-m9-next-qualification-packet-2026-10-21.md) includes a
+The next G2 packet includes a
 pure `review-m9-postboot-audit.py --review <saved-owner-JSON>` tool. A matching report only
 supports review; it never grants recovery, journal deletion, IPC or native execution.
 Postboot owner audit now matches the old G2 acknowledged journal. The separate disarmed

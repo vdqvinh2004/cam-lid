@@ -9,7 +9,7 @@ Claude Code, Codex CLI, OpenCode, Orca local status adapter, process-only fallba
 
 ## Technical Context
 **Language/Version and Primary Dependencies**: Versioned provider hooks/events and Orca JSON CLI; adapters in shared Swift core.
-**Storage**: Shared policy/configuration/history/journal definitions in [domain model](../../docs/planning/domain-model.md); evidence artifacts scoped by tasks.md.
+**Storage**: Shared policy/configuration/history/journal definitions in domain model; evidence artifacts scoped by tasks.md.
 **Testing**: Adapter fixtures and installed-version 20-run/provider matrix.
 **Target Platform**: Proposed macOS 14+, Apple Silicon first; exact hardware/OS/backend rows require M1 evidence.
 **Project Type**: Native macOS utility or its scoped feasibility/quality validation feature.
@@ -22,7 +22,7 @@ Claude Code, Codex CLI, OpenCode, Orca local status adapter, process-only fallba
 [Constitution](../../.specify/memory/constitution.md) applies. Pre-research and post-design checks:
 safety/recovery limits, evidence confidence, native accessibility, shared GUI/CLI policy and privacy
 preserved by scoped contracts and dependencies. No exceptions. Document migration does not pass
-hardware or runtime gates. Shared [architecture](../../docs/planning/architecture.md) governs seams.
+hardware or runtime gates. Shared architecture governs seams.
 
 ## Project Structure
 Feature docs: spec.md, plan.md, research.md, data-model.md, quickstart.md, tasks.md, checklists/.
@@ -39,7 +39,7 @@ Relevant future source or validation paths (not created now):
 
 ## Phase 0: Research Decisions
 See [research.md](research.md). Inherited primary-source findings and product decisions remain
-in [shared research](../../docs/planning/research-decisions.md). Future evidence choices tracked
+in shared research. Future evidence choices tracked
 as mandatory tasks; unverified backend/provider compatibility is not a resolved physical fact.
 
 ## Phase 1: Design and Contracts

@@ -1,7 +1,7 @@
 # Research and decisions
 
 **Date**: 2026-10-05. Planning evidence, not feature acceptance.
-Primary-source investigation: [QA research note](../../docs/planning/qa-refinement-research.md). Exact local probes and comparison: [LidRun comparison](lidrun-comparison.md). Apple HIG is authoritative; UIUX Pro Max is not installed in the available skill catalog, so no claim of using it.
+Primary-source investigation: QA research note. Exact local probes and comparison: [LidRun comparison](lidrun-comparison.md). Apple HIG is authoritative; UIUX Pro Max is not installed in the available skill catalog, so no claim of using it.
 
 Latest user UI review: [UI simplicity investigation](ui-simplicity-review.md), with six live app captures, UX01-18 findings, compact metrics/badges, quiet autosave and a proposed implementation/acceptance sequence. Investigation only. Its proposed removal of visible On/Off captions refines R6 presentation while preserving enrollment/readiness/activity data; spec/contract/task changes must be synchronized before that implementation. Existing checked tasks remain historical, not acceptance of this new design.
 

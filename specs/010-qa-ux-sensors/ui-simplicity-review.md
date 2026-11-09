@@ -10,18 +10,18 @@ Taste skill applied to audit, hierarchy, repetition and restraint. Its marketing
 
 ## Evidence and boundary
 
-Inspected the running `/Applications/CamLid UI Review.app`, bundle `dev.camlid.preview.ui`, PID 23215, in dark appearance. Read source through the codebase graph. App-only screenshots and capture manifest: [evidence folder](../../docs/qa/preview-evidence/ux-simplicity-2026-10-05/manifest.json).
+Inspected the running `/Applications/CamLid UI Review.app`, bundle `dev.camlid.preview.ui`, PID 23215, in dark appearance. Read source through the codebase graph. App-only screenshots and capture manifest: evidence folder.
 
 Observed dashboard content size is 390 × 560 pt; its WindowServer surface includes surrounding material at 416 × 586 pt. Settings surface is 580 × 572 pt including title bar. Dimensions are baseline observations, not proposed sizes.
 
 Six current screenshots:
 
-- [Dashboard](../../docs/qa/preview-evidence/ux-simplicity-2026-10-05/dashboard-before.png)
-- [General](../../docs/qa/preview-evidence/ux-simplicity-2026-10-05/settings-general-before.png)
-- [Agents](../../docs/qa/preview-evidence/ux-simplicity-2026-10-05/settings-agents-before.png)
-- [Safety](../../docs/qa/preview-evidence/ux-simplicity-2026-10-05/settings-safety-before.png)
-- [Activity preferences](../../docs/qa/preview-evidence/ux-simplicity-2026-10-05/settings-activity-before.png)
-- [Activity window](../../docs/qa/preview-evidence/ux-simplicity-2026-10-05/activity-before.png)
+- Dashboard
+- General
+- Agents
+- Safety
+- Activity preferences
+- Activity window
 
 Dashboard AX nodes appear under the app menu bar, but CUA cannot resolve them as an exact AXWindow. A read-only CoreGraphics inventory identified the real owned surface, window 2754; CUA captured that exact window. Dashboard findings rely on visible pixels plus source, not hidden AXPopover presence. Settings and Activity have exact-window AX readback.
 

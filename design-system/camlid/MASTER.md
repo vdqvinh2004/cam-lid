@@ -1,8 +1,8 @@
 # CamLid Native Design System
 
-Current UI contract, updated 2026-10-07 from the [UI/UX audit](../../docs/qa/uiux-review-2026-10-07.md).
+Current UI contract, updated 2026-10-07 from the UI/UX audit.
 Native macOS utility: SwiftUI content, AppKit menu/popover/window hosting. macOS 14 minimum.
-Apple HIG governs behavior. See the [SwiftUI/HIG source review](../../docs/qa/swiftui-hig-research-2026-10-07.md).
+Apple HIG governs behavior. See the SwiftUI/HIG source review.
 
 ## Visual rules
 
@@ -30,7 +30,7 @@ Click Auto/Timed to start; click the active mode again to stop. No Off button. T
 Working-provider rows use a terminal icon/count rather than redundant Active text; omit the
 positive working-agent summary. Timer/Activity use system icons with explicit native labels/help.
 Keep mode names, status and capability/safety/error meaning readable. Start/Stop buttons are removed; keyboard menu commands remain. Suppress the
-redundant Ready-to-start subtitle. [Icon provenance and mode behavior](../../docs/qa/icon-ui-2026-10-07.md).
+redundant Ready-to-start subtitle. Icon provenance and mode behavior.
 
 Battery, CPU, pressure and lid remain distinct; numerical temperature requires a named fresh
 reader. Temperature never substitutes for pressure or proves protection. Each metric uses its
@@ -115,9 +115,9 @@ No protection claim without backend/support-row/lease/recovery verification. Lea
 IPC loss alone cannot prove restoration. Preview UI work does not pass M1/M2 physical safety,
 M5 distribution, M6 full quality or M7 user-trial gates. VoiceOver acceptance remains excluded
 under existing scope; semantic labels/roles/values and keyboard behavior remain required.
-See [implementation evidence](../../docs/qa/uiux-implementation-2026-10-07.md) for verified cases
-and [subsequent compact UI feedback](../../docs/qa/compact-ui-2026-10-07.md). Older screenshots/reports are historical and are not current acceptance evidence.
+See implementation evidence for verified cases
+and subsequent compact UI feedback. Older screenshots/reports are historical and are not current acceptance evidence.
 
-Prior mode/disclosure follow-up and LidRun feature decisions: [review and evidence](../../docs/qa/mode-disclosure-lidrun-2026-10-07.md).
+Prior mode/disclosure follow-up and LidRun feature decisions: review and evidence.
 
-Current duration/defaults follow-up: [review and evidence](../../docs/qa/mode-defaults-2026-10-07.md).
+Current duration/defaults follow-up: review and evidence.

@@ -1,6 +1,6 @@
 # M8 Validation Guide
 
-**Partial implementation**: `diagnose`, Preview `sleep --dry-run`/sleep refusal, protected-run denial, `watch` editing and Preview lifetime matching are executable. Actual sleep refusals record blockers; dry-run writes nothing. Verified protection remains deferred. Alerts/login adapters are wired; isolated native failure delivery and grant/readback/revoke are verified, while complete native alert and signed lifecycle acceptance remain open. See [current evidence](../../docs/qa/awake-automation-report.md); do not run physical tests as a documentation check.
+**Partial implementation**: `diagnose`, Preview `sleep --dry-run`/sleep refusal, protected-run denial, `watch` editing and Preview lifetime matching are executable. Actual sleep refusals record blockers; dry-run writes nothing. Verified protection remains deferred. Alerts/login adapters are wired; isolated native failure delivery and grant/readback/revoke are verified, while complete native alert and signed lifecycle acceptance remain open. See current evidence; do not run physical tests as a documentation check.
 
 ## Prerequisites and document inspection
 
