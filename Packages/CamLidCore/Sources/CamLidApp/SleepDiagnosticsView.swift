@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import CamLidCore
 
@@ -30,6 +31,14 @@ public struct SleepDiagnosticsView: View {
         .frame(minWidth: 520, minHeight: 400)
         .task { if snapshot == nil { await refresh() } }
     }
+    /// Copies on press only (spec 023, FR-005), from the snapshot on screen.
+    private func copyReport() {
+        guard let snapshot else { return }
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(DiagnosticReport.text(for: snapshot, appVersion: version), forType: .string)
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             Text(headerStatus)
@@ -39,6 +48,10 @@ public struct SleepDiagnosticsView: View {
                 ProgressView().controlSize(.small)
                     .accessibilityLabel("Refreshing sleep information")
             }
+            Button("Copy diagnostics", systemImage: "doc.on.doc") { copyReport() }
+                .disabled(snapshot == nil)
+                .help("Copy a plain-text report of this sleep information to the clipboard")
+                .accessibilityIdentifier("camlid.sleepDiagnostics.copy")
             Button("Refresh", systemImage: "arrow.clockwise") { Task { await refresh() } }
                 .disabled(isLoading).help("Refresh the sleep report (⌘R)")
                 .keyboardShortcut("r", modifiers: .command)

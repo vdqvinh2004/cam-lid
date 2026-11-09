@@ -3,17 +3,20 @@ import IOKit.pwr_mgt
 
 /// The IOKit calls behind `KeepAwakeAssertion`, injected so tests can stand in for the power manager.
 struct KeepAwakeSystem {
-    /// Creates a `PreventUserIdleSystemSleep` assertion owned by this process; nil when macOS refuses it.
+    /// Creates an assertion of this system's type, owned by this process; nil when macOS refuses it.
     var create: (String) -> IOPMAssertionID?
     var release: (IOPMAssertionID) -> Void
-    /// Names of this process's own `PreventUserIdleSystemSleep` assertions, read back from the power manager.
+    /// Names of this process's own assertions of this system's type, read back from the power manager.
     var ownAssertionNames: () -> [String]
 
-    static var live: KeepAwakeSystem {
+    static var live: KeepAwakeSystem { live(assertionType: "PreventUserIdleSystemSleep") }
+
+    /// The live power manager for one assertion type. Spec 023 uses `PreventUserIdleDisplaySleep` for the display option.
+    static func live(assertionType: String) -> KeepAwakeSystem {
         KeepAwakeSystem(
             create: { reason in
                 var identifier = IOPMAssertionID(0)
-                let result = IOPMAssertionCreateWithName("PreventUserIdleSystemSleep" as CFString,
+                let result = IOPMAssertionCreateWithName(assertionType as CFString,
                     IOPMAssertionLevel(kIOPMAssertionLevelOn), reason as CFString, &identifier)
                 return result == kIOReturnSuccess ? identifier : nil
             },
@@ -25,7 +28,7 @@ struct KeepAwakeSystem {
                 let dictionary = processes?.takeRetainedValue() as? [NSNumber: [[String: Any]]]
                 guard result == kIOReturnSuccess, let dictionary else { return [] }
                 return (dictionary[NSNumber(value: getpid())] ?? []).compactMap { entry in
-                    (entry["AssertType"] as? String) == "PreventUserIdleSystemSleep" ? entry["AssertName"] as? String : nil
+                    (entry["AssertType"] as? String) == assertionType ? entry["AssertName"] as? String : nil
                 }
             })
     }
@@ -36,17 +39,21 @@ struct KeepAwakeSystem {
 /// after a read-back finds this process's own assertion. Closing the lid is not covered; that is the helper's job.
 final class KeepAwakeAssertion {
     static let reason = "CamLid keeps this Mac awake while a session runs"
+    /// The display option's assertion (spec 023). Read back by its own reason, so it is never mistaken for the system one.
+    static let displayReason = "CamLid keeps the display on while a session runs"
     /// While held, the assertion is read back this often, so one that disappears is reported.
     static let verifyEverySeconds = 15.0
 
     private let system: KeepAwakeSystem
+    private let assertionReason: String
     private var assertionID: IOPMAssertionID?
     private var lastVerifiedAt = -Double.infinity
     private(set) var verified = false
     private(set) var issue: String?
 
-    init(system: KeepAwakeSystem = .live) {
+    init(system: KeepAwakeSystem = .live, reason: String = KeepAwakeAssertion.reason) {
         self.system = system
+        self.assertionReason = reason
     }
 
     var held: Bool { assertionID != nil }
@@ -58,7 +65,7 @@ final class KeepAwakeAssertion {
             return
         }
         if assertionID == nil {
-            guard let identifier = system.create(Self.reason) else {
+            guard let identifier = system.create(assertionReason) else {
                 verified = false
                 issue = "createFailed"
                 return
@@ -79,7 +86,18 @@ final class KeepAwakeAssertion {
 
     private func verify(now: Double) {
         lastVerifiedAt = now
-        verified = system.ownAssertionNames().contains(Self.reason)
+        verified = system.ownAssertionNames().contains(assertionReason)
         issue = verified ? nil : "readBackMissing"
+    }
+}
+
+/// Spec 023 (D2): whether sessions keep the display on. The setting is read while no session runs and held until the
+/// session ends, so a change in Settings applies to the next session.
+struct DisplaySleepChoice {
+    private(set) var keepsDisplayOn = false
+
+    mutating func observe(sessionActive: Bool, displaySleepAllowed: Bool) {
+        guard !sessionActive else { return }
+        keepsDisplayOn = !displaySleepAllowed
     }
 }

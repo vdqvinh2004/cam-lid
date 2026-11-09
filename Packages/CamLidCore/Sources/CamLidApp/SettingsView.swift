@@ -243,6 +243,11 @@ private struct SettingsGeneralPane: View {
         Section {
             SettingsNumberField(editor: editor, title: "Default Timed duration", field: .timer, unit: "minutes")
             SettingsNumberField(editor: editor, title: "Default Sleep when done", field: .completionDelay, unit: "minutes")
+            Toggle("Let the display sleep during sessions", isOn: Binding(get: { editor.draft.allowDisplaySleep ?? true },
+                set: { editor.setAllowDisplaySleep($0) }))
+                .help("Off keeps the display on while a session keeps the Mac awake. The change applies to the next session.")
+                .accessibilityLabel("Let the display sleep during sessions")
+                .accessibilityIdentifier("camlid.settings.displaySleep")
         } header: {
             Text("New sessions")
         } footer: {
@@ -413,6 +418,11 @@ private struct WatchedProgramsSection: View {
 
     var body: some View {
         Section {
+            Toggle("Keep Auto awake while a Chromium browser plays audio", isOn: Binding(get: { editor.browserAudioHold },
+                set: { editor.setBrowserAudioHold($0) }))
+                .help("Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium only. Other apps are not detected.")
+                .accessibilityLabel("Keep Auto awake while a Chromium browser plays audio")
+                .accessibilityIdentifier("camlid.settings.browserAudioHold")
             ForEach(rules) { rule in
                 HStack {
                     Toggle(isOn: Binding(

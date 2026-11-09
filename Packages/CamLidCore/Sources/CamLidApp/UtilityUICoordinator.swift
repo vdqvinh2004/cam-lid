@@ -95,6 +95,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         settingsEditor?.permissionSettingsError = state.permissionSettingsError
         settingsEditor?.automaticUpdateChecks = state.automaticUpdateChecks
         settingsEditor?.agentSkillFolder = state.agentSkillFolder
+        settingsEditor?.browserAudioHold = state.browserAudioHold
         if popover?.isShown == true { dashboard(show: false) }
         if onboardingWindow?.isVisible == true { showOnboarding(show: false) }
         if updatesWindow?.isVisible == true { showUpdates(show: false) }
@@ -256,6 +257,8 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         editor.automaticUpdateChecks = state.automaticUpdateChecks; editor.agentSkillFolder = state.agentSkillFolder
         editor.onSetAutomaticUpdateChecks = { [weak self] in self?.send(.setAutomaticUpdateChecks($0)) }
         editor.onSetAgentSkill = { [weak self] in self?.setAgentSkill($0) }
+        editor.browserAudioHold = state.browserAudioHold
+        editor.onSetBrowserAudioHold = { [weak self] in self?.send(.setBrowserAudioHold($0)) }
         editor.configureAsyncAutosave { [weak self] patch, revision in
             await self?.commit(patch, revision: revision) ?? .failed("App unavailable. Input preserved.")
         }

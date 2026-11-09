@@ -45,6 +45,17 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var holdReconciler = PowerHoldReconciler()
     private var holdTransport: (any PowerHoldTransport)?
     private let keepAwake = KeepAwakeAssertion()
+    /// Spec 023: the display option's assertion, and the setting it reads when a session starts (D2).
+    private let displayAwake = KeepAwakeAssertion(system: .live(assertionType: "PreventUserIdleDisplaySleep"),
+        reason: KeepAwakeAssertion.displayReason)
+    private var displayChoice = DisplaySleepChoice()
+    /// Spec 023, User Story 3: the Chromium audio hold. Its switch is a preference, set from Settings.
+    private var audioHold = AudioPlaybackHold()
+    private var audioHoldInForce = false
+    /// Wall-clock budget for one settings write (spec 024). The app keeps 0.7 s; the test fixtures raise it, because a
+    /// budget that short fails under CPU load and the tests then report a save that did not happen.
+    var settingsWriteBudget: Double = 0.7
+    private static let browserAudioHoldKey = "CamLidBrowserAudioHold"
     private let shortcut = GlobalHotKey()
     private var commandAdmissions = CommandAdmissions()
     /// Identifies this app instance in admissions: a relaunch makes older receipts stale.
@@ -417,6 +428,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let held = holdReconciler.status == .held || holdReconciler.status == .acquiring
         holdTransport?.close()
         keepAwake.release()
+        displayAwake.release()
         return held ? "helperRestoresOnDisconnect" : "noPowerResourcesOwned"
     }
 
@@ -745,12 +757,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             }
             var policyConfig = config
             policyConfig.completionDelayMinutes = sessionSleepDelayMinutes ?? config.completionDelayMinutes
+            let browserAudio = browserAudioHoldReason(now: now)
             let decision = PolicyEngine.evaluate(
                 session: active, tasks: sleepRelevantTasks(now: now), health: health, config: policyConfig,
                 armed: true, safety: signal, recoveryConflict: false,
                 completionUncertain: agentCompletionUncertain()
                     || (!config.adapterEnrollment.isEmpty && now - lastProcessSuccess > 15),
-                lifetimeHoldReason: commandHoldReason(now: now) ?? lifetime?.holdReason
+                lifetimeHoldReason: commandHoldReason(now: now) ?? lifetime?.holdReason ?? browserAudio
                     ?? (hasLifetimeRules ? "lifetimeRuleUnknown" : nil),
                 lifetimeCompletionSuppressed: lifetime?.suppressesAutoCompletion ?? hasLifetimeRules,
                 nowMonotonic: now)
@@ -767,7 +780,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             }
         }
         driveHold(now: now)
+        displayChoice.observe(sessionActive: session != nil, displaySleepAllowed: config.displaySleepAllowed)
         keepAwake.reconcile(wanted: keepAwakeDesired, now: now)
+        displayAwake.reconcile(wanted: keepAwakeDesired && displayChoice.keepsDisplayOn, now: now)
         let shown = session?.effectiveState ?? (config.mode == .off ? .off : .ready)
         if shown != lastReportedState {
             lastReportedState = shown
@@ -872,6 +887,17 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         (config.lifetimeRules ?? []).contains(where: \.enabled)
     }
 
+    /// Spec 023, User Story 3: while a Chromium browser plays audio, an Auto session stays working for a quiet period.
+    private func browserAudioHoldReason(now: Double) -> String? {
+        guard preferences.bool(forKey: Self.browserAudioHoldKey) else {
+            audioHold = AudioPlaybackHold()
+            audioHoldInForce = false
+            return nil
+        }
+        audioHoldInForce = audioHold.observe(now: now) { AudioPlaybackSignal.isPlayingAudio() }
+        return audioHoldInForce ? "browserAudioPlayback" : nil
+    }
+
     private func updateLifetimePolicy(now: Double) -> LifetimePolicyState? {
         let state = try? lifetimeTracker.update(
             rules: config.lifetimeRules ?? [], snapshot: lifetimeProcessSnapshot, now: now,
@@ -892,6 +918,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 "powerUnknown": "Power source unavailable", "notCharging": "AC power required",
                 "batteryFloor": "Battery below safety floor", "batteryUnknown": "Battery reading unavailable", "cpuStop": "Sustained CPU load exceeded limit"]
             return signal.reasons.map { labels[$0] ?? "Safety condition requires attention" }.joined(separator: ", ")
+        }
+        if session?.requestedMode == .auto, audioHoldInForce {
+            return "A Chromium browser is playing audio."
         }
         if session?.requestedMode == .auto {
             guard let lifetime = latestLifetimeState else {
@@ -945,7 +974,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             closedLidPermit: closedLidPermit().statusCode, strictTested: strictRow != nil,
             systemModel: systemIdentity().model ?? "unknown", systemBuild: systemIdentity().osBuild ?? "unknown",
             keepAwakeApps: helper.keepAwakeApps, capabilityText: closedLidCapabilityText,
-            automaticUpdateChecks: updates.automaticChecks, agentSkillFolder: agentSkill.installedFolder)
+            automaticUpdateChecks: updates.automaticChecks, agentSkillFolder: agentSkill.installedFolder,
+            browserAudioHold: preferences.bool(forKey: Self.browserAudioHoldKey))
     }
     private func showUtility(_ surface: UtilitySurface) {
         if surface == .settings { loginItem.refresh(); Task { await outcomeNotifications.refresh() } }
@@ -1022,6 +1052,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case .updates: menuBarOpenUpdates()
         case .checkUpdates: updates.check(); refresh()
         case .setAutomaticUpdateChecks(let on): updates.setAutomaticChecks(on); refresh()
+        case .setBrowserAudioHold(let on): preferences.set(on, forKey: Self.browserAudioHoldKey); refresh()
         case .agentSkill(let request):
             utilityUI?.send(.agentSkillResult(agentSkill.perform(request)))
             refresh()
@@ -1152,7 +1183,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                   schemaVersion: PersistedSettings.currentSchemaVersion, revision: revision + 1, configuration: candidate)) else {
             return .failed(settingsRefusal(for: patch))
         }
-        let expires = min(deadline ?? (uptime() + 0.7), uptime() + 0.7)
+        let expires = min(deadline ?? (uptime() + settingsWriteBudget), uptime() + settingsWriteBudget)
         settingsPreparationCount += 1
         defer { settingsPreparationCount -= 1 }
         guard let prepared = await settingsPreparer.prepare(data, beside: configURL, deadline: expires) else {
