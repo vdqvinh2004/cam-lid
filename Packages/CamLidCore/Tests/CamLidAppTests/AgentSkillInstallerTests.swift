@@ -134,4 +134,49 @@ struct AgentSkillInstallerTests {
             #expect(files(under: folder).isEmpty)
         }
     }
+
+    /// Spec 023 hardening (security): a link on the path is never written through or removed.
+    @Test func aLinkOnThePathIsNeverWrittenThrough() throws {
+        try withProject { folder, defaults in
+            let elsewhere = folder.appendingPathComponent("elsewhere.txt")
+            try Self.foreign.write(to: elsewhere)
+            try FileManager.default.createDirectory(at: target(in: folder).deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(at: target(in: folder), withDestinationURL: elsewhere)
+            let agent = installer(defaults)
+            guard case .failed = agent.perform(.install(folder: folder.path, replacing: true)) else {
+                Issue.record("a link was written through")
+                return
+            }
+            let untouched = try Data(contentsOf: elsewhere)
+            #expect(untouched == Self.foreign)
+            #expect(agent.installedFolder == nil)
+        }
+    }
+
+    @Test func aLinkedFolderIsRefused() throws {
+        try withProject { folder, defaults in
+            let other = folder.appendingPathComponent("other", isDirectory: true)
+            try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(at: folder.appendingPathComponent(".agents"), withDestinationURL: other)
+            let agent = installer(defaults)
+            guard case .failed = agent.perform(.install(folder: folder.path, replacing: false)) else {
+                Issue.record("a linked folder was used")
+                return
+            }
+            #expect(files(under: other).isEmpty)
+        }
+    }
+
+    @Test func aFileReplacedByALinkIsNeverRemoved() throws {
+        try withProject { folder, defaults in
+            let agent = installer(defaults)
+            _ = agent.perform(.install(folder: folder.path, replacing: false))
+            let elsewhere = folder.appendingPathComponent("elsewhere.txt")
+            try Self.skill.write(to: elsewhere)
+            try FileManager.default.removeItem(at: target(in: folder))
+            try FileManager.default.createSymbolicLink(at: target(in: folder), withDestinationURL: elsewhere)
+            #expect(agent.perform(.remove) == .keptModified)
+            #expect(FileManager.default.fileExists(atPath: elsewhere.path))
+        }
+    }
 }

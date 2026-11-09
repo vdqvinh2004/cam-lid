@@ -46,6 +46,10 @@ struct AgentSkillInstaller {
                 : .failed("CamLid already installed the skill in \(installed.folder). Turn it off there first.")
         }
         guard let content = bundled() else { return .failed("This build has no bundled skill file.") }
+        // A link on the path would send the write somewhere the user did not choose. CamLid writes plain files only.
+        guard !Self.containsSymbolicLink(in: folder) else {
+            return .failed("The skill path contains a symbolic link, so CamLid did not write through it.")
+        }
         let target = folder.appendingPathComponent(Self.relativePath)
         if !replacing, FileManager.default.fileExists(atPath: target.path) { return .conflict(folder: folder.path) }
         do {
@@ -64,6 +68,11 @@ struct AgentSkillInstaller {
         guard FileManager.default.fileExists(atPath: target.path) else {
             record = nil
             return .nothingToRemove
+        }
+        // Never remove through a link: CamLid never writes one, so a link here is not the file it wrote.
+        guard !Self.containsSymbolicLink(in: URL(fileURLWithPath: installed.folder, isDirectory: true)) else {
+            record = nil
+            return .keptModified
         }
         guard let data = try? Data(contentsOf: target) else {
             return .failed("CamLid could not read the skill file, so it left the file in place.")
@@ -84,6 +93,16 @@ struct AgentSkillInstaller {
     private var record: Record? {
         get { defaults.data(forKey: Self.recordKey).flatMap { try? JSONDecoder().decode(Record.self, from: $0) } }
         nonmutating set { defaults.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: Self.recordKey) }
+    }
+
+    /// True when a component between the project folder and the skill file is a symbolic link, the file itself included.
+    static func containsSymbolicLink(in folder: URL) -> Bool {
+        var current = folder
+        for component in relativePath.split(separator: "/") {
+            current = current.appendingPathComponent(String(component))
+            if (try? current.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true { return true }
+        }
+        return false
     }
 
     private static func digest(_ data: Data) -> String {

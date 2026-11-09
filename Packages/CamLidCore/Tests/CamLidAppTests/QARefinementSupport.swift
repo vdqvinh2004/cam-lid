@@ -10,7 +10,7 @@ struct QARefinementSupport {
         healthReader: (() -> HealthSnapshot)? = { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) }) -> AppCoordinator {
         let failure: @Sendable (Data, URL) throws -> Void = { _, _ in throw CocoaError(.fileWriteNoPermission) }
         let writer: (@Sendable (Data, URL) throws -> Void)? = failingWrites ? failure : nil
-        return AppCoordinator(historyDirectory: root.appendingPathComponent("history"),
+        let app = AppCoordinator(historyDirectory: root.appendingPathComponent("history"),
             controlDirectory: root.appendingPathComponent("control"),
             preferences: UserDefaults(suiteName: suite)!,
             settingsWriter: writer, outcomeNotifications: outcomeNotifications, permissions: permissions, healthReader: healthReader,
@@ -19,8 +19,11 @@ struct QARefinementSupport {
             holdTransportFactory: { NeverTransport() }, closedLidSupportRow: { nil }, systemIdentity: { (nil, nil) },
             // Never the agents actually running on this Mac (this suite itself runs under one).
             activitySampler: { _ in ([], ContinuousTime.now) })
+        // Settings writes get a wide budget: the app's 0.7 s fails under CPU load (see `settingsWriteBudget`).
+        app.settingsWriteBudget = 10
+        return app
     }
-    func cleanup() { UserDefaults().removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+    func cleanup() { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
 }
 
 
