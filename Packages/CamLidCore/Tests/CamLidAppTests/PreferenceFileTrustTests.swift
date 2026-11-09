@@ -12,7 +12,7 @@ struct PreferenceFileTrustTests {
         try FileManager.default.createDirectory(at: history, withIntermediateDirectories: true)
         try FileManager.default.createSymbolicLink(atPath: history.appendingPathComponent("preferences.json").path,
             withDestinationPath: fixture.root.appendingPathComponent("missing.json").path)
-        let defaults = try #require(UserDefaults(suiteName: fixture.suite))
+        let defaults = fixture.preferences
         defaults.set(try JSONEncoder().encode(Configuration(completionDelayMinutes: 7)), forKey: "CamLidConfigurationV1")
         defaults.set(Data(#"{"schemaVersion":1,"revision":9,"configuration":{"mode":"off","completionDelayMinutes":7}}"#.utf8), forKey: "CamLidConfigurationV2")
         let app = fixture.makeCoordinator()

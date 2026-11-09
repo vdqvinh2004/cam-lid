@@ -10,9 +10,8 @@ struct ControlIntegrationTests {
     @Test @MainActor func legacyIngressRefusesThroughActualTransportAndCLI() async throws {
         let root = URL(fileURLWithPath: "/tmp/cl-outside-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
-        let suite = "camlid-outside-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        let defaults = MemoryPreferences()
+        defer { try? FileManager.default.removeItem(at: root) }
         let control = root.appendingPathComponent("control")
         let coordinator = AppCoordinator(historyDirectory: root.appendingPathComponent("history"), controlDirectory: control, preferences: defaults)
         coordinator.startControlService()
@@ -56,9 +55,8 @@ struct ControlIntegrationTests {
 
     @Test @MainActor func modeChangesKeepCapAndOffEndsPreview() async throws {
         let root = URL(fileURLWithPath: "/tmp/cl-mode-\(UUID().uuidString)")
-        let suite = "camlid-mode-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        let defaults = MemoryPreferences()
+        defer { try? FileManager.default.removeItem(at: root) }
         let coordinator = AppCoordinator(historyDirectory: root, preferences: defaults,
             healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) })
         coordinator.changeMode(.timed)
@@ -82,9 +80,7 @@ struct ControlIntegrationTests {
         let root = URL(fileURLWithPath: "/tmp/cl-app-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: root) }
-        let suite = "camlid-test-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = MemoryPreferences()
         let control = root.appendingPathComponent("control")
         let coordinator = AppCoordinator(historyDirectory: root.appendingPathComponent("history"), controlDirectory: control, preferences: defaults)
         coordinator.startControlService()

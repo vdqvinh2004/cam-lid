@@ -94,7 +94,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         settingsEditor?.accessibilityPermission = state.accessibilityPermission
         settingsEditor?.permissionSettingsError = state.permissionSettingsError
         settingsEditor?.automaticUpdateChecks = state.automaticUpdateChecks
-        settingsEditor?.agentSkillFolder = state.agentSkillFolder
+        settingsEditor?.agentSkillPath = state.agentSkillPath
         settingsEditor?.browserAudioHold = state.browserAudioHold
         if popover?.isShown == true { dashboard(show: false) }
         if onboardingWindow?.isVisible == true { showOnboarding(show: false) }
@@ -107,27 +107,18 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
     }
     private func send(_ event: UtilityUIEvent) { _ = pipe?.send(event) }
 
-    /// Spec 022: this window picks the folder and asks; the app writes the file and reports back.
-    private func setAgentSkill(_ on: Bool) {
-        guard on else { send(.agentSkill(.remove)); return }
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false; panel.canChooseDirectories = true
-        panel.canCreateDirectories = true; panel.allowsMultipleSelection = false
-        panel.prompt = "Choose Folder"
-        panel.message = "Choose the project folder that AI agents should read the CamLid skill from."
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
-        send(.agentSkill(.install(folder: folder.path, replacing: false)))
-    }
+    /// Spec 022: the window only asks; the app writes the file and reports back.
+    private func setAgentSkill(_ on: Bool) { send(.agentSkill(on ? .install(replacing: false) : .remove)) }
 
     private func agentSkillFinished(_ outcome: AgentSkillOutcome) {
         switch outcome {
         case .installed, .removed, .nothingToRemove: return
-        case .conflict(let folder):
+        case .conflict(let path):
             let alert = NSAlert()
-            alert.messageText = "Replace the SKILL.md already in this folder?"
-            alert.informativeText = "\(folder)/.agents/skills/camlid/SKILL.md exists, and CamLid did not write it. Replacing it cannot be undone."
+            alert.messageText = "Replace the skill file that already exists?"
+            alert.informativeText = "\((path as NSString).abbreviatingWithTildeInPath) exists, and CamLid did not write it. Replacing it cannot be undone."
             alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Replace")
-            if alert.runModal() == .alertSecondButtonReturn { send(.agentSkill(.install(folder: folder, replacing: true))) }
+            if alert.runModal() == .alertSecondButtonReturn { send(.agentSkill(.install(replacing: true))) }
         case .keptModified:
             showAgentSkillMessage("CamLid left the skill file in place",
                 "The file changed after CamLid wrote it, so CamLid did not remove it.")
@@ -254,7 +245,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         editor.onRefreshPermissions = { [weak self] in self?.send(.refreshPermissions) }
         editor.onAuthorizeNotifications = { [weak self] in self?.send(.authorizeNotifications) }
         editor.onApplyLogin = { [weak self] in self?.send(.applyLoginPreference) }
-        editor.automaticUpdateChecks = state.automaticUpdateChecks; editor.agentSkillFolder = state.agentSkillFolder
+        editor.automaticUpdateChecks = state.automaticUpdateChecks; editor.agentSkillPath = state.agentSkillPath
         editor.onSetAutomaticUpdateChecks = { [weak self] in self?.send(.setAutomaticUpdateChecks($0)) }
         editor.onSetAgentSkill = { [weak self] in self?.setAgentSkill($0) }
         editor.browserAudioHold = state.browserAudioHold

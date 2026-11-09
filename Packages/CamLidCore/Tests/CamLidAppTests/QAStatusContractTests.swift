@@ -8,9 +8,8 @@ import CamLidCore
 struct QAStatusContractTests {
     @Test @MainActor func additiveStatusDecodesAsLegacyHealthAndReportsUnavailableValuesAsNull() throws {
         let root = URL(fileURLWithPath: "/tmp/camlid-contract-" + UUID().uuidString)
-        let suite = "CamLidTest." + root.lastPathComponent
-        let preferences = try #require(UserDefaults(suiteName: suite))
-        defer { preferences.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        let preferences = MemoryPreferences()
+        defer { try? FileManager.default.removeItem(at: root) }
         let app = AppCoordinator(historyDirectory: root, controlDirectory: root.appendingPathComponent("control"), preferences: preferences)
         let result = try JSONDecoder().decode(CLIResult.self, from: app.handleControl(.status, payload: Data()))
         let status = try JSONSerialization.jsonObject(with: Data(result.json.utf8)) as! [String: Any]

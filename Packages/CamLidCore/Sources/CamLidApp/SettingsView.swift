@@ -312,19 +312,19 @@ private struct SettingsGeneralPane: View {
             Text("Off by default. When on, CamLid asks GitHub’s public releases API once a day, with no account, cookies or system profile. It only tells you that a newer release exists; it never downloads or installs anything.")
         }
         Section {
-            Toggle("Let AI agents use CamLid", isOn: Binding(get: { editor.agentSkillFolder != nil },
+            Toggle("Let AI agents use CamLid", isOn: Binding(get: { editor.agentSkillPath != nil },
                 set: { editor.onSetAgentSkill?($0) }))
-                .help("Write the CamLid skill file into a project folder you choose")
+                .help("Write the CamLid skill file to ~/.agents/skills/camlid/SKILL.md")
                 .accessibilityLabel("Let AI agents use CamLid")
                 .accessibilityIdentifier("camlid.settings.agentSkill")
-            if let folder = editor.agentSkillFolder {
-                Text("Installed in \(folder)/.agents/skills/camlid/SKILL.md")
+            if let path = editor.agentSkillPath {
+                Text("Installed at \((path as NSString).abbreviatingWithTildeInPath)")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2).truncationMode(.middle)
             }
         } header: {
             Text("AI agents")
         } footer: {
-            Text("Off by default. When on, CamLid asks for a project folder and writes one file, .agents/skills/camlid/SKILL.md. Turning it off removes that file unless you have changed it. CamLid never writes it at launch.")
+            Text("Off by default. When on, CamLid writes one file, ~/.agents/skills/camlid/SKILL.md, in your home folder, where AI agents on this Mac can read it. Turning it off removes that file unless you have changed it. CamLid never writes it at launch.")
         }
     }
 }

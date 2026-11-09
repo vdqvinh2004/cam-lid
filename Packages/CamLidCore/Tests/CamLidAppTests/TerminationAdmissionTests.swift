@@ -8,7 +8,7 @@ struct TerminationAdmissionTests {
     @Test @MainActor func onboardingContinuationCannotPersistOrRecordAfterQuitStarts() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
-        let preferences = try #require(UserDefaults(suiteName: fixture.suite))
+        let preferences = fixture.preferences
         #expect(app.beginTerminationFlow())
         app.sealTerminationHistory()
         #expect(!app.finishOnboarding())
@@ -25,7 +25,7 @@ struct TerminationAdmissionTests {
     @Test @MainActor func stagingAdmittedBeforeQuitCannotInstallAfterQuitStarts() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = AppCoordinator(historyDirectory: fixture.root.appendingPathComponent("history"),
-            preferences: UserDefaults(suiteName: fixture.suite)!, settingsWriter: { data, url in
+            preferences: fixture.preferences, settingsWriter: { data, url in
                 Thread.sleep(forTimeInterval: 0.1)
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try data.write(to: url)

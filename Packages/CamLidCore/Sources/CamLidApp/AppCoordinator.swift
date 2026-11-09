@@ -86,7 +86,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var sessionSleepDelayMinutes: Int?
     private var agents = RuntimeAgentStore()
     private let controlServer: LocalControlServer
-    private let preferences: UserDefaults
+    private let preferences: any PreferenceStore
     private let configURL: URL
     private let settingsWriter: @Sendable (Data, URL) throws -> Void
     private let settingsInstaller: @Sendable (URL, URL) throws -> Void
@@ -132,7 +132,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         guard let self else { var state = UpdateSafetyContext(); state.recoveryRequired = true; return state }
         return self.updateSafetyContext()
     })
-    private lazy var agentSkill = AgentSkillInstaller(defaults: preferences, bundled: {
+    /// Spec 022: the folder the skill file goes under. A QA run uses its own folder, never the real home.
+    private let agentSkillHome: URL
+    private lazy var agentSkill = AgentSkillInstaller(home: agentSkillHome, defaults: preferences, bundled: {
         Bundle.main.url(forResource: "SKILL", withExtension: "md").flatMap { try? Data(contentsOf: $0) }
     })
     private var refusalNotice: String?
@@ -152,14 +154,16 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             let root = URL(fileURLWithPath: qaPath, isDirectory: true)
             let preferences = UserDefaults(suiteName: "CamLidQA." + root.lastPathComponent) ?? .standard
             self.init(historyDirectory: root.appendingPathComponent("history"),
-                controlDirectory: root.appendingPathComponent("control"), preferences: preferences)
+                controlDirectory: root.appendingPathComponent("control"), preferences: preferences,
+                agentSkillHome: root.appendingPathComponent("home", isDirectory: true))
             return
         }
         self.init(historyDirectory: FileHistoryStorage.defaultDirectory)
     }
 
     init(historyDirectory: URL, controlDirectory: URL = LocalControlChannel.defaultDirectory,
-         preferences: UserDefaults = .standard, settingsWriter: (@Sendable (Data, URL) throws -> Void)? = nil,
+         preferences: any PreferenceStore = UserDefaults.standard, agentSkillHome: URL = FileManager.default.homeDirectoryForCurrentUser,
+         settingsWriter: (@Sendable (Data, URL) throws -> Void)? = nil,
          settingsInstaller: (@Sendable (URL, URL) throws -> Void)? = nil,
          outcomeNotifications: OutcomeNotifications? = nil, permissions: AppPermissions? = nil,
          healthReader: (() -> HealthSnapshot)? = nil,
@@ -178,6 +182,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             return QualifiedSupportRows.matching(model: system.model, osBuild: system.osBuild)
         }
         self.preferences = preferences
+        self.agentSkillHome = agentSkillHome
         self.outcomeNotifications = outcomeNotifications ?? OutcomeNotifications()
         self.permissions = permissions ?? AppPermissions()
         self.configURL = historyDirectory.appendingPathComponent(PersistedSettings.fileName)
@@ -974,7 +979,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             closedLidPermit: closedLidPermit().statusCode, strictTested: strictRow != nil,
             systemModel: systemIdentity().model ?? "unknown", systemBuild: systemIdentity().osBuild ?? "unknown",
             keepAwakeApps: helper.keepAwakeApps, capabilityText: closedLidCapabilityText,
-            automaticUpdateChecks: updates.automaticChecks, agentSkillFolder: agentSkill.installedFolder,
+            automaticUpdateChecks: updates.automaticChecks, agentSkillPath: agentSkill.installedPath,
             browserAudioHold: preferences.bool(forKey: Self.browserAudioHoldKey))
     }
     private func showUtility(_ surface: UtilitySurface) {

@@ -80,7 +80,7 @@ public final class SettingsEditor: ObservableObject {
     public var onApplyLogin: (() -> Void)?
     /// Specs 021 and 022: the persistent app owns these choices; the window only shows them and asks.
     @Published public var automaticUpdateChecks = false
-    @Published public var agentSkillFolder: String?
+    @Published public var agentSkillPath: String?
     public var onSetAutomaticUpdateChecks: ((Bool) -> Void)?
     public var onSetAgentSkill: ((Bool) -> Void)?
     /// Spec 023, User Story 3: the Chromium audio hold switch. The persistent app stores it.

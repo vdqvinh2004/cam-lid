@@ -44,7 +44,7 @@ struct PowerHoldIntegrationTests {
         await settle { helper.state == "installed" }
         let app = AppCoordinator(historyDirectory: support.root.appendingPathComponent("history"),
             controlDirectory: support.root.appendingPathComponent("control"),
-            preferences: UserDefaults(suiteName: support.suite)!,
+            preferences: support.preferences,
             healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) },
             helperController: helper, holdTransportFactory: { transport }, closedLidSupportRow: { row },
             systemIdentity: system)
@@ -243,7 +243,7 @@ struct PowerHoldIntegrationTests {
         func launch() -> AppCoordinator {
             AppCoordinator(historyDirectory: support.root.appendingPathComponent("history"),
                 controlDirectory: support.root.appendingPathComponent("control"),
-                preferences: UserDefaults(suiteName: support.suite)!,
+                preferences: support.preferences,
                 healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) },
                 helperController: helper, holdTransportFactory: { FakeHoldTransport() }, closedLidSupportRow: { nil },
                 systemIdentity: { ("Mac99,1", "99Z1") })

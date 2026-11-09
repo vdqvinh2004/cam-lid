@@ -31,7 +31,7 @@ struct UtilityUIState: Codable, Sendable {
     var keepAwakeApps: [KeepAwakeApp] = []
     var capabilityText = ""
     var automaticUpdateChecks = false
-    var agentSkillFolder: String?
+    var agentSkillPath: String?
     var browserAudioHold = false
 }
 enum UtilityUICommand: Codable, Sendable {

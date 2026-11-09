@@ -45,7 +45,7 @@ enum UpdateProbeOutcome: Equatable {
     static let automaticInterval: TimeInterval = 24 * 60 * 60
     private let safety: @MainActor () -> UpdateSafetyContext
     private let makeDriver: @MainActor () -> any UpdateProbeDriver
-    private let defaults: UserDefaults
+    private let defaults: any PreferenceStore
     private let now: @MainActor () -> Date
     private var driver: (any UpdateProbeDriver)?
     private var timer: Timer?
@@ -53,14 +53,14 @@ enum UpdateProbeOutcome: Equatable {
     private var inFlight = false
     private var lastOutcome: UpdateProbeOutcome?
 
-    public convenience init(bundle: Bundle = .main, defaults: UserDefaults = .standard,
+    public convenience init(bundle: Bundle = .main, defaults: any PreferenceStore = UserDefaults.standard,
                             safety: @escaping @MainActor () -> UpdateSafetyContext) {
         let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
         self.init(safety: safety, makeDriver: { GitHubReleaseDriver(currentVersion: version) }, defaults: defaults)
     }
     init(safety: @escaping @MainActor () -> UpdateSafetyContext,
          makeDriver: @escaping @MainActor () -> any UpdateProbeDriver,
-         defaults: UserDefaults = .standard, now: @escaping @MainActor () -> Date = { Date() }) {
+         defaults: any PreferenceStore = UserDefaults.standard, now: @escaping @MainActor () -> Date = { Date() }) {
         self.safety = safety; self.makeDriver = makeDriver; self.defaults = defaults; self.now = now
         snapshot = UpdateSnapshot(phase: .ready, reason: "manualCheckReady")
         automaticChecks = defaults.bool(forKey: Self.automaticChecksKey)

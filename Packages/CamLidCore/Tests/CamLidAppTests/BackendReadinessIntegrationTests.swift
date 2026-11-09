@@ -13,12 +13,8 @@ struct BackendReadinessIntegrationTests {
         let root = URL(fileURLWithPath: "/tmp/cl-gate-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
             attributes: [.posixPermissions: 0o700])
-        let suite = "camlid-backend-gate-\(UUID().uuidString)"
-        let preferences = try #require(UserDefaults(suiteName: suite))
-        defer {
-            preferences.removePersistentDomain(forName: suite)
-            try? FileManager.default.removeItem(at: root)
-        }
+        let preferences = MemoryPreferences()
+        defer { try? FileManager.default.removeItem(at: root) }
         let control = root.appendingPathComponent("control")
         let app = AppCoordinator(historyDirectory: root.appendingPathComponent("history"),
             controlDirectory: control, preferences: preferences,

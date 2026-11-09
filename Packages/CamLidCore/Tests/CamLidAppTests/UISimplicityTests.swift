@@ -178,9 +178,8 @@ struct UISimplicityTests {
 
     @Test @MainActor func offModeSettingsEventStaysOffInHistory() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("camlid-ui-test-" + UUID().uuidString)
-        let suite = "CamLidTest." + root.lastPathComponent
-        let prefs = try #require(UserDefaults(suiteName: suite))
-        defer { prefs.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        let prefs = MemoryPreferences()
+        defer { try? FileManager.default.removeItem(at: root) }
         let app = AppCoordinator(historyDirectory: root, controlDirectory: root.appendingPathComponent("control"), preferences: prefs)
         var off = ConfigPatch(); off.mode = .off
         guard case .saved = await app.applySettingsPatchAsync(off, expectedRevision: 1) else {

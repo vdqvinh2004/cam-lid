@@ -35,7 +35,7 @@ struct DashboardEmptyStateTests {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
         app.receiveUtilityEvent(.settings(.agents))
-        let stored = UserDefaults(suiteName: fixture.suite)?.string(forKey: "CamLidSettingsSection")
+        let stored = fixture.preferences.string(forKey: "CamLidSettingsSection")
         #expect(stored == SettingsSection.agents.rawValue)
         let reply = try JSONDecoder().decode(CLIResult.self, from: app.handleControl(.status, payload: Data()))
         #expect(reply.exitCode == 0)

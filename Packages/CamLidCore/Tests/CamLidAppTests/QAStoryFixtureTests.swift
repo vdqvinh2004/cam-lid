@@ -7,7 +7,7 @@ struct QAStoryFixtureTests {
     @Test @MainActor func allFiveStoryFixturesRemainIsolatedAndNeverProtected() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let second = QARefinementSupport(); defer { second.cleanup() }
-        #expect(fixture.root != second.root && fixture.suite != second.suite)
+        #expect(fixture.root != second.root && fixture.preferences !== second.preferences)
         let dashboard = fixture.dashboardFixture()
         #expect(dashboard.tasks.count == 20 && !dashboard.powerActuationAvailable && !dashboard.leaseVerified)
         let editor = try fixture.preferencesFixture()

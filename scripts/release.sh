@@ -139,7 +139,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - **Sleep diagnostics.** CamLid's own power assertion is labelled "CamLid is active" and is not counted as another app.
 - **Agents.** Claude Code, Codex and OpenCode in a terminal are estimated from CPU activity. Orca is read from its CLI.
 - **Update check (new in 0.2, off by default).** Settings › General can ask GitHub once a day whether a newer release exists. It never downloads or installs anything.
-- **Agent skill (new in 0.2).** Settings › General › *Let AI agents use CamLid* writes one skill file into a project folder you choose. Turning it off removes that file unless you changed it.
+- **Agent skill (new in 0.2).** Settings › General › *Let AI agents use CamLid* writes one skill file, `~/.agents/skills/camlid/SKILL.md`, in your home folder. Turning it off removes that file unless you changed it.
 - **Display option (new in 0.2).** Settings › General › New sessions: "Let the display sleep during sessions" is on by default. Turn it off to keep the display on while a session holds the Mac awake. It applies to the next session.
 - **Copy diagnostics (new in 0.2).** The Sleep diagnostics window copies a plain-text report. It holds no prompts, transcripts, command output or environment values.
 - **Chromium audio hold (new in 0.2).** Watched programs can keep an Auto session awake while Chrome, Brave, Edge, Vivaldi, Opera, Arc or Chromium plays audio, and for 60 seconds after it stops. Other apps are not detected.

@@ -11,15 +11,12 @@ struct AutomaticUpdateChecksTests {
         func advance(hours: Double) { now = now.addingTimeInterval(hours * 3600) }
     }
 
-    /// An isolated preferences suite, removed afterwards, so a test never reads or writes the app's own settings.
-    private func withDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
-        let suite = "camlid.tests.autoupdate." + UUID().uuidString
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
-        try body(defaults)
+    /// An in-memory preference store, so a test never reads or writes the app's own settings or a preferences file.
+    private func withDefaults(_ body: (MemoryPreferences) throws -> Void) rethrows {
+        try body(MemoryPreferences())
     }
 
-    private func controller(_ world: World, _ driver: ProbeStub, _ defaults: UserDefaults) -> UpdateController {
+    private func controller(_ world: World, _ driver: ProbeStub, _ defaults: any PreferenceStore) -> UpdateController {
         UpdateController(safety: { world.context }, makeDriver: { driver }, defaults: defaults, now: { world.now })
     }
 

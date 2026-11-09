@@ -5,14 +5,15 @@ import CamLidCore
 @MainActor
 struct QARefinementSupport {
     let root = URL(fileURLWithPath: "/tmp/camlid-refinement-" + UUID().uuidString)
-    var suite: String { "CamLidTest." + root.lastPathComponent }
+    /// One in-memory store per fixture, shared by every coordinator it makes, so a "relaunch" sees the same settings.
+    let preferences = MemoryPreferences()
     func makeCoordinator(failingWrites: Bool = false, outcomeNotifications: OutcomeNotifications? = nil, permissions: AppPermissions? = nil,
         healthReader: (() -> HealthSnapshot)? = { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) }) -> AppCoordinator {
         let failure: @Sendable (Data, URL) throws -> Void = { _, _ in throw CocoaError(.fileWriteNoPermission) }
         let writer: (@Sendable (Data, URL) throws -> Void)? = failingWrites ? failure : nil
         let app = AppCoordinator(historyDirectory: root.appendingPathComponent("history"),
             controlDirectory: root.appendingPathComponent("control"),
-            preferences: UserDefaults(suiteName: suite)!,
+            preferences: preferences,
             settingsWriter: writer, outcomeNotifications: outcomeNotifications, permissions: permissions, healthReader: healthReader,
             // Never the real Mac identity or the real installed helper: a qualified row now matches the owner's Mac.
             helperController: HelperController(status: { .notInstalled }, keepAwakeApps: { [] }),
@@ -23,7 +24,7 @@ struct QARefinementSupport {
         app.settingsWriteBudget = 10
         return app
     }
-    func cleanup() { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+    func cleanup() { try? FileManager.default.removeItem(at: root) }
 }
 
 

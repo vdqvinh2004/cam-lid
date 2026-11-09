@@ -42,7 +42,7 @@ struct SettingsInstallationTests {
     @Test @MainActor func lateInstallationIsUnconfirmedSerializedAndReconciledOnce() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = AppCoordinator(historyDirectory: fixture.root.appendingPathComponent("history"),
-            preferences: UserDefaults(suiteName: fixture.suite)!, settingsInstaller: { source, destination in
+            preferences: fixture.preferences, settingsInstaller: { source, destination in
                 Thread.sleep(forTimeInterval: 0.18)
                 guard Darwin.rename(source.path, destination.path) == 0 else { throw POSIXError(.EIO) }
             })
@@ -69,7 +69,7 @@ struct SettingsInstallationTests {
     @Test @MainActor func controlTimeoutReportsReadBackRequiredAndLateFailureRetainsRevision() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = AppCoordinator(historyDirectory: fixture.root.appendingPathComponent("history"),
-            preferences: UserDefaults(suiteName: fixture.suite)!, settingsInstaller: { _, _ in
+            preferences: fixture.preferences, settingsInstaller: { _, _ in
                 Thread.sleep(forTimeInterval: 0.15); throw POSIXError(.EIO)
             })
         let options = CLIOptions(flags: ["patchJSON": "{\"completionDelayMinutes\":7}"])
