@@ -4,8 +4,7 @@ CamLid installs a small **root helper** (a LaunchDaemon) that changes the Mac's 
 more than in an ordinary menu bar app. Please report problems privately.
 
 ## Reporting a vulnerability
-Use GitHub's private vulnerability reporting: **Security › Report a vulnerability** on the repository
-(<https://github.com/vdqvinh2004/cam-lid/security/advisories/new>). Please do not open a public issue for a security
+Send the report by email to vdqvinh2004@gmail.com. Please do not open a public issue for a security
 problem. Include the version, what you did, and what happened. This is a one-person project: expect a first answer
 within about a week.
 
@@ -24,6 +23,16 @@ recovery job restores it if the helper itself is gone; and a restart clears the 
 [ADR 0001](docs/adr/0001-persistent-helper-and-strict-experimental-mode.md) and
 [ADR 0003](docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md); the trials that tested it are in
 [specs/014-persistent-helper/g2-trial.md](specs/014-persistent-helper/g2-trial.md).
+
+## Known limits
+- Installing or reinstalling the helper asks for your administrator password, then runs CamLid's own binary as root.
+  That binary is not checked against its signature at that moment. A program running as your user that changes
+  `CamLid.app` before you approve can therefore have its code run as root. Before you install or reinstall the helper,
+  check the app with `codesign --verify --deep --strict /Applications/CamLid.app` and compare its certificate with the
+  one in the release notes (`codesign -d -r- /Applications/CamLid.app`).
+- The helper trusts only the certificate it was installed with. An ad hoc build is trusted by its exact code hash, so
+  each rebuild needs a reinstall.
+- The local control socket accepts commands from programs running as your user, as designed. It refuses other users.
 
 ## Verifying a download
 Releases are signed with the project's own certificate, not an Apple Developer ID, and are not notarized. Compare the

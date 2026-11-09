@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Report a security problem privately
-    url: https://github.com/vdqvinh2004/cam-lid/security/advisories/new
-    about: The helper runs as root; please do not post vulnerabilities in public issues.
+    url: https://github.com/vdqvinh2004/cam-lid/security/policy
+    about: The helper runs as root; email the owner as SECURITY.md describes instead of posting vulnerabilities in public issues.
