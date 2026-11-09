@@ -1,8 +1,8 @@
 # Feature Specification: Automatic update setting
 
-**Status:** Planned for the release after 0.1.0. Not in 0.1.0. Shipping it requires an amendment to
-[ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md) first, because that decision says the check runs
-only when clicked.
+**Status:** Decided 2026-11-09 for the release after 0.1.0. Not implemented yet. Off by default. When on, one check per
+day. Install mode is deferred. [ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md) is amended for
+the daily check (see its Amendment).
 
 ## Context (0.1.0)
 
@@ -24,8 +24,8 @@ for everyone who does not turn the setting on.
 | Mode | Behaviour | Network requests |
 |---|---|---|
 | Off (default) | Only *Check for Updates…*, as in 0.1.0. | Only when you click. |
-| Check | CamLid asks the same GitHub endpoint about once a day while it runs. A newer release shows "Update available" in the Updates window, with the Releases link. It never downloads or installs. | At most one per day. |
-| Install | Not in this spec (see Out of scope). | — |
+| Check | CamLid asks the same GitHub endpoint once a day (24 hours) while it runs. A newer release shows "Update available" in the Updates window, with the Releases link. It never downloads or installs. | At most one per day. |
+| Install | Deferred (see Decisions). | — |
 
 ## User stories
 
@@ -57,23 +57,20 @@ for everyone who does not turn the setting on.
 - **SC-002** With Check on, a test shows at most one request per 24 hours, and none while a session is active.
 - **SC-003** Switching to Off stops scheduled checks immediately.
 
-## Prerequisites
+## Decisions (owner, 2026-11-09)
 
-- An accepted amendment to ADR 0004 (decision 4 and its consequences) that allows one daily check. Without it this spec
-  cannot ship.
-- Owner review of the privacy wording.
+1. **Amend ADR 0004 for an opt-in daily check.** Done: the amendment is recorded in ADR 0004. Install stays excluded.
+2. **Interval: once a day (24 hours).** Recorded as FR-003.
+3. **Install mode: deferred.** It is not in the next version. It needs the Developer ID decision first (spec 020, gate
+   G1), and the admin-install gap in SECURITY.md under "Known limits" must be closed before it ships.
+
+## Remaining before release
+
+- Owner review of the privacy wording in the README and SECURITY.md (FR-006).
+- Implementation, with tests for SC-001 to SC-003.
 
 ## Out of scope
 
-- **Install mode.** ADR 0004 excludes an in-app updater until the owner has a Developer ID (see
-  [spec 020](../020-v1-gates/spec.md), gate G1). Installing also has to handle helper reinstalls. The admin-install gap
-  in SECURITY.md under "Known limits" must be closed before that.
+- **Install mode.** See decision 3.
 - Beta or pre-release channels.
 - Notifications outside the Updates window and Settings.
-
-## Open decisions (owner)
-
-1. **Amend ADR 0004 to allow a daily check?** Proposed: yes, Check only. It sends one request a day, and the owner can
-   turn it off.
-2. **Interval.** Proposed: once a day. The alternative is once a week.
-3. **Install mode.** Proposed: not in the next version. Decide after the Developer ID question (spec 020, gate G1).

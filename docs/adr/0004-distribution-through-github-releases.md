@@ -1,6 +1,6 @@
 # ADR 0004: Distribution through GitHub releases, ad-hoc signed, no notarization, no in-app updater
 
-- **Status:** Accepted (owner decision, 2026-11-03)
+- **Status:** Accepted (owner decision, 2026-11-03); decision 4 amended 2026-11-09 (see Amendment)
 - **Affects:** README, `scripts/release.sh`, the Updates window; supersedes the signed-beta plan (spec 006, M5–M7)
 - **Builds on:** [ADR 0001](0001-persistent-helper-and-strict-experimental-mode.md) (no Apple-side registration)
 
@@ -45,3 +45,14 @@ release:
 Intel Macs (the support rows are Apple silicon), a Homebrew cask, and CI builds (a GitHub runner with Xcode 27 is
 needed first). The `camlid` command-line tool ships inside the app bundle (Contents/Helpers/camlid), sealed by the
 app's signature.
+
+## Amendment (2026-11-09): opt-in daily check
+
+Decision 4 is amended for the release after 0.1.0 ([spec 021](../../specs/021-automatic-updates/spec.md)). *Check for
+Updates…* stays the manual check. A new setting, Check, is off by default. When the owner turns it on, CamLid asks
+GitHub's public releases API at most once a day while it runs, and shows "Update available" with a link to the Releases
+page. The request is the same as the manual one: no account, no cookies, and no system profile.
+
+Install is still excluded. The app never downloads or installs an update, and no in-app updater is added until the owner
+has a Developer ID (see the consequences above and [spec 020](../../specs/020-v1-gates/spec.md), gate G1). Until the
+setting ships, decision 4 stands as written.
