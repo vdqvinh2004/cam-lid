@@ -21,7 +21,8 @@ build_swift() {
   pkg="$1"; shift
   if [ "$CONFIG" = release ]; then
     env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "$pkg" "$@" \
-      -Xswiftc -file-prefix-map -Xswiftc "$SRCROOT=." -Xswiftc -debug-prefix-map -Xswiftc "$SRCROOT=."
+      -Xswiftc -file-prefix-map -Xswiftc "$SRCROOT=." -Xswiftc -debug-prefix-map -Xswiftc "$SRCROOT=." \
+      -Xcc -ffile-prefix-map="$SRCROOT=." -Xcc -fdebug-prefix-map="$SRCROOT=."
   else
     env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "$pkg" "$@"
   fi
