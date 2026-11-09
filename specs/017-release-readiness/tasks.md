@@ -1,6 +1,6 @@
 # Tasks: Release readiness for v0.1.0
 
-**Feature context:** `017-release-readiness` · **Status:** 16/19 checked (T015 partly, T033 and T035 open). Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `017-release-readiness` · **Status:** 17/19 checked (T015 partly, T035 open). Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [x] T001 Owner decides Q-A: Strict stays visible, labelled experimental. — 2026-11-05.
@@ -54,7 +54,7 @@
   CDHashes, zip SHA-256). Checked in the signed local build's notes; no "Pre-release" or "Preview". — 2026-11-05.
 - [x] T032 [US3] README status and build text match the signed release (not notarized, self-signed certificate,
   refusal without the identity). — 2026-11-05.
-- [ ] T033 [US3] Enable Private vulnerability reporting (owner signs in to `gh`, or uses the web page). — 2026-11-06: deferred by the owner for now. Until it is on, the link in SECURITY.md does not work, and the release criterion in spec.md (line 56) is not met.
+- [x] T033 [US3] Enable Private vulnerability reporting (owner signs in to `gh`, or uses the web page). — 2026-11-09: repository made public and reporting enabled through `gh api` (`{"enabled":true}`). SECURITY.md also offers e-mail.
 - [x] T034 [US3] Full test run in all packages; signed build; install; `helper status` installed. — 2026-11-05: a signed
   local build was installed and `helper status` reports installed. CamLidPowerWire (11), CamLidPowerHelper (94),
   LidRecoveryJournal (21), LidNativeAdapter (22) and LidRecoveryBroker (33) pass. 2026-11-06: release built from commit
