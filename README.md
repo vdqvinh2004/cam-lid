@@ -148,6 +148,7 @@ cookies or system profile.
   [ADR 0003](docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md),
   [ADR 0004](docs/adr/0004-distribution-through-github-releases.md).
 - [Security policy](SECURITY.md) and [contributing](CONTRIBUTING.md); `scripts/release.sh` builds a release.
+- [Constitution](.specify/memory/constitution.md).
 
 ## Limits
 

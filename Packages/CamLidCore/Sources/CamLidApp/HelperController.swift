@@ -130,6 +130,7 @@ import CamLidCore
         case "bootstrapFailed": return "macOS refused to start the helper. Nothing was left installed; try again or restart the Mac."
         case "foreignPinsPresent": return "An earlier CamLid identity file exists. In Terminal run: sudo camlid helper install --replace-pins"
         case "alreadyInstalledDifferently": return "A different helper is already installed. Remove it first."
+        case "helperSignerMismatch": return "The helper is not signed by the same certificate as CamLid, so it was not installed."
         case "restoreUnresolved": return "The sleep setting could not be restored, so the helper was kept. Check `pmset -g`."
         default: return "Helper \(result.reason) failed."
         }

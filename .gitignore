@@ -61,3 +61,15 @@ venv/
 
 # Release builds (scripts/release.sh)
 dist/
+
+# Signing material: certificates, private keys and PKCS#12 backups never belong in the repository.
+*.p12
+*.pfx
+*.pem
+*.key
+*.cer
+*.crt
+*.keychain
+*.keychain-db
+*.mobileprovision
+password.txt

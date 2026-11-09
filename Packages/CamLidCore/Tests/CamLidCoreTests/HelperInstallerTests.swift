@@ -159,6 +159,15 @@ private struct Rig {
         #expect(rig.installer().install(appBundle: rig.app).reason == "identitiesNotDistinct")
     }
 
+    @Test func refusesAHelperSignedByAnotherIdentity() throws {
+        let rig = try Rig()
+        rig.runner.leaves = ["CamLid.app": String(repeating: "c", count: 40)]          // app signed; helper ad hoc
+        #expect(rig.installer().install(appBundle: rig.app).reason == "helperSignerMismatch")
+        rig.runner.leaves["camlid-power-helper"] = String(repeating: "d", count: 40)    // helper signed by another certificate
+        #expect(rig.installer().install(appBundle: rig.app).reason == "helperSignerMismatch")
+        #expect(rig.installer().status(appBundle: rig.app) == .notInstalled)
+    }
+
     @Test func trustRepinsAfterARebuildAndRestartsTheHelper() throws {
         let rig = try Rig()
         #expect(rig.installer().install(appBundle: rig.app).accepted)

@@ -137,6 +137,9 @@ public struct HelperInstaller: Sendable {
             return .refused("signatureUnreadable", "Sign the app and helper before installing.")
         }
         guard helperHash != appHash else { return .refused("identitiesNotDistinct") }
+        // The helper runs as root and is pinned as trusted: it must be signed by the same certificate as the app
+        // (or both ad hoc). A helper signed by anything else, such as one swapped into the app bundle, is refused.
+        guard signerLeaf(of: source) == signerLeaf(of: appBundle) else { return .refused("helperSignerMismatch") }
         var movedPins = false
         switch status(appBundle: appBundle) {
         case .notInstalled:
@@ -214,6 +217,7 @@ public struct HelperInstaller: Sendable {
             return .refused("signatureUnreadable")
         }
         guard helperHash != appHash else { return .refused("identitiesNotDistinct") }
+        guard signerLeaf(of: paths.helperBinary) == signerLeaf(of: appBundle) else { return .refused("helperSignerMismatch") }
         do {
             try write(pinData(app: appHash, helper: helperHash, appSigner: signerLeaf(of: appBundle),
                               helperSigner: signerLeaf(of: paths.helperBinary)), to: paths.pinFile, mode: 0o644)
