@@ -21,3 +21,11 @@ these CLIs directly.
 - Auto works for directly run agents without touching them; accuracy is lower than lifecycle events, mainly when a
   model thinks for a long time with no visible activity. Thresholds are calibrated on real sessions (spec 015 T401).
 - Spec 004 tasks that install integrations (T003, T004, T005, T007, T011) are closed by this decision.
+
+## Amendment (2026-11-09): one project skill file
+
+Decision 1 is amended for one file. [Spec 022](../../specs/022-agent-skill/spec.md) lets the user choose, with a button in
+Settings › General, to have CamLid write `.agents/skills/camlid/SKILL.md` into a project folder they pick. CamLid writes
+that file only when the user presses the button, never at launch, and never overwrites a file it did not write. The skill
+is a plain instruction file that agents read. It is not a hook, plugin, wrapper or agent configuration, and it never takes
+part in an agent's process. Everything else in decision 1 stands.

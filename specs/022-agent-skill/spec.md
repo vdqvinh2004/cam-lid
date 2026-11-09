@@ -1,44 +1,63 @@
 # Feature Specification: Agent skill for the CamLid command
 
-**Status:** Planned for the release after 0.1.0. Not in 0.1.0. No code and no file yet.
+**Status:** Decided 2026-11-09. The skill file is in the repository now. The Settings button and the app side ship in the
+release after 0.1.0. No app code yet.
 
 ## Context
 
-- The `camlid` command inside the app is already on the Mac. It is the control surface for AI agents. An MCP server is
-  out of scope.
-- [ADR 0002](../../docs/adr/0002-observer-only-agent-activity.md): CamLid installs no hooks, plugins or wrappers and never
-  edits an agent's configuration.
+- The `camlid` command inside the app is the only control surface for AI agents. An MCP server is out of scope.
+- [ADR 0002](../../docs/adr/0002-observer-only-agent-activity.md) forbids CamLid from editing an agent's configuration.
+  Decision 3 below amends it for one file.
+- Agents that follow the `.agents/skills/<name>/SKILL.md` convention read the skill from the project root, the same way
+  they read the spec-kit skills already in this repository.
 
 ## Goal
 
-Give AI agents one short skill file that says when and how to use `camlid`: keep the Mac awake for one command, check
-the state, start or stop a session, and diagnose.
+Give AI agents one short skill that says when and how to use `camlid`. Let each user choose whether the skill is added to
+their project.
 
 ## Requirements
 
-- **FR-001** One skill file in the SKILL.md format, in English, under 80 lines, with no secrets.
-- **FR-002** It covers only these commands: `camlid status --json`, `camlid run -- <command>`,
-  `camlid start --mode auto|timed --duration <value>`, `camlid stop`, `camlid diagnose --json`, `camlid helper status`.
-- **FR-003** It tells agents not to change CamLid's settings, not to install or remove the helper (that needs an
-  administrator password), not to stop a session they did not start, and not to retry a refused `start` in a loop.
-- **FR-004** Before each release, every command in the file is checked against the installed `camlid` binary.
-- **FR-005** CamLid never writes the skill into an agent's folder by itself. The user copies it.
+- **FR-001** The skill lives at `.agents/skills/camlid/SKILL.md` at the repository root. It is in English, under 80 lines,
+  and has no secrets. Done: 49 lines.
+- **FR-002** It covers `camlid status --json`, `camlid run -- <command>`, `camlid start --mode auto|timed --duration <value>`,
+  `camlid stop`, `camlid diagnose --json` and `camlid helper status --json`. It does not cover installing or removing the
+  helper.
+- **FR-003** It tells agents not to change CamLid's settings, not to stop a session they did not start, not to retry a
+  refused `start` in a loop, and to ask the user to run helper commands that need an administrator password.
+- **FR-004** Before each release, each command in the file is run or parsed against the installed `camlid` binary.
+  Checked on 2026-11-09: `run`, `stop` (no session), `status`, `helper status`, `diagnose`, and a refused
+  `start --duration 2m`.
+- **FR-005** Settings › General gets a button, "Let AI agents use CamLid". It is off by default.
+- **FR-006** Turning the button on asks the user for a project folder, then writes `.agents/skills/camlid/SKILL.md` in that
+  folder. CamLid writes only after the user presses the button, and never at launch.
+- **FR-007** CamLid never overwrites a `.agents/skills/camlid/SKILL.md` it did not write. It asks first.
+- **FR-008** Turning the button off removes only the file CamLid wrote, and only if its contents are unchanged.
+- **FR-009** The app bundles the same SKILL.md, copied from the repository at build time, so the button works for users who
+  downloaded the zip. The release script fails if the bundled copy differs from the repository file.
+- **FR-010** The only file CamLid may write is that one skill file. No hooks, plugins, wrappers or agent settings.
 
 ## Success criteria
 
 - **SC-001** An agent that reads the skill keeps a build awake with `camlid run` and reports the result, without asking
   the user how.
-- **SC-002** Each command in the skill gives the output the file describes, checked on the release build.
+- **SC-002** Turning the button on writes exactly one file, and turning it off removes only that file.
+- **SC-003** The bundled skill matches the repository file in every release.
 
-## Decisions (owner)
+## Decisions (owner, 2026-11-09)
 
-1. **Where the file ships:** in the repository only, or also in the app bundle. Proposed: repository, and the README
-   links to it.
-2. **A `camlid skill` command** that prints the file. It adds code and needs a new version. Proposed: not in the first
-   version of the skill.
-3. **Amend ADR 0002** so that CamLid can install the skill on request. Proposed: no. Keep the observer-only rule.
+1. **Location:** the repository root `.agents/` folder, not `.agent`. It is the folder the existing skills use. Done.
+2. **Opt-in button** in Settings › General, off by default. It writes one file into a project folder the user chooses.
+3. **ADR 0002 amended** for that one file. Hooks, plugins, wrappers and agent settings stay forbidden.
+4. **No `camlid skill` command.** The app bundles the file (FR-009), so one is not needed.
+
+## Tradeoff
+
+- An agent that reads only its own folder (for example `.claude/skills`) will not see a skill that lives in `.agents`.
+  Copying the file into agent folders would change agent configuration, which ADR 0002 forbids. That is a separate
+  decision.
 
 ## Out of scope
 
-- An MCP server, a plugin or a hook. The owner has decided that the CLI is enough.
-- Automatic installation into an agent's folder. It conflicts with ADR 0002 unless decision 3 changes.
+- An MCP server, a plugin or a hook.
+- Writing into any agent's own configuration folder.
