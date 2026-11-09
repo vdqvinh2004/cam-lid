@@ -95,7 +95,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         settingsEditor?.permissionSettingsError = state.permissionSettingsError
         settingsEditor?.automaticUpdateChecks = state.automaticUpdateChecks
         settingsEditor?.agentSkillPath = state.agentSkillPath
-        settingsEditor?.browserAudioHold = state.browserAudioHold
+        settingsEditor?.watchedMusic = state.watchedMusic
         if popover?.isShown == true { dashboard(show: false) }
         if onboardingWindow?.isVisible == true { showOnboarding(show: false) }
         if updatesWindow?.isVisible == true { showUpdates(show: false) }
@@ -248,8 +248,8 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         editor.automaticUpdateChecks = state.automaticUpdateChecks; editor.agentSkillPath = state.agentSkillPath
         editor.onSetAutomaticUpdateChecks = { [weak self] in self?.send(.setAutomaticUpdateChecks($0)) }
         editor.onSetAgentSkill = { [weak self] in self?.setAgentSkill($0) }
-        editor.browserAudioHold = state.browserAudioHold
-        editor.onSetBrowserAudioHold = { [weak self] in self?.send(.setBrowserAudioHold($0)) }
+        editor.watchedMusic = state.watchedMusic
+        editor.onSetMusicSource = { [weak self] source, on in self?.send(.setMusicSource(source, on)) }
         editor.configureAsyncAutosave { [weak self] patch, revision in
             await self?.commit(patch, revision: revision) ?? .failed("App unavailable. Input preserved.")
         }

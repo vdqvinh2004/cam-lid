@@ -83,12 +83,12 @@ public final class SettingsEditor: ObservableObject {
     @Published public var agentSkillPath: String?
     public var onSetAutomaticUpdateChecks: ((Bool) -> Void)?
     public var onSetAgentSkill: ((Bool) -> Void)?
-    /// Spec 023, User Story 3: the Chromium audio hold switch. The persistent app stores it.
-    @Published public var browserAudioHold = false
-    public var onSetBrowserAudioHold: ((Bool) -> Void)?
-    public func setBrowserAudioHold(_ on: Bool) {
-        browserAudioHold = on
-        onSetBrowserAudioHold?(on)
+    /// Spec 025: the music sources that keep an Auto session awake. The persistent app stores them.
+    @Published public var watchedMusic: Set<MusicSource> = []
+    public var onSetMusicSource: ((MusicSource, Bool) -> Void)?
+    public func setMusicSource(_ source: MusicSource, _ on: Bool) {
+        if on { watchedMusic.insert(source) } else { watchedMusic.remove(source) }
+        onSetMusicSource?(source, on)
     }
     public func setAutomaticUpdateChecks(_ on: Bool) {
         automaticUpdateChecks = on

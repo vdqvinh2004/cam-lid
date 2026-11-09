@@ -23,7 +23,7 @@ Implemented 2026-11-09, not committed. Evidence is the focused and full CamLidCo
 ## Phase 3 — Chromium audio hold (US3; FR-007, SC-004; from spec 019 T080–T083)
 - [x] T030 [T080] `AudioPlaybackSignal`: the named "Playing audio" assertion of `NoIdleSleepAssertion` held by a browser process. The filter is pure and tested; the IOKit reader is live only.
 - [x] T031 [T081] Implemented as a switch in Watched programs, "Keep Auto awake while a Chromium browser plays audio", not as a new rule row. Tradeoff: no new rule kind and no config field; the switch is a preference, like the update check.
-- [~] T032 [T082] The hold ends 60 s after the last playback observation (`AudioPlaybackHold`). It only counts for Auto sessions, through the policy's hold reason `browserAudioPlayback`. The Dashboard shows "A Chromium browser is playing audio." Activity records start and end only as state transitions; not checked in the history.
+- [~] T032 [T082] Superseded by spec 025. The hold no longer waits 60 s after playback: it bridges 10 s between samples, then Sleep when done applies. It still counts only for Auto sessions, through the policy's hold reason, now `musicPlayback`. Activity records start and end only as state transitions; not checked in the history.
 - [x] T033 [T082] Tests in `AudioPlaybackSignalTests`: holds while the signal exists, ends after the quiet period, never holds without a signal, ignores other assertions and other apps.
 - [~] T034 [T083] Live check with Brave on this Mac (2026-11-09): its "Playing audio" assertion appears while audio plays and is released after pause. CamLid's hold decision was not isolated (Orca had two working tasks). Other browsers not run ([qa-evidence.md](../024-release-readiness-v0.2/qa-evidence.md)).
 

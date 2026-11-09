@@ -229,10 +229,12 @@ struct CLITests {
     @Test("simulate --use-current-config uses the saved settings and names them")
     func simulateUsesSavedSettings() throws {
         var context = try ownedContext()
+        let savedFile = URL(fileURLWithPath: "/fake/History/preferences.json")
+        context.settingsURL = savedFile
         var saved = try Configuration()
         saved.mode = .timed
         let file = PersistedSettings(schemaVersion: 1, revision: 2, configuration: saved)
-        context.files[PersistedSettings.defaultURL.path] = String(decoding: try JSONEncoder().encode(file), as: UTF8.self)
+        context.files[savedFile.path] = String(decoding: try JSONEncoder().encode(file), as: UTF8.self)
         let result = dispatch(["simulate", "--scenario", "scenario.json", "--use-current-config"], context: &context)
         #expect(result.exitCode == 0)
         let dict = try jsonDict(result)
@@ -243,10 +245,12 @@ struct CLITests {
     @Test("simulate --use-current-config uses the defaults when nothing is saved and refuses a broken file")
     func simulateUseCurrentConfigFallbacks() throws {
         var context = try ownedContext()
+        let savedFile = URL(fileURLWithPath: "/fake/History/preferences.json")
+        context.settingsURL = savedFile
         let missing = dispatch(["simulate", "--scenario", "scenario.json", "--use-current-config"], context: &context)
         #expect(missing.exitCode == 0)
         #expect(try jsonDict(missing)["configSource"] as? String == "defaults")
-        context.files[PersistedSettings.defaultURL.path] = "not json"
+        context.files[savedFile.path] = "not json"
         let broken = dispatch(["simulate", "--scenario", "scenario.json", "--use-current-config"], context: &context)
         #expect(broken.exitCode == 2)
         #expect(try jsonDict(broken)["reason"] as? String == "invalidSettings")

@@ -180,7 +180,7 @@ struct UISimplicityTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("camlid-ui-test-" + UUID().uuidString)
         let prefs = MemoryPreferences()
         defer { try? FileManager.default.removeItem(at: root) }
-        let app = AppCoordinator(historyDirectory: root, controlDirectory: root.appendingPathComponent("control"), preferences: prefs)
+        let app = AppCoordinator(locations: .test(root: root, history: root), preferences: prefs)
         var off = ConfigPatch(); off.mode = .off
         guard case .saved = await app.applySettingsPatchAsync(off, expectedRevision: 1) else {
             Issue.record("Off preference did not persist"); return

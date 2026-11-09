@@ -412,10 +412,6 @@ public struct PersistedSettings: Codable, Sendable {
         self.configuration = configuration
     }
 
-    public static var defaultURL: URL {
-        FileHistoryStorage.defaultDirectory.appendingPathComponent(fileName)
-    }
-
     /// Accepts only what the app accepts: the current schema, revision 1 or later, and a valid configuration.
     public static func validated(_ data: Data) -> PersistedSettings? {
         guard let saved = try? JSONDecoder().decode(PersistedSettings.self, from: data),

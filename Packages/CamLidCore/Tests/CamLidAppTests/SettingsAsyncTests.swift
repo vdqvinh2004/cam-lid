@@ -82,8 +82,7 @@ struct SettingsAsyncTests {
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
             fileWritten.markWritten()
         }
-        let app = AppCoordinator(historyDirectory: fixture.root.appendingPathComponent("history"),
-            controlDirectory: fixture.root.appendingPathComponent("control"), preferences: fixture.preferences, settingsWriter: writer)
+        let app = AppCoordinator(locations: .test(root: fixture.root), preferences: fixture.preferences, settingsWriter: writer)
         var patch = ConfigPatch(); patch.completionDelayMinutes = 7
         if case .failed = await app.applySettingsPatchAsync(patch, expectedRevision: 1, deadline: ContinuousTime.now + 0.03) {} else { Issue.record("Expected timeout") }
         if case .failed = await app.applySettingsPatchAsync(patch, expectedRevision: 1) {} else { Issue.record("Expected busy worker refusal") }
@@ -112,7 +111,7 @@ struct SettingsAsyncTests {
             try data.write(to: url)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         }
-        let app = AppCoordinator(historyDirectory: fixture.root.appendingPathComponent("history"), preferences: fixture.preferences, settingsWriter: writer)
+        let app = AppCoordinator(locations: .test(root: fixture.root), preferences: fixture.preferences, settingsWriter: writer)
         var first = ConfigPatch(); first.completionDelayMinutes = 7
         let pending = Task { await app.applySettingsPatchAsync(first, expectedRevision: 1) }
         try await Task.sleep(for: .milliseconds(5))

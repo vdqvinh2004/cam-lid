@@ -42,8 +42,7 @@ struct PowerHoldIntegrationTests {
         }, keepAwakeApps: { keepAwake })
         helper.refresh()
         await settle { helper.state == "installed" }
-        let app = AppCoordinator(historyDirectory: support.root.appendingPathComponent("history"),
-            controlDirectory: support.root.appendingPathComponent("control"),
+        let app = AppCoordinator(locations: .test(root: support.root),
             preferences: support.preferences,
             healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) },
             helperController: helper, holdTransportFactory: { transport }, closedLidSupportRow: { row },
@@ -241,8 +240,7 @@ struct PowerHoldIntegrationTests {
         helper.refresh()
         await settle { helper.state == "installed" }
         func launch() -> AppCoordinator {
-            AppCoordinator(historyDirectory: support.root.appendingPathComponent("history"),
-                controlDirectory: support.root.appendingPathComponent("control"),
+            AppCoordinator(locations: .test(root: support.root),
                 preferences: support.preferences,
                 healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) },
                 helperController: helper, holdTransportFactory: { FakeHoldTransport() }, closedLidSupportRow: { nil },

@@ -99,6 +99,6 @@ Native banner/consent checks still require observing the real main QA app separa
 
 ## Isolated app cleanup
 
-Use an existing, uniquely identified QA root and bundle; embed `CamLidQAStateDirectory` in a QA copy's Info.plist or pass `--qa-state-directory` at launch. The root must already exist. Never change the installed app's identity/preferences to make QA easier.
+Use an existing, uniquely identified QA root and bundle. Embed `CamLidQAStateDirectory` in the QA copy's Info.plist: its command-line tool reads its folder only from there, and without it the tool reaches no folder. `--qa-state-directory` at launch sets the app's folder alone. The root must already exist. Never change the installed app's identity/preferences to make QA easier.
 
 Quit through that app's isolated control socket, then confirm its exact parent/helper PIDs have exited and its bundle ID is absent from `NSWorkspace.runningApplications`. A CLI quit acknowledgement precedes termination. A filtered whole-process listing or empty layer-0 window list is insufficient: accessory apps and layer-25 popovers can be omitted. Keep the complete bundle and resources present until every owned process exits; removing a live bundle can trap `Bundle.module` resource loading. Only then unregister/remove the task-owned app and temporary root. Leave installed Preview running and keep native permission/appearance settings at their original values. Native input checks require an unlocked desktop; do not send input to the lock screen.

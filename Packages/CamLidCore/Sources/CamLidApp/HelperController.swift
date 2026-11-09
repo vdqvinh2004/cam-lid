@@ -132,6 +132,7 @@ import CamLidCore
         case "alreadyInstalledDifferently": return "A different helper is already installed. Remove it first."
         case "helperSignerMismatch": return "The helper is not signed by the same certificate as CamLid, so it was not installed."
         case "restoreUnresolved": return "The sleep setting could not be restored, so the helper was kept. Check `pmset -g`."
+        case "qaCopy": return "A QA copy never installs or removes the closed-lid helper."
         default: return "Helper \(result.reason) failed."
         }
     }
@@ -142,6 +143,11 @@ import CamLidCore
         guard ["install", "uninstall"].contains(operation),
               !executable.isEmpty, !executable.contains(where: { "'\"\\\n\r".contains($0) }) else { return nil }
         return "'\(executable)' --helper-admin \(operation)"
+    }
+
+    /// The answer a QA copy gets for every install or removal: no administrator prompt, and the shared helper stays as it is.
+    nonisolated static func refuseAdministratorCommand(_ operation: String) -> HelperOperationResult {
+        HelperOperationResult(accepted: false, reason: "qaCopy", detail: nil)
     }
 
     nonisolated static func runWithAdministratorPrompt(operation: String) -> HelperOperationResult {
@@ -180,6 +186,8 @@ import CamLidCore
 public enum HelperAdminCommand {
     public static func runIfRequested(arguments: [String], appBundle: URL = Bundle.main.bundleURL) -> Int32? {
         guard let index = arguments.firstIndex(of: "--helper-admin"), index + 1 < arguments.count else { return nil }
+        // Even run as root, a QA copy never changes the shared helper (see `StateLocations`).
+        if StateLocations.qaRoot(inAppBundle: appBundle) != nil { print("helper-admin: qaCopy"); return 1 }
         let installer = HelperInstaller()
         let result: HelperOperationResult
         switch arguments[index + 1] {

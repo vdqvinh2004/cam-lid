@@ -13,7 +13,7 @@ struct ControlIntegrationTests {
         let defaults = MemoryPreferences()
         defer { try? FileManager.default.removeItem(at: root) }
         let control = root.appendingPathComponent("control")
-        let coordinator = AppCoordinator(historyDirectory: root.appendingPathComponent("history"), controlDirectory: control, preferences: defaults)
+        let coordinator = AppCoordinator(locations: .test(root: root, control: control), preferences: defaults)
         coordinator.startControlService()
         defer { coordinator.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification)) }
         let channel = LocalControlChannel(directory: control)
@@ -57,7 +57,7 @@ struct ControlIntegrationTests {
         let root = URL(fileURLWithPath: "/tmp/cl-mode-\(UUID().uuidString)")
         let defaults = MemoryPreferences()
         defer { try? FileManager.default.removeItem(at: root) }
-        let coordinator = AppCoordinator(historyDirectory: root, preferences: defaults,
+        let coordinator = AppCoordinator(locations: .test(root: root, history: root), preferences: defaults,
             healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) })
         coordinator.changeMode(.timed)
         await coordinator.startPreviewSession()
@@ -82,7 +82,7 @@ struct ControlIntegrationTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let defaults = MemoryPreferences()
         let control = root.appendingPathComponent("control")
-        let coordinator = AppCoordinator(historyDirectory: root.appendingPathComponent("history"), controlDirectory: control, preferences: defaults)
+        let coordinator = AppCoordinator(locations: .test(root: root, control: control), preferences: defaults)
         coordinator.startControlService()
         defer { coordinator.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification)) }
         let channel = LocalControlChannel(directory: control)
@@ -92,7 +92,7 @@ struct ControlIntegrationTests {
         #expect(dry.exitCode == 0)
         let apply = await Task.detached { Commands.runWithRealIO(argv: ["config", "set", "--file", patch.path], channel: channel) }.value
         #expect(apply.exitCode == 0)
-        let restored = AppCoordinator(historyDirectory: root.appendingPathComponent("history"), controlDirectory: root.appendingPathComponent("unused"), preferences: defaults)
+        let restored = AppCoordinator(locations: .test(root: root, control: root.appendingPathComponent("unused")), preferences: defaults)
         let restoredResult = try JSONDecoder().decode(CLIResult.self, from: restored.handleControl(.configGet, payload: Data()))
         #expect(restoredResult.json.contains("\"runCapMinutes\":30"))
         let get = await Task.detached { Commands.runWithRealIO(argv: ["config", "get"], channel: channel) }.value

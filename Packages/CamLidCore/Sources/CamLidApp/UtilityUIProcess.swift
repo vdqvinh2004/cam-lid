@@ -32,7 +32,7 @@ struct UtilityUIState: Codable, Sendable {
     var capabilityText = ""
     var automaticUpdateChecks = false
     var agentSkillPath: String?
-    var browserAudioHold = false
+    var watchedMusic: Set<MusicSource> = []
 }
 enum UtilityUICommand: Codable, Sendable {
     case show(UtilitySurface, UtilityUIState)
@@ -73,7 +73,7 @@ case settings(SettingsSection)
     case authorizeAccessibility, refreshPermissions
     case openPermissionSettings(AppPermission)
     case setAutomaticUpdateChecks(Bool)
-    case setBrowserAudioHold(Bool)
+    case setMusicSource(MusicSource, Bool)
     case agentSkill(AgentSkillRequest)
 }
 

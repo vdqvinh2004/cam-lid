@@ -7,7 +7,7 @@ import Dispatch
 public struct LocalControlChannel: IPCChannel {
     public let directory: URL
     public static var defaultDirectory: URL { URL(fileURLWithPath: "/tmp/camlid-\(getuid())", isDirectory: true) }
-    public init(directory: URL = Self.defaultDirectory) { self.directory = directory }
+    public init(directory: URL) { self.directory = directory }
 
     public func send(command: AllowlistedCommand, payload: Data) throws -> Data {
         _ = try BoundedPayload(payload)
@@ -60,7 +60,7 @@ public final class LocalControlServer: @unchecked Sendable {
     // Handler capacity is separate from frame reception and response writes.
     private let controlQueue = DispatchQueue(label: "camlid.local-control.priority", attributes: .concurrent)
     private let exportQueue = DispatchQueue(label: "camlid.local-control.export")
-    public init(directory: URL = LocalControlChannel.defaultDirectory) { self.directory = directory }
+    public init(directory: URL) { self.directory = directory }
     deinit { stop() }
 
     public func start(handler: @escaping @Sendable (AllowlistedCommand, Data) throws -> Data) throws {

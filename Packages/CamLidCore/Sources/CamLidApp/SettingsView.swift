@@ -418,11 +418,13 @@ private struct WatchedProgramsSection: View {
 
     var body: some View {
         Section {
-            Toggle("Keep Auto awake while a Chromium browser plays audio", isOn: Binding(get: { editor.browserAudioHold },
-                set: { editor.setBrowserAudioHold($0) }))
-                .help("Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium only. Other apps are not detected.")
-                .accessibilityLabel("Keep Auto awake while a Chromium browser plays audio")
-                .accessibilityIdentifier("camlid.settings.browserAudioHold")
+            ForEach(MusicSource.allCases, id: \.self) { source in
+                Toggle(source.toggleTitle, isOn: Binding(get: { editor.watchedMusic.contains(source) },
+                    set: { editor.setMusicSource(source, $0) }))
+                    .help(source.help)
+                    .accessibilityLabel(source.toggleTitle)
+                    .accessibilityIdentifier("camlid.settings.music." + source.rawValue)
+            }
             ForEach(rules) { rule in
                 HStack {
                     Toggle(isOn: Binding(

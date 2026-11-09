@@ -40,7 +40,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private let history: AsyncHistoryRecorder
     private let sensors = LiveSensorProvider()
     private let healthReader: (() -> HealthSnapshot)?
-    private let loginItem = LoginItemController()
+    private let loginItem: LoginItemController
+    /// True for a QA copy: its folders, helper, login item and shortcut are its own (see `StateLocations`).
+    private let isQACopy: Bool
     private let helper: HelperController
     private var holdReconciler = PowerHoldReconciler()
     private var holdTransport: (any PowerHoldTransport)?
@@ -49,13 +51,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private let displayAwake = KeepAwakeAssertion(system: .live(assertionType: "PreventUserIdleDisplaySleep"),
         reason: KeepAwakeAssertion.displayReason)
     private var displayChoice = DisplaySleepChoice()
-    /// Spec 023, User Story 3: the Chromium audio hold. Its switch is a preference, set from Settings.
-    private var audioHold = AudioPlaybackHold()
-    private var audioHoldInForce = false
+    /// Spec 025: the music hold. Its switches are preferences, set from Settings.
+    private var musicHold = MusicPlaybackHold()
+    private var musicHolding: Set<MusicSource> = []
     /// Wall-clock budget for one settings write (spec 024). The app keeps 0.7 s; the test fixtures raise it, because a
     /// budget that short fails under CPU load and the tests then report a save that did not happen.
     var settingsWriteBudget: Double = 0.7
-    private static let browserAudioHoldKey = "CamLidBrowserAudioHold"
+    private static func musicKey(_ source: MusicSource) -> String { "CamLidMusicHold." + source.rawValue }
     private let shortcut = GlobalHotKey()
     private var commandAdmissions = CommandAdmissions()
     /// Identifies this app instance in admissions: a relaunch makes older receipts stale.
@@ -145,24 +147,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private static let configKey = "CamLidConfigurationV1"
 
     public override convenience init() {
-        let arguments = ProcessInfo.processInfo.arguments
-        let qaPath: String? = {
-            if let index = arguments.firstIndex(of: "--qa-state-directory"), arguments.count > index + 1 { return arguments[index + 1] }
-            return Bundle.main.object(forInfoDictionaryKey: "CamLidQAStateDirectory") as? String
-        }()
-        if let qaPath {
-            let root = URL(fileURLWithPath: qaPath, isDirectory: true)
-            let preferences = UserDefaults(suiteName: "CamLidQA." + root.lastPathComponent) ?? .standard
-            self.init(historyDirectory: root.appendingPathComponent("history"),
-                controlDirectory: root.appendingPathComponent("control"), preferences: preferences,
-                agentSkillHome: root.appendingPathComponent("home", isDirectory: true))
-            return
-        }
-        self.init(historyDirectory: FileHistoryStorage.defaultDirectory)
+        let locations = StateLocations.forApp(bundle: Bundle.main.bundleURL, arguments: ProcessInfo.processInfo.arguments)
+        // A QA copy keeps its preferences in a suite of its own, never in the owner's domain.
+        let preferences: any PreferenceStore = locations.qaRoot.flatMap { UserDefaults(suiteName: "CamLidQA." + $0.lastPathComponent) } ?? .standard
+        self.init(locations: locations, preferences: preferences)
     }
 
-    init(historyDirectory: URL, controlDirectory: URL = LocalControlChannel.defaultDirectory,
-         preferences: any PreferenceStore = UserDefaults.standard, agentSkillHome: URL = FileManager.default.homeDirectoryForCurrentUser,
+    init(locations: StateLocations, preferences: any PreferenceStore,
          settingsWriter: (@Sendable (Data, URL) throws -> Void)? = nil,
          settingsInstaller: (@Sendable (URL, URL) throws -> Void)? = nil,
          outcomeNotifications: OutcomeNotifications? = nil, permissions: AppPermissions? = nil,
@@ -174,18 +165,24 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
          activitySampler: (@Sendable (_ excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double))? = nil) {
         self.sampleActivityNow = activitySampler ?? { AppCoordinator.sampleActivity(NativeProcessList(), excludeUnderOrca: $0) }
         self.healthReader = healthReader
-        self.helper = helperController ?? HelperController()
-        self.makeHoldTransport = holdTransportFactory ?? { XPCPowerHoldTransport() }
+        // A QA copy never changes the shared helper, never reaches it, never registers a login item, never takes the shortcut.
+        self.isQACopy = locations.isQA
+        let refuseChanges: (@Sendable (String) -> HelperOperationResult)? = locations.isQA ? HelperController.refuseAdministratorCommand : nil
+        self.helper = helperController ?? HelperController(runAdmin: refuseChanges)
+        let transport: () -> any PowerHoldTransport = locations.isQA ? { UnreachableHoldTransport() } : { XPCPowerHoldTransport() }
+        self.makeHoldTransport = holdTransportFactory ?? transport
+        let refuseLogin: (() throws -> Void)? = locations.isQA ? { throw QACopyRefusal() } : nil
+        self.loginItem = LoginItemController(register: refuseLogin)
         self.systemIdentity = systemIdentity ?? { QualifiedSupportRows.currentSystem() }
         self.closedLidSupportRow = closedLidSupportRow ?? {
             let system = QualifiedSupportRows.currentSystem()
             return QualifiedSupportRows.matching(model: system.model, osBuild: system.osBuild)
         }
         self.preferences = preferences
-        self.agentSkillHome = agentSkillHome
+        self.agentSkillHome = locations.home
         self.outcomeNotifications = outcomeNotifications ?? OutcomeNotifications()
         self.permissions = permissions ?? AppPermissions()
-        self.configURL = historyDirectory.appendingPathComponent(PersistedSettings.fileName)
+        self.configURL = locations.settingsURL
         self.settingsInstaller = settingsInstaller ?? { source, destination in
             guard Darwin.rename(source.path, destination.path) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
@@ -201,8 +198,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
         }
-        controlServer = LocalControlServer(directory: controlDirectory)
-        let storage = FileHistoryStorage(directory: historyDirectory)
+        controlServer = LocalControlServer(directory: locations.control)
+        let storage = FileHistoryStorage(directory: locations.history)
         history = AsyncHistoryRecorder(store: ActivityStore(storage: storage), diagnostic: { storage.lastOperationError() })
         super.init()
         loadPersistedConfig()
@@ -212,7 +209,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         start()
-        _ = shortcut.register { [weak self] in self?.toggleAutoFromShortcut() }
+        if !isQACopy { _ = shortcut.register { [weak self] in self?.toggleAutoFromShortcut() } }
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
@@ -762,13 +759,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             }
             var policyConfig = config
             policyConfig.completionDelayMinutes = sessionSleepDelayMinutes ?? config.completionDelayMinutes
-            let browserAudio = browserAudioHoldReason(now: now)
+            let music = musicHoldReason(now: now)
             let decision = PolicyEngine.evaluate(
                 session: active, tasks: sleepRelevantTasks(now: now), health: health, config: policyConfig,
                 armed: true, safety: signal, recoveryConflict: false,
                 completionUncertain: agentCompletionUncertain()
                     || (!config.adapterEnrollment.isEmpty && now - lastProcessSuccess > 15),
-                lifetimeHoldReason: commandHoldReason(now: now) ?? lifetime?.holdReason ?? browserAudio
+                lifetimeHoldReason: commandHoldReason(now: now) ?? lifetime?.holdReason ?? music
                     ?? (hasLifetimeRules ? "lifetimeRuleUnknown" : nil),
                 lifetimeCompletionSuppressed: lifetime?.suppressesAutoCompletion ?? hasLifetimeRules,
                 nowMonotonic: now)
@@ -892,15 +889,23 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         (config.lifetimeRules ?? []).contains(where: \.enabled)
     }
 
-    /// Spec 023, User Story 3: while a Chromium browser plays audio, an Auto session stays working for a quiet period.
-    private func browserAudioHoldReason(now: Double) -> String? {
-        guard preferences.bool(forKey: Self.browserAudioHoldKey) else {
-            audioHold = AudioPlaybackHold()
-            audioHoldInForce = false
+    /// Spec 025: while a watched music source plays, an Auto session stays working. Nothing is read when no source is watched.
+    private func musicHoldReason(now: Double) -> String? {
+        let watched = watchedMusicSources()
+        guard !watched.isEmpty else {
+            musicHold = MusicPlaybackHold()
+            musicHolding = []
             return nil
         }
-        audioHoldInForce = audioHold.observe(now: now) { AudioPlaybackSignal.isPlayingAudio() }
-        return audioHoldInForce ? "browserAudioPlayback" : nil
+        musicHolding = musicHold.observe(now: now) {
+            MusicOutput.activeSources(in: MusicOutput.processes(), watched: watched)
+        }.intersection(watched)
+        return musicHolding.isEmpty ? nil : "musicPlayback"
+    }
+
+    /// Spec 025: the music sources the user turned on, from the preferences.
+    private func watchedMusicSources() -> Set<MusicSource> {
+        Set(MusicSource.allCases.filter { preferences.bool(forKey: Self.musicKey($0)) })
     }
 
     private func updateLifetimePolicy(now: Double) -> LifetimePolicyState? {
@@ -924,8 +929,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 "batteryFloor": "Battery below safety floor", "batteryUnknown": "Battery reading unavailable", "cpuStop": "Sustained CPU load exceeded limit"]
             return signal.reasons.map { labels[$0] ?? "Safety condition requires attention" }.joined(separator: ", ")
         }
-        if session?.requestedMode == .auto, audioHoldInForce {
-            return "A Chromium browser is playing audio."
+        if session?.requestedMode == .auto, !musicHolding.isEmpty {
+            let names = MusicSource.allCases.filter { musicHolding.contains($0) }.map(\.name)
+            return "Music is playing in \(names.joined(separator: " and "))."
         }
         if session?.requestedMode == .auto {
             guard let lifetime = latestLifetimeState else {
@@ -980,7 +986,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             systemModel: systemIdentity().model ?? "unknown", systemBuild: systemIdentity().osBuild ?? "unknown",
             keepAwakeApps: helper.keepAwakeApps, capabilityText: closedLidCapabilityText,
             automaticUpdateChecks: updates.automaticChecks, agentSkillPath: agentSkill.installedPath,
-            browserAudioHold: preferences.bool(forKey: Self.browserAudioHoldKey))
+            watchedMusic: watchedMusicSources())
     }
     private func showUtility(_ surface: UtilitySurface) {
         if surface == .settings { loginItem.refresh(); Task { await outcomeNotifications.refresh() } }
@@ -1057,7 +1063,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case .updates: menuBarOpenUpdates()
         case .checkUpdates: updates.check(); refresh()
         case .setAutomaticUpdateChecks(let on): updates.setAutomaticChecks(on); refresh()
-        case .setBrowserAudioHold(let on): preferences.set(on, forKey: Self.browserAudioHoldKey); refresh()
+        case .setMusicSource(let source, let on): preferences.set(on, forKey: Self.musicKey(source)); refresh()
         case .agentSkill(let request):
             utilityUI?.send(.agentSkillResult(agentSkill.perform(request)))
             refresh()

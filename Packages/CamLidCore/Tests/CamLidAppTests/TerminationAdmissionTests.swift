@@ -24,7 +24,7 @@ struct TerminationAdmissionTests {
 
     @Test @MainActor func stagingAdmittedBeforeQuitCannotInstallAfterQuitStarts() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
-        let app = AppCoordinator(historyDirectory: fixture.root.appendingPathComponent("history"),
+        let app = AppCoordinator(locations: .test(root: fixture.root),
             preferences: fixture.preferences, settingsWriter: { data, url in
                 Thread.sleep(forTimeInterval: 0.1)
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

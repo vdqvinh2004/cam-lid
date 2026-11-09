@@ -11,7 +11,7 @@ struct StartDurationTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let defaults = MemoryPreferences()
         defer { try? FileManager.default.removeItem(at: root) }
-        let coordinator = AppCoordinator(historyDirectory: root, preferences: defaults,
+        let coordinator = AppCoordinator(locations: .test(root: root, history: root), preferences: defaults,
             healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) })
         coordinator.changeMode(.timed)
         func start(_ duration: String) async throws -> CLIResult {
@@ -46,7 +46,7 @@ struct StartDurationTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let defaults = MemoryPreferences()
         defer { try? FileManager.default.removeItem(at: root) }
-        let coordinator = AppCoordinator(historyDirectory: root, preferences: defaults,
+        let coordinator = AppCoordinator(locations: .test(root: root, history: root), preferences: defaults,
             healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) })
         coordinator.changeMode(.auto)
         #expect(coordinator.dashboardData().statusTitle == "Ready")
@@ -63,7 +63,7 @@ struct StartDurationTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let defaults = MemoryPreferences()
         defer { try? FileManager.default.removeItem(at: root) }
-        let coordinator = AppCoordinator(historyDirectory: root, preferences: defaults,
+        let coordinator = AppCoordinator(locations: .test(root: root, history: root), preferences: defaults,
             healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) })
         coordinator.changeMode(.timed)
         func status() throws -> [String: Any] {

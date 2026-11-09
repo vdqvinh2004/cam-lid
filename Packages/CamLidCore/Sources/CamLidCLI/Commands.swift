@@ -51,6 +51,8 @@ public struct CommandContext: Sendable {
     public var fileWriter: (any CLIAtomicWriter)?
     public var historyStore: (any HistoryStorage)?
     public var recoveryService: (any RecoveryService)?
+    /// The saved settings file of the copy this tool belongs to (`StateLocations.settingsURL`). Nil reads nothing.
+    public var settingsURL: URL?
 
     public init(
         channel: (any IPCChannel)? = nil, ownerIdentity: String = "local-user",
@@ -133,15 +135,19 @@ public enum Commands {
     /// disk writer with no history store (unavailable until M4 lands), so
     /// config/simulate read real files, legacy integration commands refuse, and logs
     /// export honestly reports unavailable instead of inventing success.
-    public static func runWithRealIO(argv: [String], channel: (any IPCChannel)?) -> CLIResult {
+    public static func runWithRealIO(argv: [String], channel: (any IPCChannel)?, settingsURL: URL? = nil,
+                                     mayChangeHelper: Bool = false) -> CLIResult {
         if argv.first == "run" { return CommandRun.execute(arguments: Array(argv.dropFirst()), channel: channel) }
         let (name, options) = parse(argv: argv)
+        // Only the installed app changes the shared helper; a QA copy's tool never does (see `StateLocations`).
+        if !mayChangeHelper, name.hasPrefix("helper"), name != "helper status" { return fail(2, command: name, reason: "qaCopy") }
         var context = CommandContext(
             channel: channel,
             fileReader: DiskFileReader(),
             stdinReader: StandardInputReader(),
             fileWriter: DiskAtomicWriter(),
             historyStore: nil)
+        context.settingsURL = settingsURL
         if name.hasPrefix("watch ") {
             guard let channel else { return fail(4, command: name, reason: "appUnavailable") }
             return watchWithRealIO(name: name, options: options, channel: channel)
@@ -677,6 +683,8 @@ public enum Commands {
             if case .partial(let missing) = status { dict["missing"] = missing }
             return cliJSON(0, dict)
         }
+        // A QA copy never changes the shared helper, even when `--app` points at one (see `StateLocations`).
+        if StateLocations.qaRoot(inAppBundle: app) != nil { return fail(2, command: name, reason: "qaCopy") }
         let result: HelperOperationResult
         switch name {
         case "helper install":
@@ -729,7 +737,7 @@ public enum Commands {
         var source: String?
         if useCurrent {
             guard let saved = savedConfiguration(context: context) else {
-                return fail(2, command: "simulate", reason: "invalidSettings", detail: PersistedSettings.defaultURL.path)
+                return fail(2, command: "simulate", reason: "invalidSettings", detail: context.settingsURL?.path)
             }
             config = saved.config
             source = saved.source
@@ -752,8 +760,9 @@ public enum Commands {
     /// Saved settings for `simulate --use-current-config`. No saved file means the defaults, as the app uses.
     /// Nil when the file is present but is not a valid saved configuration.
     static func savedConfiguration(context: CommandContext) -> (config: Configuration, source: String)? {
+        guard let settingsURL = context.settingsURL else { return nil }
         do {
-            let data = try readFileData(atPath: PersistedSettings.defaultURL.path, context: context)
+            let data = try readFileData(atPath: settingsURL.path, context: context)
             guard let saved = PersistedSettings.validated(data) else { return nil }
             return (saved.configuration, "saved")
         } catch CLIFileReadError.notFound(path: _) {

@@ -11,8 +11,7 @@ struct QARefinementSupport {
         healthReader: (() -> HealthSnapshot)? = { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) }) -> AppCoordinator {
         let failure: @Sendable (Data, URL) throws -> Void = { _, _ in throw CocoaError(.fileWriteNoPermission) }
         let writer: (@Sendable (Data, URL) throws -> Void)? = failingWrites ? failure : nil
-        let app = AppCoordinator(historyDirectory: root.appendingPathComponent("history"),
-            controlDirectory: root.appendingPathComponent("control"),
+        let app = AppCoordinator(locations: .test(root: root),
             preferences: preferences,
             settingsWriter: writer, outcomeNotifications: outcomeNotifications, permissions: permissions, healthReader: healthReader,
             // Never the real Mac identity or the real installed helper: a qualified row now matches the owner's Mac.

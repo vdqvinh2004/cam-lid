@@ -16,8 +16,7 @@ struct BackendReadinessIntegrationTests {
         let preferences = MemoryPreferences()
         defer { try? FileManager.default.removeItem(at: root) }
         let control = root.appendingPathComponent("control")
-        let app = AppCoordinator(historyDirectory: root.appendingPathComponent("history"),
-            controlDirectory: control, preferences: preferences,
+        let app = AppCoordinator(locations: .test(root: root, control: control), preferences: preferences,
             healthReader: { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) },
             helperController: HelperController(status: { .notInstalled }, keepAwakeApps: { [] }),
             holdTransportFactory: { NeverTransport() }, closedLidSupportRow: { nil }, systemIdentity: { (nil, nil) })

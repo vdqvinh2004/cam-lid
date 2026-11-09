@@ -142,7 +142,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - **Agent skill (new in 0.2).** Settings › General › *Let AI agents use CamLid* writes one skill file, `~/.agents/skills/camlid/SKILL.md`, in your home folder. Turning it off removes that file unless you changed it.
 - **Display option (new in 0.2).** Settings › General › New sessions: "Let the display sleep during sessions" is on by default. Turn it off to keep the display on while a session holds the Mac awake. It applies to the next session.
 - **Copy diagnostics (new in 0.2).** The Sleep diagnostics window copies a plain-text report. It holds no prompts, transcripts, command output or environment values.
-- **Chromium audio hold (new in 0.2).** Watched programs can keep an Auto session awake while Chrome, Brave, Edge, Vivaldi, Opera, Arc or Chromium plays audio, and for 60 seconds after it stops. Other apps are not detected.
+- **Music hold (new in 0.2).** Watched programs can keep an Auto session awake while a browser, Spotify or Apple Music plays audio, and until Sleep when done after it stops. Each source is off by default. Browsers: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Safari and Firefox are not detected.
 
 ### Known limits
 - **Tested on one Mac:** Mac17,3, macOS build 26A434, Apple silicon. On any other Mac or macOS build, closed-lid operation
@@ -152,7 +152,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - Apple silicon only, macOS 14 or later.
 - The lid-open hold and \`camlid run\` were checked on one Mac only.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
-- The Chromium audio hold was checked on Brave only. The other browsers in its list are not yet checked on a live Mac.
+- The music hold was checked live on Brave only. Spotify, Apple Music and the other browsers in its list are not yet checked on a live Mac.
 
 ### Build and signing
 | Item | Value |

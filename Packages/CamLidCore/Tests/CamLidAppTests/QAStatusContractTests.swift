@@ -10,7 +10,7 @@ struct QAStatusContractTests {
         let root = URL(fileURLWithPath: "/tmp/camlid-contract-" + UUID().uuidString)
         let preferences = MemoryPreferences()
         defer { try? FileManager.default.removeItem(at: root) }
-        let app = AppCoordinator(historyDirectory: root, controlDirectory: root.appendingPathComponent("control"), preferences: preferences)
+        let app = AppCoordinator(locations: .test(root: root, history: root), preferences: preferences)
         let result = try JSONDecoder().decode(CLIResult.self, from: app.handleControl(.status, payload: Data()))
         let status = try JSONSerialization.jsonObject(with: Data(result.json.utf8)) as! [String: Any]
         #expect(status["schemaVersion"] as? Int == 1 && status["powerActuation"] as? Bool == false)
