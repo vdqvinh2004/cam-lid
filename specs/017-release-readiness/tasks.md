@@ -1,6 +1,6 @@
 # Tasks: Release readiness for v0.1.0
 
-**Feature context:** `017-release-readiness` · **Status:** 17/19 checked (T015 partly, T035 open). Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `017-release-readiness` · **Status:** 18/19 checked (T015 partly). Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [x] T001 Owner decides Q-A: Strict stays visible, labelled experimental. — 2026-11-05.
@@ -59,4 +59,4 @@
   local build was installed and `helper status` reports installed. CamLidPowerWire (11), CamLidPowerHelper (94),
   LidRecoveryJournal (21), LidNativeAdapter (22) and LidRecoveryBroker (33) pass. 2026-11-06: release built from commit
   `b685c16` with the release identity (SHA-256 `c5a27ab1…`); the notes name the commit and the signature holds after unzip.
-- [ ] T035 [US3] Owner approves; create the GitHub release.
+- [x] T035 [US3] Owner approves; create the GitHub release. — 2026-11-09: release v0.1.0 created with `gh` as a pre-release, tag at ed2d060.

@@ -1,6 +1,6 @@
 # Tasks: v0.2 — lid-open keep-awake, wrapper, shortcut, calibration
 
-**Feature context:** `018-lid-open-and-run` · **Status:** 1/23 checked. Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `018-lid-open-and-run` · **Status:** 16/23 checked (6 partly, T041 open). Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [x] T001 Write and accept ADR 0006 (amends ADR 0002); ADR 0002 links to it. — 2026-11-05.
@@ -60,5 +60,5 @@
 ## Phase 5 — Release and regression
 - [x] T050 Release note for the behaviour change (lid-open holds for closed-lid-off users). — 2026-11-06: in the 0.1.0 release notes (the template in `scripts/release.sh`).
 - [x] T051 Full test run in all packages. — 2026-11-06: CamLidCore 325, CamLidPowerWire 11, CamLidPowerHelper 94, LidRecoveryJournal 21, LidNativeAdapter 22 and LidRecoveryBroker 33 pass.
-- [ ] T052 Closed-lid regression: subset of S1–S4 on the installed build.
-- [ ] T053 Owner approves release.
+- [x] T052 Closed-lid regression: subset of S1–S4 on the installed build. — 2026-11-09: owner ran the manual closed-lid test on the installed 0.1.0 build and reported it passed. Per-scenario results are not recorded yet.
+- [x] T053 Owner approves release. — 2026-11-09: owner asked for the publish; v0.1.0 published as a pre-release at ed2d060.
