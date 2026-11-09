@@ -20,6 +20,11 @@ for arg in "$@"; do
 done
 [ -n "$VERSION" ] || VERSION="$(sed -n 's/^ *MARKETING_VERSION: *//p' project.yml | head -1)"
 case "$VERSION" in [0-9]*.[0-9]*) ;; *) echo "bad version: $VERSION" >&2; exit 2 ;; esac
+# A published version is never rebuilt: its zip and checksum would change under the same tag and name.
+if [ "$ADHOC" != 1 ] && git rev-parse -q --verify "refs/tags/v$VERSION" > /dev/null; then
+  echo "Refusing: tag v$VERSION already exists. Choose a new version; published releases are not rebuilt." >&2
+  exit 1
+fi
 if [ -n "${CAMLID_SIGN_IDENTITY:-}" ] && [ "$ADHOC" = 1 ]; then
   echo "--adhoc conflicts with CAMLID_SIGN_IDENTITY; unset one of them." >&2
   exit 2
@@ -122,19 +127,22 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 ### What is in this release
 - **Auto and Timed.** Auto keeps the Mac awake while the agents you selected are working, then waits for "Sleep when
   done". Timed keeps it awake for a chosen time.
-- **Lid open (new).** A session keeps the Mac awake with the lid open through a verified power assertion, without the
+- **Lid open (new in 0.1.0).** A session keeps the Mac awake with the lid open through a verified power assertion, without the
   helper. If you keep the closed-lid option off, this hold is new to you.
 - **Closed lid.** Needs the helper (Settings › Closed Lid). It works on tested Macs; on any other, first choose
   "Allow on this untested Mac" there.
-- **\`camlid run -- <command>\` (new).** Keeps the Mac awake while the command runs and returns its exit status. It needs
+- **\`camlid run -- <command>\` (new in 0.1.0).** Keeps the Mac awake while the command runs and returns its exit status. It needs
   CamLid to be running; otherwise it exits with code 4 and runs nothing.
-- **Shortcut ⌃⌥⌘K (new).** Starts or stops Auto from any app. It needs no Accessibility permission.
+- **Shortcut ⌃⌥⌘K (new in 0.1.0).** Starts or stops Auto from any app. It needs no Accessibility permission.
 - **Dashboard.** Says "Keeping awake (lid open)" when the Mac is held awake with the lid open and closed-lid protection
   is not verified.
 - **Sleep diagnostics.** CamLid's own power assertion is labelled "CamLid is active" and is not counted as another app.
 - **Agents.** Claude Code, Codex and OpenCode in a terminal are estimated from CPU activity. Orca is read from its CLI.
-- **Update check (new, off by default).** Settings › General can ask GitHub once a day whether a newer release exists. It never downloads or installs anything.
-- **Agent skill (new).** Settings › General › *Let AI agents use CamLid* writes one skill file into a project folder you choose. Turning it off removes that file unless you changed it.
+- **Update check (new in 0.2, off by default).** Settings › General can ask GitHub once a day whether a newer release exists. It never downloads or installs anything.
+- **Agent skill (new in 0.2).** Settings › General › *Let AI agents use CamLid* writes one skill file into a project folder you choose. Turning it off removes that file unless you changed it.
+- **Display option (new in 0.2).** Settings › General › New sessions: "Let the display sleep during sessions" is on by default. Turn it off to keep the display on while a session holds the Mac awake. It applies to the next session.
+- **Copy diagnostics (new in 0.2).** The Sleep diagnostics window copies a plain-text report. It holds no prompts, transcripts, command output or environment values.
+- **Chromium audio hold (new in 0.2).** Watched programs can keep an Auto session awake while Chrome, Brave, Edge, Vivaldi, Opera, Arc or Chromium plays audio, and for 60 seconds after it stops. Other apps are not detected.
 
 ### Known limits
 - **Tested on one Mac:** Mac17,3, macOS build 26A434, Apple silicon. On any other Mac or macOS build, closed-lid operation
@@ -144,6 +152,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - Apple silicon only, macOS 14 or later.
 - The lid-open hold and \`camlid run\` were checked on one Mac only.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
+- The Chromium audio hold was checked on Brave only. The other browsers in its list are not yet checked on a live Mac.
 
 ### Build and signing
 | Item | Value |
