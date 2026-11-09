@@ -172,10 +172,10 @@ no bag, no external display); one attempt per boot; stop on any anomaly; no inte
 kernel hangs.
 
 **Execution:** the executed attempt #3 packet was
-[`reset-r0-attempt3-clear-episode-journal-qa.py`](../../Tests/Hardware/reset-r0-attempt3-clear-episode-journal-qa.py)
+`reset-r0-attempt3-clear-episode-journal-qa.py`
 (reset of the attempt #2 journal; already used on boot `A9BC665D-…`),
-[`r0-session-hold.py`](../../Tests/Hardware/r0-session-hold.py) (open-lid acquire/hold/stop),
-and [`observe-r0-post-cleanup-sleep.py`](../../Tests/Hardware/observe-r0-post-cleanup-sleep.py)
+`r0-session-hold.py` (open-lid acquire/hold/stop),
+and `observe-r0-post-cleanup-sleep.py`
 (post-cleanup observer). A future attempt needs a new pinned reset packet and a new explicit
 one-use approval. Steps, operator actions and approval text are in the
 R0 runbook.
@@ -184,7 +184,7 @@ R0 runbook.
 first post-cleanup lid close produced `Clamshell Sleep`; the property read `false` after the
 wake (stale). The v9 recorder's close cue was missed, so its closed-interval gate did not run;
 that is a procedural deviation, not a clear failure. Record:
-[`r0-behavioural-clear-attempt1-2026-10-19.md`](../../docs/qa/r0-behavioural-clear-attempt1-2026-10-19.md).
+`r0-behavioural-clear-attempt1-2026-10-19.md`.
 
 **Attempt #2 (2026-10-19, boot `FD97CCAF-…`):** reset of the attempt #1 journal succeeded; the
 open-lid session hold was clean (active 10.42 s, no sleep/wake, exit 5,
@@ -193,7 +193,7 @@ shows `Entering DarkWake state due to 'Clamshell Sleep'` at 19:32:41, `Display i
 and a full wake at 19:33:22 on lid open — a normal clamshell sleep cycle, not suppression. The
 observer missed it because it counted only `Entering Sleep state`; the classifier is fixed to
 count clamshell DarkWake and store raw pmset lines. Record:
-[`r0-attempt2-adjudication-2026-10-19.md`](../../docs/qa/r0-attempt2-adjudication-2026-10-19.md).
+`r0-attempt2-adjudication-2026-10-19.md`.
 
 **Attempt #3 (2026-10-20, boot `A9BC665D-…`):** reset of the attempt #2 journal succeeded;
 the open-lid hold was clean (10.54 s, no sleep/wake, exit 5,
@@ -204,8 +204,8 @@ spoken “Open now” cue, so the observer wrote no `result.json`; raw evidence 
 `R0_POST_CLEANUP_SLEEP_OBSERVED` (full). The owner accepted the raw #3 evidence on 2026-10-20;
 R0 is met for behavioural same-boot clear effectiveness. The observer now has a visible open
 cue (self-test passes). Record:
-[`r0-attempt3-adjudication-2026-10-20.md`](../../docs/qa/r0-attempt3-adjudication-2026-10-20.md)
-and [`r0-owner-acceptance-2026-10-20.md`](../../docs/qa/r0-owner-acceptance-2026-10-20.md).
+`r0-attempt3-adjudication-2026-10-20.md`
+and `r0-owner-acceptance-2026-10-20.md`.
 
 ## 4. G2 — native qualification (after R0)
 

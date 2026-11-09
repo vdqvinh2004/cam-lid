@@ -347,8 +347,8 @@ no forced clear/daemon kill. Signed67/no G2/task credit unchanged.
 
 **Latest:** actual development LidWalk in cam-lid-v2, distinct from installed LidRun:
 owner disabled Close Lid; separately approved ordinary Stop baa2675e9/bc6f2e0c… confirms
-live keepAwake=false/displayAwake=false/sleepPolicy=off. No CamLid retest. [Private stderr
-preparation](../../docs/qa/m9-private-stderr-diagnostic-preparation-2026-10-24.md) nil/21 fake
+live keepAwake=false/displayAwake=false/sleepPolicy=off. No CamLid retest. Private stderr
+preparation nil/21 fake
 tests PASS/original guard/signed67 unchanged. Fresh helper/journal diagnostic scope needed
 before any ready Inspect/run; no implicit restart/deletion/repair or task credit.
 
@@ -607,8 +607,8 @@ pass). Native tasks below still require their own one-use approvals.
   auth still Unknown. V2 finite context proposal
   approved b7884c940 completed0: exact helper context **dropping check in message due to
   code signing requirement** corroborates this one rejected-peer case, not full matrix or
-  restoration qualification. All scopes consumed; no more query/probe. [Finite lid-open
-  native baseline](../../docs/qa/m9-lid-open-native-baseline-scope-2026-10-22.md) prepared,
+  restoration qualification. All scopes consumed; no more query/probe. Finite lid-open
+  native baseline prepared,
   12 tests PASS/template nil. Owner granted exact attended scope/accepted indefinite-policy
   risk; captured1deeec00…/foreground Terminal launcher verified without native observation/
   IPC/lease. Owner ran once: safety passed, admitted Inspect accepted/stopped/sleepObserved;
