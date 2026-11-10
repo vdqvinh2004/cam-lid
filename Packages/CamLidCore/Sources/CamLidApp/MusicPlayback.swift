@@ -30,16 +30,7 @@ public enum MusicSource: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// The Settings toggle's title.
-    public var toggleTitle: String {
-        switch self {
-        case .browser: "Keep Auto awake while a browser plays audio"
-        case .spotify: "Keep Auto awake while Spotify plays"
-        case .appleMusic: "Keep Auto awake while Apple Music plays"
-        }
-    }
-
-    /// The Settings toggle's help.
+    /// The Settings chip's help.
     public var help: String {
         switch self {
         case .browser: "Chromium browsers: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Safari and Firefox are not detected."
@@ -51,6 +42,12 @@ public enum MusicSource: String, CaseIterable, Codable, Sendable {
     /// The source that owns a bundle identifier, or nil. A prefix must end at a dot: "com.spotify.clientx" is not Spotify.
     static func matching(bundleID: String) -> MusicSource? {
         allCases.first { source in source.bundleIDs.contains { bundleID == $0 || bundleID.hasPrefix($0 + ".") } }
+    }
+
+    /// The sources Settings lists on this Mac. Browsers and Apple Music are always listed and can be clicked; Spotify is
+    /// listed only when its app is installed.
+    static func listedSources(installed: Set<MusicSource>) -> [MusicSource] {
+        allCases.filter { $0 != .spotify || installed.contains($0) }
     }
 }
 

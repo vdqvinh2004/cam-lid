@@ -386,6 +386,18 @@ private struct SettingsAgentsPane: View {
         } header: {
             Text("Agents that may delay sleep")
         }
+        Section {
+            BadgeFlowLayout(spacing: 8, lineSpacing: 8) {
+                ForEach(MusicSource.listedSources(installed: MusicSource.installed).sorted { $0.chipTitle < $1.chipTitle }, id: \.self) { source in
+                    MusicSourceChip(source: source, enabled: editor.watchedMusic.contains(source)) {
+                        editor.setMusicSource(source, $0)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } header: {
+            Text("Music that may delay sleep")
+        }
         WatchedProgramsSection(editor: editor)
     }
 
@@ -418,13 +430,6 @@ private struct WatchedProgramsSection: View {
 
     var body: some View {
         Section {
-            ForEach(MusicSource.allCases, id: \.self) { source in
-                Toggle(source.toggleTitle, isOn: Binding(get: { editor.watchedMusic.contains(source) },
-                    set: { editor.setMusicSource(source, $0) }))
-                    .help(source.help)
-                    .accessibilityLabel(source.toggleTitle)
-                    .accessibilityIdentifier("camlid.settings.music." + source.rawValue)
-            }
             ForEach(rules) { rule in
                 HStack {
                     Toggle(isOn: Binding(

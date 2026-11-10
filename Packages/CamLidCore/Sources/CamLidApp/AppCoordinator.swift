@@ -747,6 +747,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let signal = SafetySignal(reasons: baseSignal.reasons + Self.holdSafetyReasons(
             lidState: latestHealth?.lidState, holdStops: holdReconciler.stopReasons))
         let lifetime = updateLifetimePolicy(now: now)
+        // Music is read while a source is watched, with or without a session, so the Dashboard can show it as it plays.
+        let music = musicHoldReason(now: now)
         if var active = session {
             // Battery exposure latches a cap from session start; AC return and timer edits cannot extend it.
             if health.powerSource != .ac || sessionBatteryDeadline != nil {
@@ -762,7 +764,6 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             }
             var policyConfig = config
             policyConfig.completionDelayMinutes = sessionSleepDelayMinutes ?? config.completionDelayMinutes
-            let music = musicHoldReason(now: now)
             let decision = PolicyEngine.evaluate(
                 session: active, tasks: sleepRelevantTasks(now: now), health: health, config: policyConfig,
                 armed: true, safety: signal, recoveryConflict: false,
@@ -1146,7 +1147,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             timerLimitText: active == nil ? nil : timerLimitText(now: now),
             sleepDelayMinutes: active == nil ? nil : sessionSleepDelayMinutes,
             keepingAwakeWithLidOpen: state == .protected && !holdReconciler.leaseVerified(now: now)
-                && keepAwake.verified && health?.lidState == .open)
+                && keepAwake.verified && health?.lidState == .open,
+            playingMusic: MusicSource.allCases.filter { musicHolding.contains($0) })
         return data
     }
 

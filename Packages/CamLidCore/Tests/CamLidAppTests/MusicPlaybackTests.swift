@@ -122,4 +122,10 @@ struct MusicPlaybackTests {
         #expect(!PlaybackAssertion.isHeld(.appleMusic, in: [chromium]))
         #expect(!PlaybackAssertion.isHeld(.spotify, in: [music]))   // Spotify holds no signal to read
     }
+
+    @Test func settingsListsBrowsersAndAppleMusicAlwaysAndSpotifyOnlyWhenInstalled() {
+        #expect(MusicSource.listedSources(installed: []) == [.browser, .appleMusic])
+        #expect(MusicSource.listedSources(installed: [.spotify]) == [.browser, .spotify, .appleMusic])
+        #expect(MusicSource.listedSources(installed: [.browser, .appleMusic]) == [.browser, .appleMusic])
+    }
 }

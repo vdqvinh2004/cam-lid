@@ -283,8 +283,32 @@ struct AgentBadge<Accessory: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 6) {
+        BadgeShell(title: title, tone: tone, mark: {
             AgentMarkView(provider: provider, size: AgentBadgeMetrics.markSize)
+        }, accessory: {
+            accessory
+        })
+    }
+}
+
+/// The badge shell shared by agents and music sources: a mark, a name, then an optional accessory.
+struct BadgeShell<Mark: View, Accessory: View>: View {
+    let title: String
+    var tone: CamLidPillTone = .neutral
+    private let mark: Mark
+    private let accessory: Accessory
+
+    init(title: String, tone: CamLidPillTone = .neutral,
+         @ViewBuilder mark: () -> Mark, @ViewBuilder accessory: () -> Accessory) {
+        self.title = title
+        self.tone = tone
+        self.mark = mark()
+        self.accessory = accessory()
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 6) {
+            mark
                 .frame(width: AgentBadgeMetrics.markSlotSize,
                        height: AgentBadgeMetrics.markSlotSize)
             Text(title).font(.callout).bold().lineLimit(1)

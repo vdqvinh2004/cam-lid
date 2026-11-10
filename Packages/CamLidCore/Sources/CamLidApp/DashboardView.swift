@@ -134,6 +134,8 @@ public struct DashboardData: Codable, Sendable, Equatable {
     public let startEnabled: Bool
     public let metrics: [DashboardMetric]
     public let agents: [AgentBadgeState]
+    /// Music sources playing now (spec 025). The Dashboard shows each one as a badge, like a working agent.
+    public let playingMusic: [MusicSource]
     public let timerMinutes: Int?
     /// Largest finite duration the active session can accept. On battery this
     /// is the stable safety cap, not the shrinking remaining time.
@@ -169,7 +171,8 @@ public struct DashboardData: Codable, Sendable, Equatable {
         stopEnabled: Bool = false, startEnabled: Bool = false, metrics: [DashboardMetric] = DashboardMetric.from(nil), agents: [AgentBadgeState] = [],
         timerMinutes: Int? = nil, timerMaximumMinutes: Int? = nil, timerLimitText: String? = nil,
         sleepDelayMinutes: Int? = nil,
-        keepingAwakeWithLidOpen: Bool = false
+        keepingAwakeWithLidOpen: Bool = false,
+        playingMusic: [MusicSource] = []
     ) {
         self.mode = mode
         self.state = state
@@ -196,6 +199,7 @@ public struct DashboardData: Codable, Sendable, Equatable {
         self.stopEnabled = stopEnabled
         self.startEnabled = startEnabled; self.metrics = isStale ? DashboardMetric.from(nil) : metrics
         self.agents = agents
+        self.playingMusic = playingMusic
         self.timerMinutes = timerMinutes; self.timerMaximumMinutes = timerMaximumMinutes
         self.timerLimitText = timerLimitText; self.sleepDelayMinutes = sleepDelayMinutes
         self.keepingAwakeWithLidOpen = keepingAwakeWithLidOpen
@@ -312,6 +316,13 @@ public struct DashboardView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier(CamLidAccessibility.IDs.taskList)
+        }
+        if !data.playingMusic.isEmpty {
+            BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
+                ForEach(data.playingMusic, id: \.self) { DashboardMusicBadge(source: $0) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("camlid.dashboard.music")
         }
     }
 
