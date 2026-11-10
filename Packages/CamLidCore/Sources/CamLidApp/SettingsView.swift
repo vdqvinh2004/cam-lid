@@ -215,7 +215,7 @@ public struct SettingsView: View {
                     .padding(.horizontal, 16).padding(.bottom, 12)
             }
         }
-        .frame(minWidth: 500, maxWidth: .infinity, minHeight: 160, maxHeight: .infinity, alignment: .topLeading)
+        .frame(minWidth: 500, maxWidth: .infinity, minHeight: 360, maxHeight: .infinity, alignment: .topLeading)
         .onChange(of: editor.section) { _, section in onSectionChange(section) }
         .onAppear { editor.configureAutosave(onCommit) }
     }

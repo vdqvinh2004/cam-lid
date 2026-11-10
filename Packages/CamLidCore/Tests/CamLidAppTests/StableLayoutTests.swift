@@ -54,7 +54,7 @@ import CamLidCore
             "Badges should flow onto additional lines at a narrow dashboard width")
     }
 
-    /// HIG: a settings window fits the selected pane; it keeps its top edge and width (owner-approved 2026-11-01).
+    /// Switching panes never moves or resizes the Settings window (replaces the 2026-11-01 fit-to-pane rule).
     @Test func settingsTabsKeepWindowFrame() throws {
         let editor = SettingsEditor(configuration: try Configuration(), revision: 1)
         let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 580, height: 540),
@@ -65,8 +65,7 @@ import CamLidCore
         for section in SettingsSection.allCases {
             editor.section = section
             toolbar.select(section)
-            #expect(window.frame.maxY == initial.maxY && window.frame.width == initial.width, "Tab \(section) moved Settings")
-            #expect(abs(window.contentRect(forFrameRect: window.frame).height - section.preferredHeight) <= 1)
+            #expect(window.frame == initial, "Tab \(section) changed the Settings window")
             #expect(window.title == section.title)
         }
         window.close()

@@ -11,10 +11,9 @@ public enum SettingsSection: String, Codable, CaseIterable, Sendable {
     public var symbol: String {
         switch self { case .general: "gearshape"; case .agents: "terminal"; case .safety: "laptopcomputer" }
     }
-    /// Content height that fits each pane (HIG: a settings window resizes to the selected pane). Closed Lid scrolls.
-    public var preferredHeight: CGFloat {
-        switch self { case .general: 520; case .agents: 360; case .safety: 640 }
-    }
+    /// One content height for every pane, so switching panes never moves the window. Closed Lid, the tallest pane by default,
+    /// fits beside the picker; taller content (General) scrolls inside its pane.
+    public static let windowHeight: CGFloat = 700
 }
 
 public enum SettingsCommitResult: Codable, Sendable {

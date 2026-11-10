@@ -262,8 +262,9 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         host.sizingOptions = []
         let window = NSWindow(contentViewController: host)
         window.isReleasedWhenClosed = false; window.title = "Settings"
-        window.contentMinSize = NSSize(width: 500, height: 240)   // SettingsView lays out from 500 pt
-        window.setContentSize(NSSize(width: 580, height: editor.section.preferredHeight)); window.center()
+        window.contentMinSize = NSSize(width: 500, height: 360)   // SettingsView lays out from 500 pt; the picker and some content stay visible
+        window.setContentSize(NSSize(width: 580, height: SettingsSection.windowHeight)); window.center()
+        window.setFrameAutosaveName("CamLid.Settings")   // restores the size and position the person left, when one is saved
         settingsWindow = window
         closeGuard = SettingsCloseGuard(editor: editor,
             installationPending: { [weak self] in self?.state?.installationPending ?? true },

@@ -20,16 +20,10 @@ final class SettingsToolbar: NSObject, NSToolbarDelegate {
         select(editor.section)
     }
 
+    /// Pane selection changes the selection and the title only. The window keeps the size the person chose.
     func select(_ section: SettingsSection) {
         toolbar.selectedItemIdentifier = NSToolbarItem.Identifier(section.rawValue)
-        guard let window else { return }
-        window.title = section.title   // macOS settings windows are titled with the pane name
-        let content = window.contentRect(forFrameRect: window.frame)
-        let delta = section.preferredHeight - content.height
-        guard abs(delta) > 1 else { return }
-        var frame = window.frame
-        frame.origin.y -= delta; frame.size.height += delta   // keep the top edge in place
-        window.setFrame(frame, display: true, animate: window.isVisible && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+        window?.title = section.title   // macOS settings windows are titled with the pane name
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
