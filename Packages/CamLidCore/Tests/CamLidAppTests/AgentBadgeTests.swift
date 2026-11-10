@@ -127,6 +127,14 @@ struct AgentBadgeTests {
         #expect(data.waitingAgents.map(\.provider) == ["opencode"])
         #expect(data.listedAgents.map(\.provider) == ["codex", "opencode", "orca"])
     }
+    /// Agents and playing music sources share one A–Z row on the Dashboard.
+    @Test func dashboardBadgesMergeAgentsAndMusicAlphabetically() throws {
+        let orca = AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("o", .working)])
+        let codex = AgentBadgeState(provider: "codex", enabled: true, tasks: [try row("c", .working)])
+        let data = DashboardData(mode: .auto, state: .ready, reasonText: "", stopEnabled: true,
+            agents: [orca, codex], playingMusic: [.spotify, .appleMusic])
+        #expect(data.dashboardBadges.map(\.title) == ["Apple Music", "Codex", "Orca", "Spotify"])
+    }
     @Test func agentBadgeDisplayOrderIsAlphabeticalAndDetectedFirst() {
         let windsurf = AgentBadgeState(provider: "windsurf", enabled: true, tasks: [])
         let codex = AgentBadgeState(provider: "codex", enabled: true, tasks: [], cliDetected: true)

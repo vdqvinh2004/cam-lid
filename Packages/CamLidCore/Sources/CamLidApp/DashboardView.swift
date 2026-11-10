@@ -92,6 +92,26 @@ public enum CapabilityAction: String, Codable, Sendable, Equatable {
     }
 }
 
+/// One Dashboard badge: a working or waiting agent, or a music source that plays. Both kinds share one A–Z row.
+enum DashboardBadge: Identifiable, Equatable {
+    case agent(AgentBadgeState)
+    case music(MusicSource)
+
+    var id: String {
+        switch self {
+        case .agent(let agent): "agent." + agent.provider
+        case .music(let source): "music." + source.rawValue
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .agent(let agent): agent.title
+        case .music(let source): source.chipTitle
+        }
+    }
+}
+
 /// Render model for the compact dashboard panel. All values are injected —
 /// countdowns come from explicit deadlines, telemetry strings are nil when
 /// unknown (rendered as "Unknown", never green). No live engine wiring.
@@ -295,7 +315,7 @@ public struct DashboardView: View {
         }.padding(10).frame(minWidth: 232, maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// The working agents, or the reason there are none to show when none is selected in Settings.
+    /// Dashboard badges in one A–Z row: working or waiting agents and playing music. With no agent selected, a hint says so.
     @ViewBuilder private var agentsSection: some View {
         if !data.hasEnabledAgents {
             HStack(spacing: 4) {
@@ -308,21 +328,18 @@ public struct DashboardView: View {
                 }
             }
             .font(.caption)
-        } else if !data.listedAgents.isEmpty {
+        }
+        if !data.dashboardBadges.isEmpty {
             BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
-                ForEach(data.listedAgents) { agent in
-                    DashboardAgentBadge(agent: agent)
+                ForEach(data.dashboardBadges) { badge in
+                    switch badge {
+                    case .agent(let agent): DashboardAgentBadge(agent: agent)
+                    case .music(let source): DashboardMusicBadge(source: source)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier(CamLidAccessibility.IDs.taskList)
-        }
-        if !data.playingMusic.isEmpty {
-            BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
-                ForEach(data.playingMusic, id: \.self) { DashboardMusicBadge(source: $0) }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityIdentifier("camlid.dashboard.music")
         }
     }
 
@@ -457,6 +474,13 @@ public extension DashboardData {
     /// The dashboard shows one scan-friendly A–Z list across both states.
     var listedAgents: [AgentBadgeState] {
         (workingAgents + waitingAgents).sortedForAgentDisplay()
+    }
+    /// Agents and playing music sources in one A–Z list, as the dashboard shows them.
+    internal var dashboardBadges: [DashboardBadge] {
+        (listedAgents.map(DashboardBadge.agent) + playingMusic.map(DashboardBadge.music)).sorted { lhs, rhs in
+            let order = lhs.title.localizedStandardCompare(rhs.title)
+            return order == .orderedSame ? lhs.id < rhs.id : order == .orderedAscending
+        }
     }
     /// Whether the user selected any agent for detection. The empty-state hint shows
     /// only in this case; enabled-but-idle shows no agent section at all.
