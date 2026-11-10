@@ -8,9 +8,10 @@ extension MusicSource {
     /// The name on a chip or a badge. Browsers are one source because the Chromium browsers share one audio signal.
     var chipTitle: String {
         switch self {
-        case .browser: "Browser"
+        case .browser: "Chromium browsers"
         case .spotify: "Spotify"
         case .appleMusic: "Apple Music"
+        case .safari: "Safari"
         }
     }
 
@@ -20,7 +21,11 @@ extension MusicSource {
     }
 
     var symbolName: String {
-        self == .browser ? "globe" : "music.note"
+        switch self {
+        case .browser: "globe"
+        case .safari: "safari"
+        case .spotify, .appleMusic: "music.note"
+        }
     }
 
     /// The sources whose app or browser is installed on this Mac, found by bundle identifier.

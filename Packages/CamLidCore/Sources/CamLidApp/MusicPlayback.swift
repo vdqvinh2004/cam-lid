@@ -7,7 +7,7 @@ import IOKit.pwr_mgt
 /// output. A browser and Apple Music also hold a playback assertion while they play (`PlaybackAssertion`). Both reads need no
 /// permission and send nothing to the program.
 public enum MusicSource: String, CaseIterable, Codable, Sendable {
-    case browser, spotify, appleMusic
+    case browser, spotify, appleMusic, safari
 
     /// Bundle identifiers. A helper matches by prefix: "com.brave.Browser.helper" is Brave.
     /// shortcut: only Brave was checked live; check any other browser's output process on this Mac before relying on it.
@@ -18,6 +18,7 @@ public enum MusicSource: String, CaseIterable, Codable, Sendable {
              "com.operasoftware.Opera", "company.thebrowser.Browser", "org.chromium.Chromium"]
         case .spotify: ["com.spotify.client"]
         case .appleMusic: ["com.apple.Music"]
+        case .safari: ["com.apple.Safari", "com.apple.WebKit.GPU"]
         }
     }
 
@@ -27,15 +28,17 @@ public enum MusicSource: String, CaseIterable, Codable, Sendable {
         case .browser: "a browser"
         case .spotify: "Spotify"
         case .appleMusic: "Apple Music"
+        case .safari: "Safari"
         }
     }
 
     /// The Settings chip's help.
     public var help: String {
         switch self {
-        case .browser: "Chromium browsers: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Safari and Firefox are not detected."
+        case .browser: "Chromium browsers: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Firefox is not detected."
         case .spotify: "Detected from Spotify's audio output. When the music stops, Sleep when done applies, as after agent work."
         case .appleMusic: "Detected from Music's audio output. When the music stops, Sleep when done applies, as after agent work."
+        case .safari: "Detected from Safari's audio output and its media-playback assertion. When the music stops, Sleep when done applies, as after agent work."
         }
     }
 
@@ -67,14 +70,14 @@ enum MusicOutput {
     }
 
     /// Pure: what one read found. `outputting` lists the watched sources with a process running audio output, and
-    /// `assertionHeld` the outputting sources whose playback assertion is held. `holders` is read only when a browser or Apple
+    /// `assertionHeld` the outputting sources whose playback assertion is held. `holders` is read only when a browser, Safari or Apple
     /// Music outputs, so an idle Mac reads no assertions.
     static func reading(in processes: [Process], watched: Set<MusicSource>, holders: () -> [AssertionHolder]) -> MusicReading {
         let outputting = Set(processes.compactMap { process -> MusicSource? in
             guard process.isOutputting, let bundleID = process.bundleID else { return nil }
             return MusicSource.matching(bundleID: bundleID)
         }).intersection(watched)
-        let gated = outputting.intersection([.browser, .appleMusic])
+        let gated = outputting.intersection([.browser, .appleMusic, .safari])
         guard !gated.isEmpty else { return MusicReading(outputting: outputting) }
         let table = holders()
         return MusicReading(outputting: outputting, assertionHeld: gated.filter { PlaybackAssertion.isHeld($0, in: table) })
@@ -128,7 +131,7 @@ struct AssertionHolder {
 /// The playback assertions (read from IOKit; no permission is needed). A Chromium browser holds the named "Playing audio" assertion
 /// and Apple's Music app holds "com.apple.Music.playback" while audio plays. Each is released when playback stops, and a silent output
 /// stream holds neither. Measured: Brave's assertion went about 2 to 3 s after pause, and Music's went at the pause, while each output
-/// stream stayed open for about 5 to 10 s. Spotify holds no assertion, so it is judged by its output alone.
+/// stream stayed open for about 5 to 10 s. Safari's media playback holds "com.apple.WebCore: HTMLMediaElement playback" under its own process name, so only Safari matches it. Spotify holds no assertion, so it is judged by its output alone.
 enum PlaybackAssertion {
     struct Signal {
         let processNames: [String]
@@ -146,6 +149,8 @@ enum PlaybackAssertion {
             Signal(processNames: browserProcessNames, assertionName: "Playing audio", assertionType: "NoIdleSleepAssertion")
         case .appleMusic:
             Signal(processNames: ["Music"], assertionName: "com.apple.Music.playback", assertionType: "PreventUserIdleSystemSleep")
+        case .safari:
+            Signal(processNames: ["Safari"], assertionName: "com.apple.WebCore: HTMLMediaElement playback", assertionType: "PreventUserIdleSystemSleep")
         case .spotify:
             nil
         }
@@ -205,7 +210,7 @@ struct MusicPlaybackHold {
     /// Whether a source is judged by its playback assertion right now.
     private func isAsserted(_ source: MusicSource) -> Bool {
         switch source {
-        case .browser: true
+        case .browser, .safari: true
         case .appleMusic: musicAssertionSeen
         case .spotify: false
         }

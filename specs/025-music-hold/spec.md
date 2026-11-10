@@ -24,7 +24,7 @@ default). The run cap (120 minutes by default) still bounds every Auto session.
 
    Spotify holds no assertion, so it is judged by its output alone. All reads need no permission and send nothing to the
    program (ADR 0002: observer only).
-4. **Browsers:** Chromium browsers only (Chrome, Brave, Edge, Vivaldi, Opera, Arc, Chromium). Safari and Firefox are not
+4. **Browsers:** Chromium browsers (Chrome, Brave, Edge, Vivaldi, Opera, Arc, Chromium) share one chip and one signal. Safari has its own chip and signal, measured on 2026-11-10 with YouTube. Firefox is not
    detected.
 5. **Quiet periods and reads:** while a hold is in force the signals are read every 2 seconds, and every 5 seconds otherwise.
    A source judged by its assertion (a browser, and Music once its assertion has been seen) bridges 3 seconds after its last
@@ -75,12 +75,13 @@ default). The run cap (120 minutes by default) still bounds every Auto session.
     isolate the test tab. The per-process measurement is the evidence.
 - Before this revision (2026-11-09, QA copy with Brave): the Auto session was `protected` while the tone played, and entered
   `completionGrace` 18 seconds after Pause, because the output stream was still open.
+- Live, Safari, YouTube playing (2026-11-10), read-only: the audio came from com.apple.WebKit.GPU, and Safari held "com.apple.WebCore: HTMLMediaElement playback" under its own process name. Safari's pause and muted playback are not yet checked.
 - Not verified live: other Chromium browsers, automatic track changes at the end of a track, Apple Music track changes, the
   Dashboard text, and Apple Music on other macOS versions.
 
 ## Known limits
 
-- Browsers other than Chromium are not detected.
+- Browsers other than Chromium and Safari are not detected. Firefox is not installed here and was not measured.
 - The assertion names are read from this Mac (macOS 26): the Chromium "Playing audio" assertion and Music's
   "com.apple.Music.playback". A macOS version or a browser that names them differently is not detected by its assertion. Music
   then keeps the output-only hold; a browser has no such fallback and is not detected.

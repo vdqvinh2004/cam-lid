@@ -18,7 +18,7 @@ struct MusicPlaybackTests {
         #expect(MusicSource.matching(bundleID: "com.apple.Music") == .appleMusic)
         #expect(MusicSource.matching(bundleID: "com.apple.Music.helper") == .appleMusic)
         #expect(MusicSource.matching(bundleID: "com.spotify.clientx") == nil)   // a prefix must end at a dot
-        #expect(MusicSource.matching(bundleID: "com.apple.Safari") == nil)       // Safari is not detected
+        #expect(MusicSource.matching(bundleID: "org.mozilla.firefox") == nil)    // Firefox is not detected
     }
 
     @Test func onlyWatchedSourcesThatAreOutputtingCount() {
@@ -123,9 +123,32 @@ struct MusicPlaybackTests {
         #expect(!PlaybackAssertion.isHeld(.spotify, in: [music]))   // Spotify holds no signal to read
     }
 
-    @Test func settingsListsBrowsersAndAppleMusicAlwaysAndSpotifyOnlyWhenInstalled() {
-        #expect(MusicSource.listedSources(installed: []) == [.browser, .appleMusic])
-        #expect(MusicSource.listedSources(installed: [.spotify]) == [.browser, .spotify, .appleMusic])
-        #expect(MusicSource.listedSources(installed: [.browser, .appleMusic]) == [.browser, .appleMusic])
+    @Test func settingsListsBrowsersAppleMusicAndSafariAlwaysAndSpotifyOnlyWhenInstalled() {
+        #expect(MusicSource.listedSources(installed: []) == [.browser, .appleMusic, .safari])
+        #expect(MusicSource.listedSources(installed: [.spotify]) == [.browser, .spotify, .appleMusic, .safari])
+        #expect(MusicSource.listedSources(installed: [.browser, .appleMusic]) == [.browser, .appleMusic, .safari])
+    }
+
+    @Test func safariIsDetectedByWebKitOutputAndItsOwnMediaAssertion() {
+        #expect(MusicSource.matching(bundleID: "com.apple.WebKit.GPU") == .safari)
+        #expect(MusicSource.matching(bundleID: "com.apple.Safari") == .safari)
+        let safari = AssertionHolder(processName: "Safari",
+            assertions: [["AssertName": "com.apple.WebCore: HTMLMediaElement playback", "AssertType": "PreventUserIdleSystemSleep"]])
+        let mail = AssertionHolder(processName: "Mail",
+            assertions: [["AssertName": "com.apple.WebCore: HTMLMediaElement playback", "AssertType": "PreventUserIdleSystemSleep"]])
+        #expect(PlaybackAssertion.isHeld(.safari, in: [safari]))
+        #expect(!PlaybackAssertion.isHeld(.safari, in: [mail]))   // another WebKit app's playback is not Safari's
+        #expect(!PlaybackAssertion.isHeld(.safari, in: [chromium]))
+    }
+
+    @Test func safariCountsOnlyWhileItsOutputAndItsAssertionAreBothPresent() {
+        let safari = AssertionHolder(processName: "Safari",
+            assertions: [["AssertName": "com.apple.WebCore: HTMLMediaElement playback", "AssertType": "PreventUserIdleSystemSleep"]])
+        let reading = MusicOutput.reading(in: [MusicOutput.Process(bundleID: "com.apple.WebKit.GPU", isOutputting: true)],
+            watched: [.safari], holders: { [safari] })
+        #expect(reading == MusicReading(outputting: [.safari], assertionHeld: [.safari]))
+        var hold = MusicPlaybackHold()
+        #expect(hold.observe(now: 0) { MusicReading(outputting: [.safari]) }.isEmpty)
+        #expect(hold.observe(now: 6) { reading } == [.safari])
     }
 }

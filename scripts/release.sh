@@ -142,7 +142,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - **Agent skill (new in 0.2).** Settings › General › *Let AI agents use CamLid* writes one skill file, \`~/.agents/skills/camlid/SKILL.md\`, in your home folder. Turning it off removes that file unless you changed it.
 - **Display option (new in 0.2).** Settings › General › New sessions: "Let the display sleep during sessions" is on by default. Turn it off to keep the display on while a session holds the Mac awake. It applies to the next session.
 - **Copy diagnostics (new in 0.2).** The Sleep diagnostics window copies a plain-text report. It holds no prompts, transcripts, command output or environment values.
-- **Music hold (new in 0.2).** Music that may delay sleep (Settings › Agents) can keep an Auto session awake while a browser, Spotify or Apple Music plays audio, and until Sleep when done after it stops. Each source is off by default. Browsers: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Safari and Firefox are not detected.
+- **Music hold (new in 0.2).** Music that may delay sleep (Settings › Agents) can keep an Auto session awake while a Chromium browser, Safari, Spotify or Apple Music plays audio, and until Sleep when done after it stops. Each source is off by default. Chromium browsers: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Safari is detected by its media playback. Firefox is not detected.
 
 ### Known limits
 - **Tested on one Mac:** Mac17,3, macOS build 26A434, Apple silicon. On any other Mac or macOS build, closed-lid operation
@@ -152,7 +152,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - Apple silicon only, macOS 14 or later.
 - The lid-open hold and \`camlid run\` were checked on one Mac only.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
-- The music hold was checked on Brave, Spotify and Apple Music with a read-only probe and a replay of its logic, not in a full CamLid run for each. Other browsers and other macOS versions are not yet checked.
+- The music hold was checked on Brave, Safari, Spotify and Apple Music with a read-only probe and a replay of its logic, not in a full CamLid run for each. Other Chromium browsers and other macOS versions are not yet checked.
 
 ### Build and signing
 | Item | Value |
