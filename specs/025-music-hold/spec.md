@@ -7,13 +7,13 @@ one Brave test. Apple Music and Brave come from a single cycle each, not from a 
 
 ## Goal
 
-An Auto session stays awake while music plays, with the same mechanism as Auto's agent work. Each source is a switch in
-Watched programs, off by default. When the music stops, the hold ends promptly and Sleep when done applies (2 minutes by
+An Auto session stays awake while music plays, with the same mechanism as Auto's agent work. Each source is a chip in
+Settings › Agents, off by default. When the music stops, the hold ends promptly and Sleep when done applies (2 minutes by
 default). The run cap (120 minutes by default) still bounds every Auto session.
 
 ## Decisions (owner, 2026-11-09 and 2026-11-10)
 
-1. **Sources:** a browser, Spotify and Apple Music. Each has its own switch, like an agent's detection toggle.
+1. **Sources:** a browser, Spotify and Apple Music. Each has its own switch, like an agent's detection toggle. Browsers and Apple Music are always listed in Settings › Agents and can be clicked; Spotify is listed when its app is installed on this Mac.
 2. **Auto only:** the music hold is a lifetime hold reason (`musicPlayback`). The run cap and the safety stops still apply.
    Timed and Infinite sessions ignore it. The cap stays at its default, 120 minutes (owner, 2026-11-10).
 3. **Detection:** CoreAudio lists the processes that run audio output. The app matches their bundle IDs, and a helper matches
@@ -90,6 +90,7 @@ default). The run cap (120 minutes by default) still bounds every Auto session.
   the session until the run cap.
 - Music's assertion is used once it has been seen. If Music plays without it later (for example through AirPlay or a radio stream),
   that playback is judged by its assertion and may end early. This was not checked.
+- A Spotify switch that stays on after Spotify is removed has no chip, because Spotify is listed only when installed. It does nothing without the app.
 
 ## Out of scope
 
