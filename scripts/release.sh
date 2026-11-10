@@ -152,7 +152,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - Apple silicon only, macOS 14 or later.
 - The lid-open hold and \`camlid run\` were checked on one Mac only.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
-- The music hold was checked live on Brave only. Spotify, Apple Music and the other browsers in its list are not yet checked on a live Mac.
+- The music hold was checked on Brave, Spotify and Apple Music with a read-only probe and a replay of its logic, not in a full CamLid run for each. Other browsers and other macOS versions are not yet checked.
 
 ### Build and signing
 | Item | Value |

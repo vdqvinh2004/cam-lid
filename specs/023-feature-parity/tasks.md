@@ -1,6 +1,6 @@
 # Tasks: display option, copyable diagnostics, Chromium audio hold (v0.2)
 
-**Feature context:** `023-feature-parity` · **Status:** 14/18 checked, 3 partly, 1 open. Sources: [spec.md](spec.md), [comparison.md](comparison.md).
+**Feature context:** `023-feature-parity` · **Status:** 16/18 checked, 2 partly, 0 open. Sources: [spec.md](spec.md), [comparison.md](comparison.md).
 
 Implemented 2026-11-09, not committed. Evidence is the focused and full CamLidCore test runs (354 tests in 69 suites pass) and a Release build. No live check was run: the open items are the ones that need a real Mac.
 
@@ -12,7 +12,7 @@ Implemented 2026-11-09, not committed. Evidence is the focused and full CamLidCo
 - [x] T010 [FR-001] Settings › General › New sessions: "Let the display sleep during sessions", bound to `allowDisplaySleep` through the existing `setAllowDisplaySleep` (`SettingsView.swift`).
 - [x] T011 [FR-003] `DisplaySleepChoice` (`KeepAwakeAssertion.swift`) reads the setting while no session runs and holds it until the session ends. Test `theDisplayChoiceIsReadWhileIdleAndHeldDuringASession`.
 - [x] T012 [FR-002] `AppCoordinator` reconciles a second `KeepAwakeAssertion` for `PreventUserIdleDisplaySleep` with its own reason. The same create, read-back and release path. Released at quit.
-- [~] T013 [FR-004] Code evidence and a live check: with the option off, the QA build holds `PreventUserIdleDisplaySleep` named "CamLid keeps the display on while a session runs" during a timed session and releases it on stop (2026-11-09, `pmset`). The on-screen "CamLid is active" wording was not seen (`SleepDiagnosticsCopy.swift`).
+- [x] T013 [FR-004] Code evidence and a live check: with the option off, the QA build holds `PreventUserIdleDisplaySleep` named "CamLid keeps the display on while a session runs" during a timed session and releases it on stop (2026-11-09, `pmset`). The on-screen "CamLid is active" wording was not seen on 2026-11-09 (`SleepDiagnosticsCopy.swift`); on 2026-11-10 the QA copy showed the row with "Active now" during a timed session ([qa-evidence.md](../024-release-readiness-v0.2/qa-evidence.md)).
 - [x] T014 [SC-001, SC-002] Tests in `DisplayHoldTests`: no display assertion by default; with the option off, exactly one held and released at the end.
 
 ## Phase 2 — Copyable diagnostics (US2; FR-005, FR-006)

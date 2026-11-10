@@ -9,7 +9,7 @@ The shared roadmap (kept outside this repository) defines cross-feature gates an
 > agents, one persistent helper, GitHub releases). Their task lists now mark tasks `[x]` when evidence exists, `[~]`
 > when [ADR 0002](../docs/adr/0002-observer-only-agent-activity.md), [0003](../docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md)
 > or [0004](../docs/adr/0004-distribution-through-github-releases.md) replaced them (the reason is on the line), and
-> leave `[ ]` only for work that is still valid. Current work is the release after 0.1.0, v0.2 (specs 021 and 022), and spec 016 (remaining trials). Specs 019 and 020 plan later versions.
+> leave `[ ]` only for work that is still valid. Current work is the release after 0.1.0, v0.2 (specs 021, 022, 023 and 025; the release gate is spec 024), and spec 016 (remaining trials). Specs 019 and 020 plan later versions.
 
 - [M0: Project Planning](001-project-planning/spec.md) — Complete: documentation only.
 - [M1: Power and Detection Feasibility](002-power-feasibility/spec.md) — **Closed for this design:** the backend question was answered by the persistent helper (014) and Strict (016), qualified on one Mac by attended trials.
@@ -41,7 +41,7 @@ Experimental feature spec (not a milestone; no gate change):
 - [Agent skill for the CamLid command (022)](022-agent-skill/spec.md) — **Implemented for v0.2** (the release after 0.1.0). The skill is in `.agents/skills/camlid/SKILL.md`; the opt-in Settings button writes it to `~/.agents/skills/camlid/SKILL.md`, in the home folder (changed from a project folder on 2026-11-09). ADR 0002 is amended for that one file. No MCP. Open: an agent run (SC-001).
 - [Display option and copyable diagnostics (023)](023-feature-parity/spec.md) — **Implemented** for v0.2 (not released; live checks open in its [tasks](023-feature-parity/tasks.md)). Decisions D1–D4 accepted 2026-11-09. The comparison with LidRun and LidWalk is in [comparison.md](023-feature-parity/comparison.md): most features are already in CamLid; the display option, copyable diagnostics and the Chromium audio hold are the additions.
 - [Release readiness for v0.2 (024)](024-release-readiness-v0.2/spec.md) — **In progress**: the risk register and the release gate. Code is done; the gate lists what needs a real Mac or an owner decision.
-- [Music hold: browsers, Spotify and Apple Music (025)](025-music-hold/spec.md) — **Implemented** for v0.2 (not released). Each source is an opt-in switch in Watched programs. Open: live checks of Spotify and Apple Music.
+- [Music hold: browsers, Spotify and Apple Music (025)](025-music-hold/spec.md) — **Implemented** for v0.2 (not released). Each source is an opt-in switch in Watched programs. Open: a full CamLid run per source. The probe checks of Brave, Spotify and Apple Music are done (2026-11-10).
 
 Each folder contains its scoped spec/plan/tasks; supporting research/model/quickstart/checklists
 exist where applicable (012 uses the linked decision memo and runbooks). Base runtime contracts reside with M2/M3; M8 adds scoped automation extensions while consuming the existing policy/transport/backend contracts.
