@@ -14,6 +14,7 @@ struct ControlIntegrationTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let control = root.appendingPathComponent("control")
         let coordinator = AppCoordinator(locations: .test(root: root, control: control), preferences: defaults)
+        coordinator.controlAllowance = 10
         coordinator.startControlService()
         defer { coordinator.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification)) }
         let channel = LocalControlChannel(directory: control)
@@ -83,6 +84,7 @@ struct ControlIntegrationTests {
         let defaults = MemoryPreferences()
         let control = root.appendingPathComponent("control")
         let coordinator = AppCoordinator(locations: .test(root: root, control: control), preferences: defaults)
+        coordinator.controlAllowance = 10
         coordinator.startControlService()
         defer { coordinator.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification)) }
         let channel = LocalControlChannel(directory: control)

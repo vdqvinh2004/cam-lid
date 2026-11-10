@@ -57,6 +57,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     /// Wall-clock budget for one settings write (spec 024). The app keeps 0.7 s; the test fixtures raise it, because a
     /// budget that short fails under CPU load and the tests then report a save that did not happen.
     var settingsWriteBudget: Double = 0.7
+    /// Wall-clock budget for a control reply, which waits on the main actor. The app keeps 0.8 s; the control tests raise
+    /// it, because other main-actor work under load can exceed it and the test then reports the service as unavailable.
+    var controlAllowance: Double = 0.8
     private static func musicKey(_ source: MusicSource) -> String { "CamLidMusicHold." + source.rawValue }
     private let shortcut = GlobalHotKey()
     private var commandAdmissions = CommandAdmissions()
@@ -898,7 +901,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             return nil
         }
         musicHolding = musicHold.observe(now: now) {
-            MusicOutput.activeSources(in: MusicOutput.processes(), watched: watched)
+            MusicOutput.reading(in: MusicOutput.processes(), watched: watched, holders: PlaybackAssertion.holders)
         }.intersection(watched)
         return musicHolding.isEmpty ? nil : "musicPlayback"
     }
@@ -1484,8 +1487,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     func startControlService() {
         do {
+            let standardAllowance = controlAllowance
             try controlServer.start { [weak self] command, payload in
-                let allowance = command == .diagnose ? 5.5 : 0.8
+                let allowance = command == .diagnose ? 5.5 : standardAllowance
                 let box = ControlReplyBox(timeout: allowance + 0.1)
                 let deadline = ContinuousTime.now + allowance
                 Task { @MainActor in

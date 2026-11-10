@@ -1,8 +1,11 @@
 import CoreAudio
+import Darwin
 import Foundation
+import IOKit.pwr_mgt
 
-/// Spec 025: a music source that keeps an Auto session awake while it plays. Playback is read from CoreAudio, which lists
-/// the processes that run audio output. The read needs no permission and sends nothing to the program.
+/// Spec 025: a music source that keeps an Auto session awake while it plays. CoreAudio lists the processes that run audio
+/// output. A browser and Apple Music also hold a playback assertion while they play (`PlaybackAssertion`). Both reads need no
+/// permission and send nothing to the program.
 public enum MusicSource: String, CaseIterable, Codable, Sendable {
     case browser, spotify, appleMusic
 
@@ -66,13 +69,18 @@ enum MusicOutput {
         }
     }
 
-    /// Pure: the watched sources that have a process running audio output.
-    static func activeSources(in processes: [Process], watched: Set<MusicSource>) -> Set<MusicSource> {
-        let sources = processes.compactMap { process -> MusicSource? in
+    /// Pure: what one read found. `outputting` lists the watched sources with a process running audio output, and
+    /// `assertionHeld` the outputting sources whose playback assertion is held. `holders` is read only when a browser or Apple
+    /// Music outputs, so an idle Mac reads no assertions.
+    static func reading(in processes: [Process], watched: Set<MusicSource>, holders: () -> [AssertionHolder]) -> MusicReading {
+        let outputting = Set(processes.compactMap { process -> MusicSource? in
             guard process.isOutputting, let bundleID = process.bundleID else { return nil }
             return MusicSource.matching(bundleID: bundleID)
-        }
-        return Set(sources).intersection(watched)
+        }).intersection(watched)
+        let gated = outputting.intersection([.browser, .appleMusic])
+        guard !gated.isEmpty else { return MusicReading(outputting: outputting) }
+        let table = holders()
+        return MusicReading(outputting: outputting, assertionHeld: gated.filter { PlaybackAssertion.isHeld($0, in: table) })
     }
 
     @available(macOS 14.2, *)
@@ -108,21 +116,131 @@ enum MusicOutput {
     }
 }
 
-/// Spec 025 (SC-004 of spec 023, extended): a watched source that plays keeps an Auto session working. The hold lasts for a
-/// short quiet period after the last playing observation, which bridges two samples. The Auto completion delay (Sleep when
-/// done) then waits, as it does after agent work. The outputs are read at most every `sampleEverySeconds`.
+/// What one read found: the watched sources with audio output, and the outputting ones whose playback assertion is held.
+struct MusicReading: Equatable {
+    var outputting: Set<MusicSource> = []
+    var assertionHeld: Set<MusicSource> = []
+}
+
+/// A process that holds power assertions, identified by its executable name.
+struct AssertionHolder {
+    let processName: String
+    let assertions: [[String: Any]]
+}
+
+/// The playback assertions (read from IOKit; no permission is needed). A Chromium browser holds the named "Playing audio" assertion
+/// and Apple's Music app holds "com.apple.Music.playback" while audio plays. Each is released when playback stops, and a silent output
+/// stream holds neither. Measured: Brave's assertion went about 2 to 3 s after pause, and Music's went at the pause, while each output
+/// stream stayed open for about 5 to 10 s. Spotify holds no assertion, so it is judged by its output alone.
+enum PlaybackAssertion {
+    struct Signal {
+        let processNames: [String]
+        let assertionName: String
+        let assertionType: String
+    }
+
+    /// Browser process names. A helper is named "<browser> Helper (...)", so a name matches its browser by prefix.
+    /// shortcut: only Brave was checked live; check another browser's assertion before relying on it.
+    static let browserProcessNames = ["Google Chrome", "Chromium", "Brave Browser", "Microsoft Edge", "Vivaldi", "Opera", "Arc"]
+
+    static func signal(for source: MusicSource) -> Signal? {
+        switch source {
+        case .browser:
+            Signal(processNames: browserProcessNames, assertionName: "Playing audio", assertionType: "NoIdleSleepAssertion")
+        case .appleMusic:
+            Signal(processNames: ["Music"], assertionName: "com.apple.Music.playback", assertionType: "PreventUserIdleSystemSleep")
+        case .spotify:
+            nil
+        }
+    }
+
+    /// Pure: whether a source's playback assertion is held by one of the holders.
+    static func isHeld(_ source: MusicSource, in holders: [AssertionHolder]) -> Bool {
+        guard let signal = signal(for: source) else { return false }
+        return holders.contains { holder in
+            signal.processNames.contains { isNamed(holder.processName, $0) } && holder.assertions.contains {
+                ($0["AssertName"] as? String) == signal.assertionName && ($0["AssertType"] as? String) == signal.assertionType
+            }
+        }
+    }
+
+    /// Live: reads this Mac's power assertions with the executable name of each holder. Copy APIs transfer ownership, also on error.
+    static func holders() -> [AssertionHolder] {
+        var processes: Unmanaged<CFDictionary>?
+        let result = IOPMCopyAssertionsByProcess(&processes)
+        let dictionary = processes?.takeRetainedValue() as? [NSNumber: [[String: Any]]]
+        guard result == kIOReturnSuccess, let dictionary else { return [] }
+        return dictionary.compactMap { pid, assertions in
+            processName(pid.intValue).map { AssertionHolder(processName: $0, assertions: assertions) }
+        }
+    }
+
+    private static func isNamed(_ process: String, _ name: String) -> Bool {
+        process == name || process.hasPrefix(name + " ")
+    }
+
+    private static func processName(_ pid: Int) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard proc_pidpath(pid_t(pid), &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        return URL(fileURLWithPath: String(cString: buffer)).lastPathComponent
+    }
+}
+
+/// Spec 025: a watched source that plays keeps an Auto session working until it stops, then Sleep when done applies, as after
+/// agent work. A source judged by its playback assertion (a browser, and Apple Music once its assertion has been seen on this
+/// Mac) plays only while the assertion is held, and keeps a 3-second bridge over missed reads. Spotify plays while its output
+/// runs and keeps a 5-second bridge: its output had no gap at three manual track changes (2026-11-10). Apple Music before its
+/// assertion is seen plays while its output runs and keeps a 10-second bridge, since its track changes are not measured.
+/// Reads come every 2 s while a hold is in force, and every 5 s otherwise.
 struct MusicPlaybackHold {
-    static let quietSeconds = 10.0
-    static let sampleEverySeconds = 5.0
+    static let idleSampleSeconds = 5.0
+    static let holdingSampleSeconds = 2.0
+    static let assertedQuietSeconds = 3.0
+    static let spotifyQuietSeconds = 5.0
+    static let outputOnlyQuietSeconds = 10.0
     private var lastSampleAt: Double?
     private var lastPlayingAt: [MusicSource: Double] = [:]
+    private var holding: Set<MusicSource> = []
+    /// Whether Apple Music's playback assertion has been seen on this Mac. Until it has, Music is judged by its output alone, so a
+    /// Mac without that assertion still gets the output-only hold.
+    private var musicAssertionSeen = false
 
-    /// The sources that hold the session at `now`. `sample` reads the outputs, and runs only when a read is due.
-    mutating func observe(now: Double, sample: () -> Set<MusicSource>) -> Set<MusicSource> {
-        if lastSampleAt.map({ now - $0 >= Self.sampleEverySeconds }) ?? true {
-            for source in sample() { lastPlayingAt[source] = now }
+    /// Whether a source is judged by its playback assertion right now.
+    private func isAsserted(_ source: MusicSource) -> Bool {
+        switch source {
+        case .browser: true
+        case .appleMusic: musicAssertionSeen
+        case .spotify: false
+        }
+    }
+
+    /// A source plays when its output runs, and, if it is judged by its assertion, when the assertion is held too.
+    private func isPlaying(_ source: MusicSource, in reading: MusicReading) -> Bool {
+        guard reading.outputting.contains(source) else { return false }
+        return !isAsserted(source) || reading.assertionHeld.contains(source)
+    }
+
+    /// How long a source keeps the hold after its last playing read.
+    static func quietSeconds(for source: MusicSource, asserted: Bool) -> Double {
+        if asserted { return assertedQuietSeconds }
+        return source == .spotify ? spotifyQuietSeconds : outputOnlyQuietSeconds
+    }
+
+    /// The sources that hold the session at `now`. `sample` reads the sources, and runs only when a read is due.
+    mutating func observe(now: Double, sample: () -> MusicReading) -> Set<MusicSource> {
+        let interval = holding.isEmpty ? Self.idleSampleSeconds : Self.holdingSampleSeconds
+        if lastSampleAt.map({ now - $0 >= interval }) ?? true {
+            let reading = sample()
+            if reading.assertionHeld.contains(.appleMusic) { musicAssertionSeen = true }
+            for source in MusicSource.allCases where isPlaying(source, in: reading) {
+                lastPlayingAt[source] = now
+            }
             lastSampleAt = now
         }
-        return Set(lastPlayingAt.filter { now - $0.value <= Self.quietSeconds }.keys)
+        holding = Set(MusicSource.allCases.filter { source in
+            guard let last = lastPlayingAt[source] else { return false }
+            return now - last <= Self.quietSeconds(for: source, asserted: isAsserted(source))
+        })
+        return holding
     }
 }
