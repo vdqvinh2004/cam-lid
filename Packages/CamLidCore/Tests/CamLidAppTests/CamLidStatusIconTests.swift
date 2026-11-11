@@ -8,7 +8,7 @@ struct CamLidStatusIconTests {
     @Test @MainActor func autoStatesHaveDistinctIconsAndTimedUsesText() throws {
         let idle = try #require(CamLidStatusIcon.image(for: .neutral))
         let autoIdle = try #require(CamLidStatusIcon.image(for: .neutral, activeMode: .auto))
-        let autoWorking = try #require(CamLidStatusIcon.image(for: .neutral, activeMode: .auto, agentWorking: true))
+        let autoWorking = try #require(CamLidStatusIcon.image(for: .neutral, activeMode: .auto, activityHolding: true))
         let images = try [idle, autoIdle, autoWorking].map { try #require($0.tiffRepresentation) }
         #expect(Set(images).count == 3)
         #expect(CamLidStatusIcon.image(for: .neutral, activeMode: .timed) == nil)
@@ -17,7 +17,7 @@ struct CamLidStatusIconTests {
     /// One laptop family, all templates: a white mark vanished on a light menu bar (owner decision 2026-11-01).
     @Test @MainActor func activeSymbolsAreTemplatesThatFollowTheMenuBar() throws {
         for working in [false, true] {
-            let image = try #require(CamLidStatusIcon.image(for: .neutral, activeMode: .auto, agentWorking: working))
+            let image = try #require(CamLidStatusIcon.image(for: .neutral, activeMode: .auto, activityHolding: working))
             #expect(image.isTemplate && image.size == NSSize(width: 18, height: 16))
         }
         #expect(CamLidStatusIcon.image(for: .attention)?.isTemplate == true)
@@ -31,6 +31,14 @@ struct CamLidStatusIconTests {
         #expect(frames.count == 12)
         #expect(Set(try frames.map { try #require($0.tiffRepresentation) }).count == frames.count)
         #expect(frames.allSatisfy { $0.isTemplate })
+    }
+    /// The spinner runs for an Auto session that activity keeps awake: a working agent, or music (owner report 2026-11-11).
+    @Test @MainActor func spinnerRunsForAgentWorkAndMusicOnlyInAutoMode() {
+        #expect(AppCoordinator.isHoldingForActivity(mode: .auto, agentWorking: true, musicHolding: []))
+        #expect(AppCoordinator.isHoldingForActivity(mode: .auto, agentWorking: false, musicHolding: [.browser]))
+        #expect(!AppCoordinator.isHoldingForActivity(mode: .auto, agentWorking: false, musicHolding: []))
+        #expect(!AppCoordinator.isHoldingForActivity(mode: .timed, agentWorking: true, musicHolding: [.browser]))
+        #expect(!AppCoordinator.isHoldingForActivity(mode: nil, agentWorking: true, musicHolding: [.spotify]))
     }
     @Test func menuBarCountdownUsesCompactLiveClockText() {
         #expect(MenuBarCountdown.text(remaining: nil) == nil)
@@ -56,10 +64,10 @@ struct CamLidStatusIconTests {
         let button = try #require(controller.anchorButton)
 
         actions.mode = .auto
-        controller.update(status: MenuBarStatus(state: .protected, leaseVerified: true, agentWorking: false))
+        controller.update(status: MenuBarStatus(state: .protected, leaseVerified: true, activityHolding: false))
         let idleImage = try #require(button.image)
         #expect(button.title.isEmpty)
-        controller.update(status: MenuBarStatus(state: .protected, leaseVerified: true, agentWorking: true))
+        controller.update(status: MenuBarStatus(state: .protected, leaseVerified: true, activityHolding: true))
         #expect(button.image !== idleImage)
         #expect(button.title.isEmpty)
 

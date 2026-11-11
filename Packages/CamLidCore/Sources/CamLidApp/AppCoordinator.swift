@@ -76,6 +76,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private let permissions: AppPermissions
     private var latestHealth: HealthSnapshot?
     private var latestReason: String?
+    /// Set by each policy evaluation: the last decision had unclear agent state, which the countdown reason line names.
+    private var graceUnclear = false
     private var sensorAvailability: [String: String] = [:]
     private var omittedHistoryRecords = 0
     private var lastReportedEvidenceRejection: String?
@@ -667,11 +669,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         // The helper's refusal explains closed lid while the session runs, even when the lid is open and it does not
         // stop the session. A stopped session keeps the reason it latched.
         if let stop = (session.stopReasons + holdReconciler.stopReasons).first(where: { $0.hasPrefix("helper") }) {
-            switch stop {
-            case "helperLeaseLost": return "Closed lid lost contact with the helper; sleep was restored automatically."
-            case "helperReleaseFailed": return "The sleep setting could not be restored yet. CamLid is retrying."
-            default: return Self.helperReasonText(String(stop.dropFirst("helper:".count)))
-            }
+            return Self.helperStopText(stop)
         }
         if let app = helper.keepAwakeApps.first(where: \.resetsSleepSetting)?.name {
             return "\(app) resets the sleep setting, so closed lid will be interrupted. Quit \(app) or remove its helper."
@@ -687,6 +685,35 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case .releaseFailed: return "The sleep setting could not be restored yet. CamLid is retrying."
         default: return holdReconciler.unavailableReason == nil ? nil : "Closed lid can’t reach the helper. Retrying."
         }
+    }
+
+    /// The closed-lid sentence for a helper stop: "helperLeaseLost", "helperReleaseFailed" or "helper:<refusal>".
+    static func helperStopText(_ stop: String) -> String {
+        switch stop {
+        case "helperLeaseLost": return "Closed lid lost contact with the helper; sleep was restored automatically."
+        case "helperReleaseFailed": return "The sleep setting could not be restored yet. CamLid is retrying."
+        default: return helperReasonText(String(stop.dropFirst("helper:".count)))
+        }
+    }
+
+    /// The reason line while music keeps an Auto session awake, naming each source as its Settings chip does.
+    static func musicReasonText(_ sources: Set<MusicSource>) -> String {
+        let names = MusicSource.allCases.filter { sources.contains($0) }.map(\.name)
+        return "Music is playing in \(names.joined(separator: " and "))."
+    }
+
+    /// The reason line for a stop: one phrase per code. A helper stop uses the closed-lid wording without its final period.
+    static func safetyReasonText(_ reasons: [String]) -> String {
+        let labels = ["thermalCritical": "Critical thermal pressure", "thermalSerious": "Sustained serious thermal pressure",
+            "thermalUnknown": "Thermal reading unavailable", "lidUnknown": "Lid reading unavailable",
+            "powerUnknown": "Power source unavailable", "notCharging": "AC power required",
+            "batteryFloor": "Battery below safety floor", "batteryUnknown": "Battery reading unavailable", "cpuStop": "Sustained CPU load exceeded limit"]
+        return reasons.map { reason -> String in
+            if reason.hasPrefix("helper") {
+                return helperStopText(reason).trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            }
+            return labels[reason] ?? "Safety condition requires attention"
+        }.joined(separator: "; ")
     }
 
     static func helperReasonText(_ reason: String) -> String {
@@ -770,6 +797,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 lifetimeCompletionSuppressed: lifetime?.suppressesAutoCompletion ?? hasLifetimeRules,
                 nowMonotonic: now)
             let changed = decision.state != active.effectiveState
+            graceUnclear = decision.reasons.contains("workUncertain")
             active = decision.session
             session = active
             if changed {
@@ -790,9 +818,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
         latestReason = statusReason(signal: signal)
         let activeMode = session?.requestedMode
-        let agentWorking = activeMode == .auto && badgeStates().contains {
-            $0.detectionEnabled && $0.workingCount > 0
-        }
+        let agentWorking = badgeStates().contains { $0.detectionEnabled && $0.workingCount > 0 }
+        let activityHolding = Self.isHoldingForActivity(mode: activeMode, agentWorking: agentWorking, musicHolding: musicHolding)
         let timerRemaining: Double? = if activeMode == .timed || activeMode == .manual {
             session?.capDeadlineMonotonic.map { max(0, $0 - now) }
         } else {
@@ -800,7 +827,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
         menuBar.update(status: MenuBarStatus(
             state: shown, reasonText: latestReason, leaseVerified: holdReconciler.leaseVerified(now: now),
-            agentWorking: agentWorking, timerRemainingSeconds: timerRemaining,
+            activityHolding: activityHolding, timerRemainingSeconds: timerRemaining,
             keepingAwakeWithLidOpen: shown == .protected && !holdReconciler.leaseVerified(now: now)
                 && keepAwake.verified && health.lidState == .open))
         updates.refreshSafety()
@@ -921,16 +948,11 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         if agents.lastRejection == "enrollmentFull" { return "Agent capacity reached: 20 holding tasks are already tracked." }
         if agents.lastRejection == "retirementHistoryFull" { return "Detection history full; new agent evidence is unavailable." }
         if session == nil { return Self.noSessionReason }
-        if !signal.reasons.isEmpty {
-            let labels = ["thermalCritical": "Critical thermal pressure", "thermalSerious": "Sustained serious thermal pressure",
-                "thermalUnknown": "Thermal reading unavailable", "lidUnknown": "Lid reading unavailable",
-                "powerUnknown": "Power source unavailable", "notCharging": "AC power required",
-                "batteryFloor": "Battery below safety floor", "batteryUnknown": "Battery reading unavailable", "cpuStop": "Sustained CPU load exceeded limit"]
-            return signal.reasons.map { labels[$0] ?? "Safety condition requires attention" }.joined(separator: ", ")
-        }
-        if session?.requestedMode == .auto, !musicHolding.isEmpty {
-            let names = MusicSource.allCases.filter { musicHolding.contains($0) }.map(\.name)
-            return "Music is playing in \(names.joined(separator: " and "))."
+        if !signal.reasons.isEmpty { return Self.safetyReasonText(signal.reasons) }
+        if session?.requestedMode == .auto, !musicHolding.isEmpty { return Self.musicReasonText(musicHolding) }
+        // Owner decision (2026-11-11): the countdown runs even when agent state is unclear. Say so while it runs.
+        if session?.effectiveState == .completionGrace, graceUnclear {
+            return "Agent state is unclear, so the Mac sleeps after the countdown."
         }
         if session?.requestedMode == .auto {
             guard let lifetime = latestLifetimeState else {
@@ -1542,6 +1564,23 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
     }
 
+    /// The menu-bar spinner runs while activity keeps an Auto session awake: a working agent, or music (spec 025).
+    static func isHoldingForActivity(mode: RequestedMode?, agentWorking: Bool, musicHolding: Set<MusicSource>) -> Bool {
+        mode == .auto && (agentWorking || !musicHolding.isEmpty)
+    }
+
+    /// Whether a state change belongs in Activity history: a change that starts or ends work, waiting, completion or
+    /// failure. Idle and unknown flicker is not news, so it does not write a record.
+    static func isNewsForHistory(from before: TaskState?, to after: TaskState) -> Bool {
+        func significant(_ state: TaskState?) -> Bool {
+            switch state {
+            case .working, .waiting, .completed, .failed: true
+            case .idle, .unknown, nil: false
+            }
+        }
+        return before != after && (significant(before) || significant(after))
+    }
+
     /// In-process observer metadata only; no provider/IPC producer can call this path.
     @discardableResult
     func receiveObservation(_ event: NormalizedEvent) throws -> String {
@@ -1573,8 +1612,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             }
         }
         refresh()
-        // Only a change is history: an unchanged state re-reported on every poll flooded Activity (20 521 of 21 489).
-        if let stateAfter = matching()?.state, stateAfter != stateBefore {
+        // Only news is history: work, waiting, completion or failure starting or ending. An unchanged state re-reported on
+        // every poll flooded Activity (20 521 of 21 489), and idle/unknown flicker does too (Orca: 600–1,300 flips a day).
+        if let stateAfter = matching()?.state, Self.isNewsForHistory(from: stateBefore, to: stateAfter) {
             record(category: .stateTransition, newState: sessionStateForRecord(),
                    reasons: ["agentStateChanged", "\(event.provider):\(stateAfter.rawValue)"])
         }

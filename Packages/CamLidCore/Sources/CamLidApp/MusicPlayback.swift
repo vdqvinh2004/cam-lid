@@ -22,10 +22,10 @@ public enum MusicSource: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// The source's name in the Dashboard status.
+    /// The source's name in the reason line: the same words as its Settings chip.
     public var name: String {
         switch self {
-        case .browser: "a browser"
+        case .browser: "Chromium browsers"
         case .spotify: "Spotify"
         case .appleMusic: "Apple Music"
         case .safari: "Safari"

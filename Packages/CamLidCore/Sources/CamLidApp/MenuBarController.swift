@@ -37,21 +37,21 @@ public struct MenuBarStatus: Sendable, Equatable {
     public let state: EffectiveState
     public let reasonText: String?
     public let leaseVerified: Bool
-    /// Auto mode: true while any enabled agent reports work.
-    public let agentWorking: Bool
+    /// Auto mode: true while activity keeps the Mac awake: an enabled agent reports work, or music plays (spec 025).
+    public let activityHolding: Bool
     /// Timed/manual mode: live remaining seconds, or nil for Infinite.
     public let timerRemainingSeconds: Double?
     /// Lid open, keep-awake verified and the closed-lid lease unverified: the label says so instead of Unknown.
     public let keepingAwakeWithLidOpen: Bool
 
     public init(state: EffectiveState, reasonText: String? = nil, leaseVerified: Bool = false,
-                agentWorking: Bool = false, timerRemainingSeconds: Double? = nil,
+                activityHolding: Bool = false, timerRemainingSeconds: Double? = nil,
                 keepingAwakeWithLidOpen: Bool = false) {
         self.keepingAwakeWithLidOpen = keepingAwakeWithLidOpen
         self.state = state
         self.reasonText = reasonText
         self.leaseVerified = leaseVerified
-        self.agentWorking = agentWorking
+        self.activityHolding = activityHolding
         self.timerRemainingSeconds = timerRemainingSeconds
     }
 
@@ -193,7 +193,7 @@ public final class MenuBarController: NSObject {
         renderedMode = activeMode
         renderedTimerText = timerText
 
-        let autoWorking = activeMode == .auto && status.tone != .stopped && status.agentWorking
+        let autoWorking = activeMode == .auto && status.tone != .stopped && status.activityHolding
         if let timerText {
             // Timed/manual sessions replace the clock icon with the actual
             // remaining time, updating once per second.
@@ -223,7 +223,7 @@ public final class MenuBarController: NSObject {
                 stopAutoAnimation()
                 let iconMode: RequestedMode? = activeMode == .auto ? .auto : nil
                 button.image = CamLidStatusIcon.image(for: status.tone, activeMode: iconMode,
-                                                      agentWorking: false)
+                                                      activityHolding: false)
             }
         }
 
@@ -237,7 +237,7 @@ public final class MenuBarController: NSObject {
             countdownText = ""
         }
         let workingText = activeMode == .auto
-            ? (status.agentWorking ? ", agent working" : ", no agent working") : ""
+            ? (status.activityHolding ? ", working" : ", not working") : ""
         let label = status.accessibilityLabel + modeText + countdownText + workingText
         button.setAccessibilityLabel(label)
         button.setAccessibilityValue(label)

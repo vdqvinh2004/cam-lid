@@ -2,7 +2,7 @@ import AppKit
 import CamLidCore
 
 /// Native menu-bar marks, one laptop family shared with the Dashboard: the laptop alone while idle, with a small
-/// badge for the session (Auto arrows, a rotating arc while an agent works, a moon while waiting to sleep) and the
+/// badge for the session (Auto arrows, a rotating arc while activity keeps the Mac awake, a moon while waiting to sleep) and the
 /// warning variant when stopped. Timed shows its countdown as text. Every mark is a template image, so it follows
 /// light and dark menu bars (a white mark disappeared on a light menu bar).
 public enum CamLidStatusIcon {
@@ -15,10 +15,10 @@ public enum CamLidStatusIcon {
     }
 
     public static func image(for tone: CamLidAccessibility.StatusTone, activeMode: RequestedMode? = nil,
-                             agentWorking: Bool = false) -> NSImage? {
+                             activityHolding: Bool = false) -> NSImage? {
         if tone == .stopped { return symbolImage("laptopcomputer.trianglebadge.exclamationmark") }
         if activeMode == .auto {
-            return agentWorking ? autoSpinnerFrames.first : badged(symbol: "arrow.triangle.2.circlepath")
+            return activityHolding ? autoSpinnerFrames.first : badged(symbol: "arrow.triangle.2.circlepath")
         }
         // Timed sessions show the real remaining time as menu-bar text.
         if activeMode == .timed || activeMode == .manual { return nil }
@@ -26,7 +26,7 @@ public enum CamLidStatusIcon {
         return symbolImage("laptopcomputer")
     }
 
-    /// Rotating frames for an Auto session with at least one working agent.
+    /// Rotating frames for an Auto session that activity keeps awake: a working agent, or music.
     public static var autoSpinnerFrames: [NSImage] { spinnerFrames }
 
     private static func symbolImage(_ name: String) -> NSImage? {
