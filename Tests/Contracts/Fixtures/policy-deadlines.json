@@ -1,0 +1,119 @@
+{
+  "fixture": "policy-deadlines",
+  "description": "Waiting never holds power (supervision only); unknown holds through bounded deadline and never extends the cap; process-only never arms auto.",
+  "config": {
+    "completionDelayMinutes": 2,
+    "waitRetentionMinutes": 5,
+    "batteryFloorPercent": 20,
+    "runCapMinutes": 120
+  },
+  "capDeadlineAt": 1000.0,
+  "steps": [
+    {
+      "at": 10.0,
+      "tasks": [
+        {
+          "id": "t1",
+          "state": "waiting",
+          "kind": "lifecycle",
+          "waitUntil": 50.0
+        }
+      ],
+      "sensors": {
+        "battery": 80,
+        "power": "ac",
+        "thermal": "nominal",
+        "lid": "open",
+        "display": "awake"
+      },
+      "safety": [],
+      "expect": "ready"
+    },
+    {
+      "at": 60.0,
+      "tasks": [
+        {
+          "id": "t1",
+          "state": "waiting",
+          "kind": "lifecycle",
+          "waitUntil": 50.0
+        }
+      ],
+      "sensors": {
+        "battery": 80,
+        "power": "ac",
+        "thermal": "nominal",
+        "lid": "open",
+        "display": "awake"
+      },
+      "safety": [],
+      "expect": "ready"
+    },
+    {
+      "at": 70.0,
+      "tasks": [
+        {
+          "id": "t2",
+          "state": "unknown",
+          "kind": "lifecycle",
+          "unknownUntil": 90.0
+        }
+      ],
+      "sensors": {
+        "battery": 80,
+        "power": "ac",
+        "thermal": "nominal",
+        "lid": "open",
+        "display": "awake"
+      },
+      "safety": [],
+      "expect": "protected"
+    },
+    {
+      "at": 95.0,
+      "tasks": [
+        {
+          "id": "t2",
+          "state": "unknown",
+          "kind": "lifecycle",
+          "unknownUntil": 90.0
+        }
+      ],
+      "sensors": {
+        "battery": 80,
+        "power": "ac",
+        "thermal": "nominal",
+        "lid": "open",
+        "display": "awake"
+      },
+      "safety": [],
+      "expect": "completionGrace",
+      "expectReasons": [
+        "lastTaskStopped",
+        "workUncertain"
+      ]
+    },
+    {
+      "at": 100.0,
+      "tasks": [
+        {
+          "id": "t3",
+          "state": "working",
+          "kind": "process"
+        }
+      ],
+      "sensors": {
+        "battery": 80,
+        "power": "ac",
+        "thermal": "nominal",
+        "lid": "open",
+        "display": "awake"
+      },
+      "safety": [],
+      "expect": "ready",
+      "expectReasons": [
+        "processOnlyNoArm"
+      ]
+    }
+  ]
+}

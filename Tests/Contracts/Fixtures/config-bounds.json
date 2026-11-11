@@ -1,0 +1,35 @@
+{
+  "fixture": "config-bounds",
+  "description": "Configuration validation matrix: ranges, defaults, atomic rejection, unknown keys, migration clamp + never-arm.",
+  "defaults": {
+    "completionDelayMinutes": 2,
+    "waitRetentionMinutes": 5,
+    "batteryFloorPercent": 20,
+    "chargingOnly": true,
+    "runCapMinutes": 120,
+    "cpuStopEnabled": false
+  },
+  "validPatches": [
+    { "completionDelayMinutes": 0 },
+    { "completionDelayMinutes": 30 },
+    { "batteryFloorPercent": 10 },
+    { "batteryFloorPercent": 50 },
+    { "runCapMinutes": 5 },
+    { "runCapMinutes": 480 },
+    { "waitRetentionMinutes": 0 },
+    { "waitRetentionMinutes": 30 }
+  ],
+  "invalidPatches": [
+    { "patch": { "completionDelayMinutes": 31 }, "field": "completionDelayMinutes" },
+    { "patch": { "completionDelayMinutes": -1 }, "field": "completionDelayMinutes" },
+    { "patch": { "batteryFloorPercent": 9 }, "field": "batteryFloorPercent" },
+    { "patch": { "batteryFloorPercent": 51 }, "field": "batteryFloorPercent" },
+    { "patch": { "runCapMinutes": 4 }, "field": "runCapMinutes" },
+    { "patch": { "runCapMinutes": 481 }, "field": "runCapMinutes" },
+    { "patch": { "noSuchKey": true }, "unknownKeys": ["noSuchKey"] }
+  ],
+  "migration": {
+    "from": { "mode": "auto", "closedLidOptIn": true, "runCapMinutes": 9999, "batteryFloorPercent": 1 },
+    "expect": { "mode": "off", "closedLidOptIn": false, "runCapMinutes": 480, "batteryFloorPercent": 10 }
+  }
+}

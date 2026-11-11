@@ -1,0 +1,35 @@
+{
+  "fixture": "policy-cap",
+  "description": "Nonresetting runtime cap: expiry wins over holding work; fresh work after expiry stays expired; clock jump past cap expires.",
+  "config": {
+    "completionDelayMinutes": 2,
+    "waitRetentionMinutes": 5,
+    "batteryFloorPercent": 20,
+    "runCapMinutes": 120
+  },
+  "capDeadlineAt": 100.0,
+  "steps": [
+    {
+      "at": 10.0,
+      "tasks": [{ "id": "t1", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "protected"
+    },
+    {
+      "at": 100.0,
+      "tasks": [{ "id": "t1", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "expired",
+      "expectReasons": ["capReached"]
+    },
+    {
+      "at": 101.0,
+      "tasks": [{ "id": "t2", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "expired"
+    }
+  ]
+}

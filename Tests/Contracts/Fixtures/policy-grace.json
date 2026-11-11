@@ -1,0 +1,70 @@
+{
+  "fixture": "policy-grace",
+  "description": "Last task stops -> completionGrace; fresh work returns to protected; lid-open expiry releases to ready; lid-closed expiry requests sleep.",
+  "config": {
+    "completionDelayMinutes": 2,
+    "waitRetentionMinutes": 5,
+    "batteryFloorPercent": 20,
+    "runCapMinutes": 120
+  },
+  "steps": [
+    {
+      "at": 10.0,
+      "tasks": [{ "id": "t1", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "protected"
+    },
+    {
+      "at": 20.0,
+      "tasks": [],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "completionGrace"
+    },
+    {
+      "at": 21.0,
+      "tasks": [{ "id": "t2", "state": "working", "kind": "wrapper" }],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "protected"
+    },
+    {
+      "at": 30.0,
+      "tasks": [],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "completionGrace"
+    },
+    {
+      "at": 200.0,
+      "tasks": [],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "ready",
+      "expectReasons": ["graceExpired", "releaseComplete"]
+    },
+    {
+      "at": 210.0,
+      "tasks": [{ "id": "t3", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "protected"
+    },
+    {
+      "at": 220.0,
+      "tasks": [],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "closed", "display": "asleep" },
+      "safety": [],
+      "expect": "completionGrace"
+    },
+    {
+      "at": 400.0,
+      "tasks": [],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "closed", "display": "asleep" },
+      "safety": [],
+      "expect": "ready",
+      "expectReasons": ["graceExpired", "sleepRequested"]
+    }
+  ]
+}

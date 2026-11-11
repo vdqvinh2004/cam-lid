@@ -1,0 +1,48 @@
+{
+  "fixture": "policy-safety",
+  "description": "Safety overrides protection: critical immediate, serious after 30s, unknown inputs stop, latch requires explicit re-arm.",
+  "config": {
+    "completionDelayMinutes": 2,
+    "waitRetentionMinutes": 5,
+    "batteryFloorPercent": 20,
+    "runCapMinutes": 120
+  },
+  "steps": [
+    {
+      "at": 10.0,
+      "tasks": [{ "id": "t1", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "protected"
+    },
+    {
+      "at": 20.0,
+      "tasks": [{ "id": "t1", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "critical", "lid": "open", "display": "awake" },
+      "safety": ["thermalCritical"],
+      "expect": "safetyStopped"
+    },
+    {
+      "at": 30.0,
+      "tasks": [{ "id": "t1", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": 80, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": [],
+      "expect": "safetyStopped",
+      "expectReasons": ["safetyLatched"]
+    },
+    {
+      "at": 40.0,
+      "tasks": [{ "id": "t1", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": 10, "power": "ac", "thermal": "nominal", "lid": "open", "display": "awake" },
+      "safety": ["batteryFloor"],
+      "expect": "safetyStopped"
+    },
+    {
+      "at": 50.0,
+      "tasks": [{ "id": "t1", "state": "working", "kind": "lifecycle" }],
+      "sensors": { "battery": null, "power": "unknown", "thermal": "unknown", "lid": "unknown", "display": "unknown" },
+      "safety": ["thermalUnknown", "lidUnknown", "powerUnknown"],
+      "expect": "safetyStopped"
+    }
+  ]
+}

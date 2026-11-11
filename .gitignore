@@ -49,7 +49,9 @@ docs/qa/
 docs/planning/
 docs/research/
 docs/design/
-/Tests/
+# Local QA under Tests/ stays ignored, except the contract fixtures the Swift tests read (spec 003, T008).
+/Tests/*
+!/Tests/Contracts/
 
 # Python packaging QA
 __pycache__/
