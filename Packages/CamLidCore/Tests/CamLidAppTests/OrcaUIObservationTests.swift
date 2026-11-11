@@ -172,10 +172,15 @@ struct OrcaUIObservationTests {
         #expect(session.graceDeadlineMonotonic == nil && session.capDeadlineMonotonic == 7200)
         let lost = try update([], now: 5, complete: false)
         #expect(!lost.reasons.contains("sleepRequested"))
-        let expired = PolicyEngine.evaluate(session: session, tasks: store.tasks(now: 200), health: try health(.closed),
-            config: config, armed: true, safety: .clear, recoveryConflict: false,
-            completionUncertain: true, nowMonotonic: 200)
-        #expect(expired.state == .ready && !expired.reasons.contains("sleepRequested"))
+        // The bounded unknown hold has ended: unclear work still counts down, then sleeps with the lid closed.
+        func uncertain(at now: Double) throws -> PolicyDecision {
+            let result = PolicyEngine.evaluate(session: session, tasks: store.tasks(now: now), health: try health(.closed),
+                config: config, armed: true, safety: .clear, recoveryConflict: false, completionUncertain: true, nowMonotonic: now)
+            session = result.session; return result
+        }
+        #expect(try uncertain(at: 200).state == .completionGrace)
+        let expired = try uncertain(at: 200 + Double(config.completionDelayMinutes) * 60)
+        #expect(expired.state == .ready && expired.reasons.contains("sleepRequested"))
         #expect(expired.session.graceDeadlineMonotonic == nil)
     }
 }

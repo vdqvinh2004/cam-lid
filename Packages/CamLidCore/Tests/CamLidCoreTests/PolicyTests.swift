@@ -311,7 +311,8 @@ struct PolicyTests {
             config: try config(), armed: true, safety: .clear,
             recoveryConflict: false, nowMonotonic: 60
         )
-        #expect(decision.state == .ready)
+        // Unclear work still gets its countdown (owner decision 2026-11-11), then sleeps with the lid closed.
+        #expect(decision.state == .completionGrace && decision.session.graceDeadlineMonotonic != nil)
         #expect(decision.reasons.contains("workUncertain"))
         #expect(!decision.reasons.contains("sleepRequested"))
         var grace = try makeSession(capAt: 1_000)
@@ -323,7 +324,7 @@ struct PolicyTests {
             config: try config(), armed: true, safety: .clear, recoveryConflict: false,
             completionUncertain: true, nowMonotonic: 60)
         #expect(decision.state == .ready && decision.session.graceDeadlineMonotonic == nil)
-        #expect(!decision.reasons.contains("sleepRequested"))
+        #expect(decision.reasons.contains("sleepRequested") && decision.reasons.contains("workUncertain"))
     }
 
     @Test("recovery conflict becomes recoveryRequired")

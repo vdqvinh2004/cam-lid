@@ -330,7 +330,7 @@ struct AuditCLITests {
                     sensors: FixtureSensors(), safety: [], expect: "protected"),
                 FixtureStep(
                     at: 95, tasks: [FixtureTask(id: "t2", state: "unknown", kind: "lifecycle", unknownUntil: 500)],
-                    sensors: FixtureSensors(), safety: [], expect: "ready", expectReasons: ["workUncertain", "releaseComplete"]),
+                    sensors: FixtureSensors(), safety: [], expect: "completionGrace", expectReasons: ["lastTaskStopped", "workUncertain"]),
             ])
         let result = Simulator().runFixture(fixture)
         #expect(result.steps[0].passed)

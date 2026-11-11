@@ -120,28 +120,26 @@ public enum PolicyEngine {
                     return transition(.ready, reasons: ["lifetimeEpochUnconfirmed", "releaseComplete"])
                 }
             }
-            // Unknown may release its bounded hold, but cannot prove completion
-            // or authorize an explicit sleep request.
-            if completionUncertain || tasks.contains(where: { $0.state == .unknown }) {
-                updated.graceDeadlineMonotonic = nil
-                return transition(.ready, reasons: ["workUncertain", "releaseComplete"])
-            }
+            // Owner decision (2026-11-11): unclear agent state does not cut the session short. A held session still
+            // runs its countdown and then sleeps as promised; sleeping an agent by mistake is the safer error.
+            // "workUncertain" stays in the reasons so the Activity log records it.
+            let uncertain = completionUncertain || tasks.contains(where: { $0.state == .unknown }) ? ["workUncertain"] : []
             switch updated.effectiveState {
             case .protected:
                 updated.graceDeadlineMonotonic =
                     nowMonotonic + Double(config.completionDelayMinutes) * 60
-                return transition(.completionGrace, reasons: ["lastTaskStopped"])
+                return transition(.completionGrace, reasons: ["lastTaskStopped"] + uncertain)
             case .completionGrace:
                 if let grace = updated.graceDeadlineMonotonic, nowMonotonic < grace {
-                    return transition(.completionGrace, reasons: ["gracePending"])
+                    return transition(.completionGrace, reasons: ["gracePending"] + uncertain)
                 }
                 updated.graceDeadlineMonotonic = nil
                 if health.lidState == .closed {
-                    return transition(.ready, reasons: ["graceExpired", "sleepRequested"])
+                    return transition(.ready, reasons: ["graceExpired", "sleepRequested"] + uncertain)
                 }
-                return transition(.ready, reasons: ["graceExpired", "releaseComplete"])
+                return transition(.ready, reasons: ["graceExpired", "releaseComplete"] + uncertain)
             default:
-                return transition(.ready, reasons: ["noHoldingTask"])
+                return transition(.ready, reasons: uncertain.isEmpty ? ["noHoldingTask"] : ["workUncertain", "releaseComplete"])
             }
         }
 
