@@ -40,6 +40,8 @@ xcuserdata/
 .agents/*
 !.agents/skills/
 !.agents/skills/**
+# Claude Code files stay on this Mac; their skills link to .agents/skills, which stays tracked.
+/.claude/
 # Serena tool state: default project config plus local cache/memories.
 .serena/
 # Keep reusable Spec Kit skills versionable; no personal auth/cache files.
