@@ -24,7 +24,7 @@ default). The run cap (120 minutes by default) still bounds every Auto session.
 
    Spotify holds no assertion, so it is judged by its output alone. All reads need no permission and send nothing to the
    program (ADR 0002: observer only).
-4. **Browsers:** Chromium browsers (Chrome, Brave, Edge, Vivaldi, Opera, Arc, Chromium) share one chip and one signal. Safari has its own chip and signal, measured on 2026-11-10 with YouTube. Firefox is not
+4. **Browsers:** Chromium browsers (Chrome, Brave, Edge, Vivaldi, Opera, Arc, Chromium) share one chip and one signal. Safari has its own chip and signal: a video holds "com.apple.WebCore: HTMLMediaElement playback" under its own process name, as system or display sleep, and its audio is held through WebKit's "WebKit Media Playback" by runningboardd, named after Safari's app. The 2026-11-10 measurement was on macOS 26; the 2026-11-16 check was on macOS 27.0.1. Firefox is not
    detected.
 5. **Quiet periods and reads:** while a hold is in force the signals are read every 2 seconds, and every 5 seconds otherwise.
    A source judged by its assertion (a browser, and Music once its assertion has been seen) bridges 3 seconds after its last
@@ -75,14 +75,14 @@ default). The run cap (120 minutes by default) still bounds every Auto session.
     isolate the test tab. The per-process measurement is the evidence.
 - Before this revision (2026-11-09, QA copy with Brave): the Auto session was `protected` while the tone played, and entered
   `completionGrace` 18 seconds after Pause, because the output stream was still open.
-- Live, Safari, YouTube playing (2026-11-10), read-only: the audio came from com.apple.WebKit.GPU, and Safari held "com.apple.WebCore: HTMLMediaElement playback" under its own process name. Safari's pause and muted playback are not yet checked.
+- Live, Safari, YouTube playing (2026-11-10), read-only: the audio came from com.apple.WebKit.GPU, and Safari held "com.apple.WebCore: HTMLMediaElement playback" under its own process name. 2026-11-16 (macOS 27.0.1, QA copy), before the fix: CamLid did not detect Safari. Local audio held "WebKit Media Playback" under runningboardd, and the popover stayed "Waiting for agents". A YouTube video held "com.apple.WebCore: HTMLMediaElement playback" under process Safari, but with type PreventUserIdleDisplaySleep, while the signal required PreventUserIdleSystemSleep. After the fix (Auto, Safari switch on): local audio was detected as "Music is playing in Safari."; paused at 12:10:57, the reason cleared and the "Sleep when done" countdown began at about 12:11:06, and the hold released at 12:13:08. A YouTube video was detected through its WebCore assertion (display sleep); paused at 12:19:12, the WebCore assertion was released about 2 seconds later, the countdown began at about 12:19:21, and the hold released at 12:21:20. The reason clears about 9 seconds after pause in both cases, because WebKit's runningboardd assertion lingers until then. Muted playback is not counted: after a mute, WebKit released its assertions and the countdown began about 8 to 9 seconds later (local audio muted at 12:17:22; YouTube muted at about 12:16:01).
 - Not verified live: other Chromium browsers, automatic track changes at the end of a track, Apple Music track changes, the
   Dashboard text, and Apple Music on other macOS versions.
 
 ## Known limits
 
 - Browsers other than Chromium and Safari are not detected. Firefox is not installed here and was not measured.
-- The assertion names are read from this Mac (macOS 26): the Chromium "Playing audio" assertion and Music's
+- The assertion names are read from this Mac (macOS 26 for the Chromium and Music names; Safari's names were checked on macOS 27.0.1): the Chromium "Playing audio" assertion and Music's
   "com.apple.Music.playback". A macOS version or a browser that names them differently is not detected by its assertion. Music
   then keeps the output-only hold; a browser has no such fallback and is not detected.
 - Spotify has only the output signal. Its output closes about 2.7 seconds after pause and had no gap at three manual track changes.
@@ -93,6 +93,8 @@ default). The run cap (120 minutes by default) still bounds every Auto session.
   that playback is judged by its assertion and may end early. This was not checked.
 - A Spotify switch that stays on after Spotify is removed has no chip, because Spotify is listed only when installed. It does nothing without the app.
 
+- Safari's hold ends about 9 seconds after pause on macOS 27.0.1, because WebKit's runningboardd assertion ("WebKit Media Playback") lingers until then; the video's own assertion ends about 2 seconds after pause. Muted Safari playback is not counted. Both are measured (2026-11-16) and not tuned. The owner accepted the delay on 2026-11-16; the owner has not yet confirmed the muted rule.
+
 ## Out of scope
 
-Safari, Firefox, other music apps, and controlling playback.
+Firefox, other music apps, and controlling playback.

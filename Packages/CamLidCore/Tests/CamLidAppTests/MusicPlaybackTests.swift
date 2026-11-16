@@ -141,6 +141,25 @@ struct MusicPlaybackTests {
         #expect(!PlaybackAssertion.isHeld(.safari, in: [chromium]))
     }
 
+    @Test func safariCountsWhetherItsVideoHoldsTheDisplayTypeOrItsAudioIsHeldByRunningBoard() {
+        // macOS 27.0.1: a video holds the named assertion as display sleep; audio is held by runningboardd for Safari's app.
+        let video = AssertionHolder(processName: "Safari",
+            assertions: [["AssertName": "com.apple.WebCore: HTMLMediaElement playback", "AssertType": "PreventUserIdleDisplaySleep"]])
+        let audio = AssertionHolder(processName: "runningboardd",
+            assertions: [["AssertName": "app<application.com.apple.Safari.96478.97144(501)>417-80460-398019:WebKit Media Playback",
+                          "AssertType": "PreventUserIdleSystemSleep"]])
+        let otherApp = AssertionHolder(processName: "runningboardd",
+            assertions: [["AssertName": "app<application.com.apple.mail.1.2(501)>417-1-1:WebKit Media Playback",
+                          "AssertType": "PreventUserIdleSystemSleep"]])
+        #expect(PlaybackAssertion.isHeld(.safari, in: [video]))
+        #expect(PlaybackAssertion.isHeld(.safari, in: [audio]))
+        #expect(!PlaybackAssertion.isHeld(.safari, in: [otherApp]))   // WebKit media of another app is not Safari's
+        #expect(!PlaybackAssertion.isHeld(.safari, in: [AssertionHolder(processName: "runningboardd", assertions: video.assertions)]))
+        let notASleepType = AssertionHolder(processName: "Safari",
+            assertions: [["AssertName": "com.apple.WebCore: HTMLMediaElement playback", "AssertType": "NoIdleSleepAssertion"]])
+        #expect(!PlaybackAssertion.isHeld(.safari, in: [notASleepType]))
+    }
+
     @Test func safariCountsOnlyWhileItsOutputAndItsAssertionAreBothPresent() {
         let safari = AssertionHolder(processName: "Safari",
             assertions: [["AssertName": "com.apple.WebCore: HTMLMediaElement playback", "AssertType": "PreventUserIdleSystemSleep"]])

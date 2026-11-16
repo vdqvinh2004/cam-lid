@@ -131,37 +131,46 @@ struct AssertionHolder {
 /// The playback assertions (read from IOKit; no permission is needed). A Chromium browser holds the named "Playing audio" assertion
 /// and Apple's Music app holds "com.apple.Music.playback" while audio plays. Each is released when playback stops, and a silent output
 /// stream holds neither. Measured: Brave's assertion went about 2 to 3 s after pause, and Music's went at the pause, while each output
-/// stream stayed open for about 5 to 10 s. Safari's media playback holds "com.apple.WebCore: HTMLMediaElement playback" under its own process name, so only Safari matches it. Spotify holds no assertion, so it is judged by its output alone.
+/// stream stayed open for about 5 to 10 s. Safari's video holds "com.apple.WebCore: HTMLMediaElement playback" under its own process name, and its audio holds WebKit's "WebKit Media Playback" through runningboardd, named after Safari's app. Spotify holds no assertion, so it is judged by its output alone.
 enum PlaybackAssertion {
     struct Signal {
         let processNames: [String]
-        let assertionName: String
-        let assertionType: String
+        /// A playback assertion keeps its name whichever sleep type holds it, so a signal accepts either type.
+        let assertionTypes: Set<String>
+        let matchesName: (String) -> Bool
     }
 
     /// Browser process names. A helper is named "<browser> Helper (...)", so a name matches its browser by prefix.
     /// shortcut: only Brave was checked live; check another browser's assertion before relying on it.
     static let browserProcessNames = ["Google Chrome", "Chromium", "Brave Browser", "Microsoft Edge", "Vivaldi", "Opera", "Arc"]
 
-    static func signal(for source: MusicSource) -> Signal? {
+    /// Safari's video holds the display type on macOS 27.0.1 (2026-11-16); the code before that expected the system type.
+    private static let sleepTypes: Set<String> = ["PreventUserIdleSystemSleep", "PreventUserIdleDisplaySleep"]
+
+    static func signals(for source: MusicSource) -> [Signal] {
         switch source {
         case .browser:
-            Signal(processNames: browserProcessNames, assertionName: "Playing audio", assertionType: "NoIdleSleepAssertion")
+            [Signal(processNames: browserProcessNames, assertionTypes: ["NoIdleSleepAssertion"], matchesName: { $0 == "Playing audio" })]
         case .appleMusic:
-            Signal(processNames: ["Music"], assertionName: "com.apple.Music.playback", assertionType: "PreventUserIdleSystemSleep")
+            [Signal(processNames: ["Music"], assertionTypes: ["PreventUserIdleSystemSleep"], matchesName: { $0 == "com.apple.Music.playback" })]
         case .safari:
-            Signal(processNames: ["Safari"], assertionName: "com.apple.WebCore: HTMLMediaElement playback", assertionType: "PreventUserIdleSystemSleep")
+            [Signal(processNames: ["Safari"], assertionTypes: sleepTypes, matchesName: { $0 == "com.apple.WebCore: HTMLMediaElement playback" }),
+             // WebKit's assertion for audio is held by runningboardd on Safari's behalf, and named after Safari's app.
+             Signal(processNames: ["runningboardd"], assertionTypes: sleepTypes,
+                    matchesName: { $0.contains("application.com.apple.Safari.") && $0.hasSuffix("WebKit Media Playback") })]
         case .spotify:
-            nil
+            []
         }
     }
 
     /// Pure: whether a source's playback assertion is held by one of the holders.
     static func isHeld(_ source: MusicSource, in holders: [AssertionHolder]) -> Bool {
-        guard let signal = signal(for: source) else { return false }
-        return holders.contains { holder in
-            signal.processNames.contains { isNamed(holder.processName, $0) } && holder.assertions.contains {
-                ($0["AssertName"] as? String) == signal.assertionName && ($0["AssertType"] as? String) == signal.assertionType
+        signals(for: source).contains { signal in
+            holders.contains { holder in
+                signal.processNames.contains { isNamed(holder.processName, $0) } && holder.assertions.contains {
+                    guard let name = $0["AssertName"] as? String, let type = $0["AssertType"] as? String else { return false }
+                    return signal.assertionTypes.contains(type) && signal.matchesName(name)
+                }
             }
         }
     }
