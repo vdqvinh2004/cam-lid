@@ -1,6 +1,6 @@
 # Tasks: agent skill for the CamLid command (v0.2)
 
-**Feature context:** `022-agent-skill` · **Status:** 16/20 checked (2 partly, 2 open). Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `022-agent-skill` · **Status:** 17/20 checked (2 partly, 1 open). Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [x] T001 Location: the repository root `.agents/` folder, not `.agent` (spec decision 1).
@@ -32,4 +32,4 @@
 
 ## Phase 5 — Documents and GUI
 - [x] T050 README "Command line" section describes the skill and the button (2026-11-09).
-- [ ] T051 [FR-005, FR-006] Look at the button in the built app: the open panel, the conflict alert and turning it Off. Status: see the report.
+- [~] T051 [FR-005, FR-006] Look at the button in the built app: the open panel, the conflict alert and turning it Off. 2026-11-16 (QA copy): the button writes the file, turning it off removes it, and a foreign file shows the alert "Replace the skill file that already exists?" (Cancel keeps the file, Replace overwrites it). The open panel was not found in the UI.

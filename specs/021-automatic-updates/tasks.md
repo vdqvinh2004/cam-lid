@@ -18,7 +18,7 @@ privacy wording, release notes and the installed-build check. Sources: [spec.md]
 ## Phase 2 — Settings window and copy (FR-005, US1, US2)
 - [x] T020 [FR-005] Settings › General toggle "Check for new releases once a day", with the request described in its footer. `SettingsView.swift`, `SettingsEditor.swift`, `UtilityUICoordinator.swift`, `UtilityUIProcess.swift`.
 - [x] T021 [US2] The Updates window's default text names the daily check when it is on. `UpdatesView.swift`.
-- [ ] T022 [FR-005] Look at the toggle in the built app, light and dark, with the keyboard and VoiceOver. Not done: see the report for the GUI check status.
+- [~] T022 [FR-005] Look at the toggle in the built app, light and dark, with the keyboard and VoiceOver. 2026-11-16 (QA copy): the toggle was seen on and off in the General pane, in light and dark. Keyboard not rerun; VoiceOver excluded by the owner's request.
 
 ## Phase 3 — Documents (FR-006)
 - [x] T030 [FR-006] README "Updating" and "Privacy" name the setting and the one daily request (drafted 2026-11-09).
