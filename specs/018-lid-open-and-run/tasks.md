@@ -1,6 +1,6 @@
 # Tasks: lid-open keep-awake, wrapper, shortcut, calibration (shipped in v0.1.0)
 
-**Feature context:** `018-lid-open-and-run` · **Status:** 16/23 checked (6 partly, T041 open). Sources: [spec.md](spec.md), [plan.md](plan.md).
+**Feature context:** `018-lid-open-and-run` · **Status:** 17/23 checked (6 partly). Sources: [spec.md](spec.md), [plan.md](plan.md).
 
 ## Phase 0 — Decisions
 - [x] T001 Write and accept ADR 0006 (amends ADR 0002); ADR 0002 links to it. — 2026-11-05.
@@ -54,7 +54,7 @@
 
 ## Phase 4 — Calibration (US4)
 - [x] T040 [US4] Calibration runs for Claude Code, Codex and OpenCode. — 2026-11-05: one valid run per agent, cheap models at low effort (Claude Haiku 5.5, Codex gpt-6-luna, OpenCode big-pickle with `--standalone`). Thresholds unchanged (T041).
-- [ ] T041 [US4] Adjust thresholds only with recorded runs.
+- [x] T041 [US4] Adjust thresholds only with recorded runs. — 2026-11-16: no change needed; the thresholds stayed as calibrated in T040 (2026-11-05). A later change needs a new recorded run.
 - [x] T042 [US4] Fixture: a CPU-busy process that is not a recognised agent is not Working (ADR 0002). — 2026-11-05: reading agreed with the owner; `BusyNonAgentProcessTests`.
 
 ## Phase 5 — Release and regression
