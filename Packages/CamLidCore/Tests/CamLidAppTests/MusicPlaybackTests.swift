@@ -48,11 +48,19 @@ struct MusicPlaybackTests {
         #expect(reads == 0)
     }
 
-    @Test func theBrowserHoldEndsThreeSecondsAfterItsLastPlayingRead() {
+    @Test func aMutedBrowserKeepsItsHoldWhileItsOutputRunsAndEndsThreeSecondsAfterThePause() {
         var hold = MusicPlaybackHold()
         #expect(hold.observe(now: 0) { MusicReading(outputting: [.browser], assertionHeld: [.browser]) } == [.browser])
-        #expect(hold.observe(now: 2) { MusicReading(outputting: [.browser]) } == [.browser])   // one missed read is bridged
-        #expect(hold.observe(now: 4) { MusicReading(outputting: [.browser]) }.isEmpty)         // more than 3 s after the last playing read
+        #expect(hold.observe(now: 2) { MusicReading(outputting: [.browser]) } == [.browser])   // muted: the assertion is released, the output runs
+        #expect(hold.observe(now: 600) { MusicReading(outputting: [.browser]) } == [.browser])  // still muted ten minutes later
+        #expect(hold.observe(now: 602) { MusicReading() } == [.browser])                        // paused: the bridge holds for 3 s
+        #expect(hold.observe(now: 606) { MusicReading() }.isEmpty)                              // more than 3 s after the last playing read
+    }
+
+    @Test func aBrowserWhoseOutputNeverHeldTheAssertionHoldsNothing() {
+        var hold = MusicPlaybackHold()
+        #expect(hold.observe(now: 0) { MusicReading(outputting: [.browser]) }.isEmpty)
+        #expect(hold.observe(now: 600) { MusicReading(outputting: [.browser]) }.isEmpty)     // silent output that never held the assertion
     }
 
     @Test func spotifyHoldsFiveSecondsAfterItsLastOutput() {

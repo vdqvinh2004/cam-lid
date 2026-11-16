@@ -199,9 +199,10 @@ enum PlaybackAssertion {
 
 /// Spec 025: a watched source that plays keeps an Auto session working until it stops, then Sleep when done applies, as after
 /// agent work. A source judged by its playback assertion (a browser, and Apple Music once its assertion has been seen on this
-/// Mac) plays only while the assertion is held, and keeps a 3-second bridge over missed reads. Spotify plays while its output
-/// runs and keeps a 5-second bridge: its output had no gap at three manual track changes (2026-11-10). Apple Music before its
-/// assertion is seen plays while its output runs and keeps a 10-second bridge, since its track changes are not measured.
+/// Mac) plays while the assertion is held. A browser or Safari also keeps playing while its output runs after the assertion
+/// was held (muted playback), and each keeps a 3-second bridge over missed reads. Spotify plays while its output runs and
+/// keeps a 5-second bridge: its output had no gap at three manual track changes (2026-11-10). Apple Music before its assertion
+/// is seen plays while its output runs and keeps a 10-second bridge, since its track changes are not measured.
 /// Reads come every 2 s while a hold is in force, and every 5 s otherwise.
 struct MusicPlaybackHold {
     static let idleSampleSeconds = 5.0
@@ -215,6 +216,12 @@ struct MusicPlaybackHold {
     /// Whether Apple Music's playback assertion has been seen on this Mac. Until it has, Music is judged by its output alone, so a
     /// Mac without that assertion still gets the output-only hold.
     private var musicAssertionSeen = false
+    /// Browsers and Safari whose playback assertion was held while their output ran. Muted playback releases the assertion
+    /// but keeps the output running, so such a source keeps counting until its output stops.
+    private var latched: Set<MusicSource> = []
+
+    /// Whether a source keeps counting after its assertion is released, while its output still runs.
+    private func latches(_ source: MusicSource) -> Bool { source == .browser || source == .safari }
 
     /// Whether a source is judged by its playback assertion right now.
     private func isAsserted(_ source: MusicSource) -> Bool {
@@ -228,7 +235,7 @@ struct MusicPlaybackHold {
     /// A source plays when its output runs, and, if it is judged by its assertion, when the assertion is held too.
     private func isPlaying(_ source: MusicSource, in reading: MusicReading) -> Bool {
         guard reading.outputting.contains(source) else { return false }
-        return !isAsserted(source) || reading.assertionHeld.contains(source)
+        return !isAsserted(source) || reading.assertionHeld.contains(source) || latched.contains(source)
     }
 
     /// How long a source keeps the hold after its last playing read.
@@ -243,6 +250,10 @@ struct MusicPlaybackHold {
         if lastSampleAt.map({ now - $0 >= interval }) ?? true {
             let reading = sample()
             if reading.assertionHeld.contains(.appleMusic) { musicAssertionSeen = true }
+            for source in MusicSource.allCases where latches(source) {
+                if reading.outputting.contains(source) && reading.assertionHeld.contains(source) { latched.insert(source) }
+                if !reading.outputting.contains(source) { latched.remove(source) }
+            }
             for source in MusicSource.allCases where isPlaying(source, in: reading) {
                 lastPlayingAt[source] = now
             }
