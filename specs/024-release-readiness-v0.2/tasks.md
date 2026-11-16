@@ -28,7 +28,7 @@ decision.
 - [~] G17 R16 Turning the skill on writes `~/.agents/skills/camlid/SKILL.md` with no privacy prompt on the installed build, and turning it off removes the file (location changed 2026-11-09). 2026-11-16 (QA copy): on writes the file into the QA home (matches the bundled file), off removes it; a file CamLid did not write gives the alert "Replace the skill file that already exists?": Cancel keeps it, Replace overwrites it. Not checked: the installed build's path and privacy prompt (owner).
 - [~] G18 R19 Update switch on the QA build: on writes the setting, off clears it. 2026-11-16 (QA copy): the manual "Check for Updates" ran and reported "You're up to date" (installed 0.2.0); no deferral while agents work was seen. The scheduled request was not observed. Owner: confirm one request a day on the installed build (021 T051).
 - [ ] G19 R22 An agent reads the skill and keeps a build awake with `camlid run` (022 SC-001).
-- [~] G20 R21 Skill command check (spec 022 FR-004), run on 2026-11-09 with the release zip's CLI against the isolated QA instance: `status`, `helper status`, `diagnose`, refused `start --duration 2m`, `stop` with no session, `run -- /usr/bin/true` (exit 0), and exit 4 when CamLid is not running. Also run earlier on the installed build. Repeat on the release zip before publishing (S1).
+- [x] G20 R21 Skill command check (spec 022 FR-004), run on 2026-11-09 with the release zip's CLI against the isolated QA instance: `status`, `helper status`, `diagnose`, refused `start --duration 2m`, `stop` with no session, `run -- /usr/bin/true` (exit 0), and exit 4 when CamLid is not running. Also run earlier on the installed build. Repeated 2026-11-16 on the final release zip (commit 76cfa90, SHA-256 841954fe…; the earlier zip from d982ac1 gave the same results) against an isolated instance with its own state folder: status 0, helper status 0 (installed), diagnose 0, start --duration 2m refused (exit 2, invalidDuration), stop with no session 0, run -- /usr/bin/true 0, and exit 4 when CamLid is not running.
 - [x] G21 R17 The release zip's SKILL.md equals `.agents/skills/camlid/SKILL.md`; the zip's SHA-256 verifies (2026-11-09).
 - [ ] G26 R25 Owner check after the next update of the skill manager: the CamLid folder in `~/.agents/skills` stays, and the manager's update or removal does not touch it. CamLid never edits `.skill-lock.json`.
 
@@ -39,8 +39,8 @@ decision.
 - [ ] G25 D4 Whether the v0.1.0 carry-over items (R23) block v0.2. Recommendation: no.
 
 ## Release steps (after the gate)
-- [ ] S1 `CAMLID_SIGN_IDENTITY=<release certificate> sh scripts/release.sh 0.2.0` on the owner's Mac. Then repeat the skill command check (G20) on the release zip.
-- [ ] S2 Owner uploads the zip, checksum and notes as a GitHub pre-release, then tags `v0.2.0` (ADR 0004).
+- [x] S1 `CAMLID_SIGN_IDENTITY=<release certificate> sh scripts/release.sh 0.2.0` on the owner's Mac. Then repeat the skill command check (G20) on the release zip. Built and checked 2026-11-16 from commit 76cfa90: dist/CamLid-0.2.0-macos-arm64.zip, SHA-256 841954fe…, App CDHash 19e2d859…, helper CDHash c6b952f6…, CLI CDHash ccc5fcb0…; signature, helper pin, skill file and notes checked; G20 repeated. Rebuild if the code changes. Open risk: each build embeds its temporary build folder path, so CDHash changes between builds of the same commit; the notes match only the build they come with.
+- [ ] S2 Owner uploads the zip, checksum and notes as a GitHub pre-release, then tags `v0.2.0` (ADR 0004). Push branch v0.2 before tagging (the release commits are 97e5de2, d982ac1 and 76cfa90). The notes were corrected in 76cfa90; the owner reads their wording once more before publishing (021 T050).
 - [ ] S3 Move specs 021, 022, 023, 024 and 025 from "implemented" to "released"; update the spec index.
 
-Counts: 15 done, 4 partly (G13, G17, G18, G20), 7 open (G14–G16, G19, G24–G26), 3 release steps.
+Counts: 16 done, 3 partly (G13, G17, G18), 7 open (G14–G16, G19, G24–G26), 3 release steps (S1 done; S2 and S3 open).
