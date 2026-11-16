@@ -52,10 +52,12 @@ trap '"$LSREGISTER" -u "$BUILD/Build/Products/Release/CamLid.app" >/dev/null 2>&
 mkdir -p dist
 
 echo "== Building $VERSION ($COMMIT)"
-# Release binaries must not carry this checkout's path (#filePath, debug info): the flags map it to "." (no spaces in the path).
+# Release binaries must not carry this checkout's path or the temporary build folder: the checkout maps to ".", the build
+# folder to /build, and the linker strips it from the object paths (-oso_prefix). Then the code hashes match between builds.
 xcodebuild -project CamLid.xcodeproj -scheme CamLid -configuration Release -destination 'platform=macOS,arch=arm64' \
-  -derivedDataPath "$BUILD" CODE_SIGNING_ALLOWED=NO ARCHS=arm64 MARKETING_VERSION="$VERSION" \
-  OTHER_SWIFT_FLAGS="\$(inherited) -file-prefix-map $PWD=. -debug-prefix-map $PWD=." build >"$BUILD/build.log" 2>&1 \
+  -derivedDataPath "$BUILD" CODE_SIGNING_ALLOWED=NO ARCHS=arm64 MARKETING_VERSION="$VERSION" CAMLID_BUILD_ROOT="$BUILD" \
+  OTHER_SWIFT_FLAGS="\$(inherited) -file-prefix-map $PWD=. -debug-prefix-map $PWD=. -file-prefix-map $BUILD=/build -debug-prefix-map $BUILD=/build" \
+  OTHER_LDFLAGS="\$(inherited) -Wl,-oso_prefix,$BUILD -Wl,-S" build >"$BUILD/build.log" 2>&1 \
   || { tail -30 "$BUILD/build.log" >&2; exit 1; }
 APP="$BUILD/Build/Products/Release/CamLid.app"
 HELPER="$APP/Contents/Library/LaunchServices/camlid-power-helper"
@@ -152,7 +154,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - Apple silicon only, macOS 14 or later.
 - The lid-open hold and \`camlid run\` were checked on one Mac only.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
-- The music hold was checked in full CamLid runs on macOS 27.0.1 for Chrome, Brave, Safari, Spotify and Apple Music. Safari's hold ends about 9 seconds after pause, and muted Safari playback is not counted. Other Chromium browsers, Firefox and other macOS versions are not checked.
+- The music hold was checked in full CamLid runs on macOS 27.0.1 for Chrome, Brave, Safari, Spotify and Apple Music. Muted Safari playback keeps the Mac awake (checked 2026-11-16); muted playback in other sources is not yet checked, and a track that starts muted is not detected. The hold ends about 5 seconds after pause in the Safari test. Other Chromium browsers, Firefox and other macOS versions are not checked.
 
 ### Build and signing
 | Item | Value |

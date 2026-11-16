@@ -16,13 +16,15 @@ APP="${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}"
 SCRATCH="${DERIVED_FILE_DIR}/helper-build"
 CONFIG=release
 [ "${CONFIGURATION:-Debug}" = "Debug" ] && CONFIG=debug
-# Release binaries must not carry this Mac's checkout path (#filePath, debug info): map it to "." in those builds.
+# Release binaries must not carry this Mac's checkout path (#filePath, debug info): map it to "." in those builds, and the
+# temporary build folder (CAMLID_BUILD_ROOT, set by release.sh) to /build, so the code hashes match between builds.
 build_swift() {
   pkg="$1"; shift
   if [ "$CONFIG" = release ]; then
     env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "$pkg" "$@" \
       -Xswiftc -file-prefix-map -Xswiftc "$SRCROOT=." -Xswiftc -debug-prefix-map -Xswiftc "$SRCROOT=." \
-      -Xcc -ffile-prefix-map="$SRCROOT=." -Xcc -fdebug-prefix-map="$SRCROOT=."
+      -Xcc -ffile-prefix-map="$SRCROOT=." -Xcc -fdebug-prefix-map="$SRCROOT=." \
+      ${CAMLID_BUILD_ROOT:+-Xswiftc -file-prefix-map -Xswiftc "$CAMLID_BUILD_ROOT=/build" -Xswiftc -debug-prefix-map -Xswiftc "$CAMLID_BUILD_ROOT=/build" -Xlinker -oso_prefix -Xlinker "$CAMLID_BUILD_ROOT" -Xlinker -S}
   else
     env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET swift build -c "$CONFIG" --package-path "$pkg" "$@"
   fi
