@@ -145,14 +145,14 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - **Music hold (new in 0.2).** Music that may delay sleep (Settings › Agents) can keep an Auto session awake while a Chromium browser, Safari, Spotify or Apple Music plays audio, and until Sleep when done after it stops. Each source is off by default. Chromium browsers: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Safari is detected by its media playback. Firefox is not detected.
 
 ### Known limits
-- **Tested on one Mac:** Mac17,3, macOS build 26A434, Apple silicon. On any other Mac or macOS build, closed-lid operation
+- **Tested on one Mac:** Mac17,3, macOS 27.0.1 (build 26A434), Apple silicon. On any other Mac or macOS build, closed-lid operation
   stays off until you choose "Allow on this untested Mac" in Settings › Closed Lid.
 - **Strict mode is experimental**, limited to tested Macs. The README says what it changes.
 - **Not notarized by Apple.** The project has no Apple Developer account, so the first launch needs the steps below.
 - Apple silicon only, macOS 14 or later.
 - The lid-open hold and \`camlid run\` were checked on one Mac only.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
-- The music hold was checked on Brave, Safari, Spotify and Apple Music with a read-only probe and a replay of its logic, not in a full CamLid run for each. Other Chromium browsers and other macOS versions are not yet checked.
+- The music hold was checked in full CamLid runs on macOS 27.0.1 for Chrome, Brave, Safari, Spotify and Apple Music. Safari's hold ends about 9 seconds after pause, and muted Safari playback is not counted. Other Chromium browsers, Firefox and other macOS versions are not checked.
 
 ### Build and signing
 | Item | Value |
