@@ -18,6 +18,66 @@ struct AgentActivityIntegrationTests {
         #expect(app.sleepRelevantTasksForTesting(provider: "codex").isEmpty)
     }
 
+    /// Anything running under Orca is reported as Orca's, never under the provider of the agent it runs.
+    @Test func anAgentRunningUnderOrcaIsReportedAsOrca() {
+        var process = AgentActivityProcess(provider: "claude", pid: 6, startTime: 1_700_000_000, cpuSeconds: 1)
+        #expect(process.reportedProvider == "claude")
+        process.underOrca = true
+        #expect(process.reportedProvider == "orca")
+    }
+
+    @Test @MainActor func anAgentRunningUnderOrcaIsTasksOfOrcaOnly() throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let app = fixture.makeCoordinator()
+        var inOrca = AgentActivityProcess(provider: "pi", pid: 8, startTime: 1_700_000_000, cpuSeconds: 1)
+        inOrca.underOrca = true
+        app.receiveActivity([inOrca], at: ContinuousTime.now)
+        #expect(app.sleepRelevantTasksForTesting(provider: "orca").count == 1)
+        #expect(app.sleepRelevantTasksForTesting(provider: "pi").isEmpty)
+    }
+
+    /// Orca's own process and every agent running under it count under Orca; an agent provider counts only what runs
+    /// outside Orca.
+    @Test func processesRunningUnderOrcaAreCountedUnderOrcaOnly() {
+        let providers = ["orca", "claude"]
+        #expect(AppCoordinator.processCount(for: "orca", candidateProviders: providers, orcaRunAgents: 3) == 4)
+        #expect(AppCoordinator.processCount(for: "claude", candidateProviders: providers, orcaRunAgents: 3) == 1)
+        #expect(AppCoordinator.processCount(for: "pi", candidateProviders: providers, orcaRunAgents: 3) == 0)
+    }
+
+    /// Orca's fresh report decides for each provider it names an agent of. A provider it names none of is sampled, so an
+    /// agent Orca does not report (freebuff, or an unhooked session) is not invisible.
+    @Test func orcaReportDecidesOnlyForTheProvidersItNames() {
+        var codexOne = codex(cpu: 1); codexOne.underOrca = true
+        var codexTwo = codex(cpu: 2); codexTwo.underOrca = true
+        var freebuff = AgentActivityProcess(provider: "freebuff", pid: 5, startTime: 1_700_000_000, cpuSeconds: 4)
+        freebuff.underOrca = true
+        let processes = [codexOne, codexTwo, freebuff]
+        #expect(processes.applyingOrcaReports(reportedProviders: ["codex"]).map(\.orcaHosted) == [true, true, false])
+        #expect(processes.applyingOrcaReports(reportedProviders: ["codex", "freebuff"]).map(\.orcaHosted) == [true, true, true])
+        #expect(processes.applyingOrcaReports(reportedProviders: []).map(\.orcaHosted) == [false, false, false])
+        #expect(processes.applyingOrcaReports(reportedProviders: nil).map(\.orcaHosted) == [false, false, false])
+    }
+
+    /// A process that does not run under Orca is never left to Orca, however many agents Orca reports.
+    @Test func aProcessOutsideOrcaIsNeverLeftToOrca() {
+        let outside = AgentActivityProcess(provider: "claude", pid: 9, startTime: 1_700_000_000, cpuSeconds: 1)
+        #expect([outside].applyingOrcaReports(reportedProviders: ["claude"]).map(\.orcaHosted) == [false])
+    }
+
+    /// An agent Orca reports leaves no CPU work under Orca, so its CPU cannot count again on top of Orca's state; an
+    /// agent of a provider Orca does not name still counts there.
+    @Test @MainActor func aProviderOrcaReportsAddsNoCPUWorkUnderOrca() throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let app = fixture.makeCoordinator()
+        var claude = AgentActivityProcess(provider: "claude", pid: 11, startTime: 1_700_000_000, cpuSeconds: 1)
+        claude.underOrca = true
+        var freebuff = AgentActivityProcess(provider: "freebuff", pid: 12, startTime: 1_700_000_000, cpuSeconds: 1)
+        freebuff.underOrca = true
+        app.receiveActivity([claude, freebuff].applyingOrcaReports(reportedProviders: ["claude"]), at: ContinuousTime.now)
+        #expect(app.sleepRelevantTasksForTesting(provider: "orca").count == 1)
+    }
+
     /// The stop menu offers up to 50 percent; with a lower start level the refusal must say what to change.
     @Test @MainActor func aStopLevelAtOrAboveTheStartLevelIsRefusedWithAnExplanation() throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
@@ -146,5 +206,31 @@ struct AgentActivityIntegrationTests {
         #expect(NativeProcessList.agent(fromArguments: ["/usr/bin/python3", "/opt/bin/aider"]) == "aider")
         #expect(NativeProcessList.agent(fromArguments: ["node", "server.js", "pi"]) == nil)          // a script argument
         #expect(NativeProcessList.agentName(pid: getpid(), processName: "node") == "node")
+    }
+
+    /// A process inside Orca is recognised by its ancestry, past the root-owned `login` (Orca's host sits above it). The
+    /// same agent started from Ghostty has no Orca ancestor.
+    @Test func ancestryFindsOrcaPastRootOwnedLogin() {
+        let tree: [Int32: (parent: Int32, name: String)] = [
+            99741: (99740, "freebuff"), 99740: (99528, "node"), 99528: (99527, "zsh"), 99527: (40167, "login"),
+            40167: (1, "orca terminal h"),
+            79041: (78452, "claude"), 78452: (78451, "zsh"), 78451: (691, "login"), 691: (1, "ghostty"),
+        ]
+        let inOrca = NativeProcessList.ancestorNames(of: 99741) { tree[$0] }
+        let outside = NativeProcessList.ancestorNames(of: 79041) { tree[$0] }
+        #expect(inOrca == ["node", "zsh", "login", "orca terminal h"])
+        #expect(inOrca.contains { $0.hasPrefix("orca") })
+        #expect(!outside.contains { $0.hasPrefix("orca") })
+        #expect(!NativeProcessList.runsUnderOrca(1))
+    }
+
+    /// freebuff run outside Orca is freebuff's own work, not Orca's.
+    @Test @MainActor func aFreebuffOutsideOrcaIsTasksOfFreebuffOnly() throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let app = fixture.makeCoordinator()
+        let freebuff = AgentActivityProcess(provider: "freebuff", pid: 13, startTime: 1_700_000_000, cpuSeconds: 1)
+        app.receiveActivity([freebuff], at: ContinuousTime.now)
+        #expect(app.sleepRelevantTasksForTesting(provider: "freebuff").count == 1)
+        #expect(app.sleepRelevantTasksForTesting(provider: "orca").isEmpty)
     }
 }

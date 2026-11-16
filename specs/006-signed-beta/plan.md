@@ -30,9 +30,8 @@ Relevant implementation and validation paths:
 - `Packages/CamLidCore/Sources/CamLidApp/UpdateController.swift`
 - `Packages/CamLidCore/Sources/CamLidApp/UpdatesView.swift`
 - `Config/Beta.xcconfig`
-- `scripts/package-beta.py`
+- `scripts/release.sh`
 - `CamLid.xcodeproj/project.pbxproj`
-- `docs/qa/packaging-report.md`
 
 ## Phase 0: Research Decisions
 See [research.md](research.md). Inherited primary-source findings and product decisions remain

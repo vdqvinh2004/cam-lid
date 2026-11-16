@@ -59,13 +59,6 @@ Review [contracts/status.md](contracts/status.md) and verify:
 
 ## 5. Reproducibility follow-up (2026-10-21)
 
-```sh
-python3 -m unittest discover -s Tests/Hardware -p 'test_*.py' -v
-python3 Tests/Hardware/g2-foreign-policy-row.py --self-test
-python3 Tests/Hardware/audit-m9-host-readonly.py --self-test
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  python3 scripts/verify-preview.py --output docs/qa/preview-evidence/my-new-preview-run
-```
 
 The hardware Python tests use fakes/owned PTYs only. Canonical Preview verification also
 performs read-only hardware preflight, but never installs/starts a helper or actuates power.
@@ -82,14 +75,13 @@ that exact staging; `--run-approved` remains blocked with no approved boot pin.
 
 The owner-confirmed lock-only profile has a separate
 auth-only installation packet.
-Its `python3 Tests/Hardware/install-m9-lock-only-qa.py --self-test` only verifies staging;
-it never installs or contacts the helper. Do not run its approval flag/launcher as part of
+Its staging check never installs or contacts the helper. Do not run its approval flag/launcher as part of
 software verification. Root install/bootstrap/one-inspect consent is a separate human gate, now completed per the
 owner-returned receipts. Do not rerun that consumed launcher as a verification step. Native
 G2 still requires its own exact approval; software tests/metadata do not contact the helper.
 
 The next G2 packet includes a
-pure `review-m9-postboot-audit.py --review <saved-owner-JSON>` tool. A matching report only
+pure review tool. A matching report only
 supports review; it never grants recovery, journal deletion, IPC or native execution.
 Postboot owner audit now matches the old G2 acknowledged journal. The separate disarmed
 archival/restart packet is the next decision; its native flags are not software-test commands. Do not substitute an old

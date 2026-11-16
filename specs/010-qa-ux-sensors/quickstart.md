@@ -1,6 +1,6 @@
 # Validation guide
 
-**Today**: UI simplicity increment T046–T052 implemented; 335 Swift tests (200 Core/42 CLI/93 App) and seven canonical checks pass. Native bounded preview done partial (290 pt dashboard, 4 badges, footer gone, outside dismissal, menu Start/Stop refusal); full 30-cycle/IME/VoiceOver/appearance/device matrix remains open. Physical/full milestone acceptance remains partial/open; see tasks.md and docs/qa/qa-refinement-report.md plus docs/qa/ui-simplicity-report.md. These procedures are not passes. Use isolated QA state; do not mutate LidRun or production provider files for comparison. All host-power tests supervised and gated by M1.
+**Today**: UI simplicity increment T046–T052 implemented; 335 Swift tests (200 Core/42 CLI/93 App) and seven canonical checks pass. Native bounded preview done partial (290 pt dashboard, 4 badges, footer gone, outside dismissal, menu Start/Stop refusal); full 30-cycle/IME/VoiceOver/appearance/device matrix remains open. Physical/full milestone acceptance remains partial/open; see tasks.md. These procedures are not passes. Use isolated QA state; do not mutate LidRun or production provider files for comparison. All host-power tests supervised and gated by M1.
 
 ## Prerequisites and documentation checks
 
@@ -11,16 +11,6 @@ rtk .specify/scripts/bash/check-prerequisites.sh --json --require-tasks --includ
 ```
 
 Confirm feature_directory=specs/010-qa-ux-sensors. Record build/source hashes, exact OS/model/display, source/provider versions, support row and config revision for later QA. Live status includes additive lid/unsupported temperature/provider/protection fields. Config writes use `camlid config set --file <patch.json> --expectedRevision <N> --json`; stale revision is refused.
-
-## Component/build checks
-
-After implementation, run canonical verifier once on settled sources:
-
-```sh
-rtk python3 scripts/verify-preview.py --build-directory /tmp/camlid-m4b-verify --output docs/qa/preview-evidence/m4b
-```
-
-Expected: source unchanged during verification, Swift tests/Debug/Release/binary integration/packaging checks pass; read-only preflight does not claim M1 PASS. New tests include per-field concurrency/failure/pending settlement, presets/custom boundaries, Boolean lid typing, per-source timestamps, temperature decode/unsupported path, badge aggregation and capability refusal. No redundant tests for removing a static label alone.
 
 ## US1 dashboard
 
@@ -46,6 +36,6 @@ Use fixtures for Preview/Needs setup/Untested/Conflict/Recovery required/Ready/P
 
 ## Final quality and user gate
 
-Actual keyboard plus light/dark/contrast/transparency/motion, long labels/20 tasks/notch/scale where available. Measure shared SC-005 and new dismissal/autosave latency, not estimate them. Independent AI reviews source against spec/contracts/L01–L20 and attached evidence; zero critical/high, all supported rows physical PASS required. Record docs/qa/qa-refinement-report.md and update M6 report with verdict. Only then five supervised users under M7 (≥4/5 uncoached primary-flow success). Remaining hardware/cert/Orca/Claude gates never disappear because this milestone's component suite passed.
+Actual keyboard plus light/dark/contrast/transparency/motion, long labels/20 tasks/notch/scale where available. Measure shared SC-005 and new dismissal/autosave latency, not estimate them. Independent AI reviews source against spec/contracts/L01–L20 and attached evidence; zero critical/high, all supported rows physical PASS required. Update the M6 report with the verdict. Only then five supervised users under M7 (≥4/5 uncoached primary-flow success). Remaining hardware/cert/Orca/Claude gates never disappear because this milestone's component suite passed.
 
-Current user scope: VoiceOver acceptance excluded. Passive observation requires no bridge/hook/provider setup; provider badges select sleep relevance. Latest evidence: docs/qa/passive-supervision-report.md. Earlier checkpoints above retain their historical scope.
+Current user scope: VoiceOver acceptance excluded. Passive observation requires no bridge/hook/provider setup; provider badges select sleep relevance. Earlier checkpoints above retain their historical scope.

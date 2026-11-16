@@ -50,11 +50,8 @@ sudo cat "/Library/Application Support/CamLidPowerHelper/identity.json"
 pmset -g | grep -i SleepDisabled          # must be unchanged from step 1
 
 # 5. Identity check. A copy re-signed ad hoc with the same identifier and entitlements has the SAME CDHash, so
-#    it is the same pinned identity and is accepted: the pin follows the code, not the path. To see the helper
-#    refuse a different peer, run the probe (an unpinned client) right after a positive control:
-swiftc scripts/helper-peer-probe.swift -o /tmp/helper-peer-probe
+#    it is the same pinned identity and is accepted: the pin follows the code, not the path.
 "$APP/Contents/MacOS/CamLid" --helper-inspect; echo "control exit=$?"      # expect accepted=true, exit 0
-/tmp/helper-peer-probe; echo "probe exit=$?"                               # expect "refused", exit 0; "ANSWERED" (exit 1) is a failure
 
 # 6. Recovery job (no password). The journal is empty, so it must do nothing.
 sudo /Library/PrivilegedHelperTools/com.camlid.power-helper --recover-v1   # expect "recovery: nothingToRecover"
@@ -86,7 +83,7 @@ them as arguments.
 Second run (2026-10-31): both daemons loaded (`com.camlid.power-helper` running, `com.camlid.power-recovery` with `runs = 2`,
 `last exit code = 0`); `--recover-v1` as root returned `recovery: nothingToRecover` (exit 0) with `SleepDisabled` 0; uninstall
 again restored the earlier files. The re-signed copy was **accepted** (same CDHash, same identity), which corrected the
-step 5 design above; the helper-side refusal of a different peer is checked with `scripts/helper-peer-probe.swift`.
+step 5 design above.
 
 Third run (2026-10-31): with the helper installed, the control (`--helper-inspect`) returned `accepted=true state=ready`
 and the unpinned probe returned `refused: connection interrupted` (exit 0). With no helper installed the same probe

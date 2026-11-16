@@ -25,14 +25,14 @@ Pre-research and post-design: PASS for the design. Safety precedence/verified re
 
 ## Project Structure
 
-Documentation: `specs/010-qa-ux-sensors/{spec,plan,research,data-model,quickstart,lidrun-comparison,tasks}.md`, `contracts/{interaction,status}.md`, `checklists/requirements.md`; primary sources in `docs/planning/qa-refinement-research.md`.
+Documentation: `specs/010-qa-ux-sensors/{spec,plan,research,data-model,quickstart,lidrun-comparison,tasks}.md`, `contracts/{interaction,status}.md`, `checklists/requirements.md`.
 
 Existing implementation seams (future edits only):
 
 - `Packages/CamLidCore/Sources/CamLidApp/`: DashboardView.swift, MenuBarController.swift, AppCoordinator.swift, SettingsView.swift, SettingsEditor.swift, LiveSensors.swift, UpdateController.swift, Accessibility.swift.
 - `Packages/CamLidCore/Sources/CamLidCore/`: Configuration.swift, HealthMonitor.swift, Models.swift, ActivityStore.swift, adapters/control/history. Locate actual sensor/status types with graph before changing; proposed new TemperatureReader.swift/LidStateReader.swift/AgentBadgeView.swift are app-layer files, not new subsystems.
 - `Packages/CamLidCore/Sources/CamLidCLI/`: existing status/config serialization; additive projection only.
-- `Packages/CamLidCore/Tests/{CamLidCoreTests,CamLidCLITests,CamLidAppTests}/`; `Tests/UI/`, `Tests/Contracts/`, `docs/qa/`.
+- `Packages/CamLidCore/Tests/{CamLidCoreTests,CamLidCLITests,CamLidAppTests}/`; `Tests/Contracts/`.
 
 Structure decision: deepen existing app coordinator/editor/sensor seams; keep pure validation/projection tests and bounded platform reads. No generic sensor plugin framework or new helper for temperature.
 
@@ -84,4 +84,4 @@ M4b engineering approval before M5/M6 covers SC-001–006 (qualified advertised 
 
 Implement UX01-18 through T046-T054: contracts first, meaningful projection/history/action tests, then DashboardView/AgentBadgeView/SettingsView and a narrow native SettingsToolbar, AppCoordinator history/size/action wiring, Activity event presentation. Native CUA plus canonical verification follows settled changes. No power backend, provider setup mutation or release-gate bypass. Taste audit informs restraint; Apple native APIs remain the implementation foundation.
 
-Current user scope: VoiceOver acceptance excluded. Passive observation requires no bridge/hook/provider setup; provider badges select sleep relevance. Latest evidence: docs/qa/passive-supervision-report.md. Earlier checkpoints above retain their historical scope.
+Current user scope: VoiceOver acceptance excluded. Passive observation requires no bridge/hook/provider setup; provider badges select sleep relevance. Earlier checkpoints above retain their historical scope.

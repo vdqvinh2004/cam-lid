@@ -53,47 +53,7 @@ Use signed isolated QA app identity for register/unregister and OS approval case
 
 Inspect Dashboard, options/context menu, all Settings tabs, Activity and Diagnostics at small/large sizes and light/dark. Keyboard-only focus, native labels, whole-row disclosure, hover help, empty/loading/error states and active icon must work. No duplicate mode controls or irrelevant status in Agent Settings. Full VoiceOver acceptance remains excluded by existing user revision.
 
-Record build/OS/hardware/case IDs/expected/actual/artifacts in `docs/qa/awake-automation-report.md`. Mark simulated vs native vs physical separately. M5 upgrade/uninstall and M6 security/recovery/privacy regression required; zero unresolved critical/high defects before M7 users. No support matrix row passes from a CLI acknowledgement alone.
-
-## Diagnostic layout fixtures
-
-The manual renderer uses the existing native view with injected loading/empty/error snapshots at 500×360 and 840×720 in Light/Dark. Its windows remain hidden and it creates no AppCoordinator or power backend. This covers layout inspection; it cannot replace live collector or native input acceptance. Run from repository root, serially after tests:
-
-```sh
-rtk env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project CamLid.xcodeproj -scheme CamLid -configuration Debug -derivedDataPath /tmp/camlid-m8-diagnostic-fixtures build CODE_SIGNING_ALLOWED=NO
-rtk env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swiftc -parse-as-library \
-  -I /tmp/camlid-m8-diagnostic-fixtures/Build/Products/Debug \
-  -F /tmp/camlid-m8-diagnostic-fixtures/Build/Products/Debug \
-  -framework Sparkle -Xlinker -rpath -Xlinker /tmp/camlid-m8-diagnostic-fixtures/Build/Products/Debug \
-  Tests/UI/RenderAwakeDiagnostics.swift \
-  /tmp/camlid-m8-diagnostic-fixtures/Build/Products/Debug/CamLidApp.o \
-  /tmp/camlid-m8-diagnostic-fixtures/Build/Products/Debug/CamLidCore.o \
-  /tmp/camlid-m8-diagnostic-fixtures/Build/Products/Debug/CamLidCLI.o \
-  -o /tmp/camlid-m8-render-diagnostics
-rtk /tmp/camlid-m8-render-diagnostics /tmp/camlid-m8-diagnostic-captures
-```
-
-Inspect every PNG and its `remaining-diagnostics-fixtures.json` manifest. Retain evidence outside temporary build directories before removing those artifacts. The fixture timestamp is fixed; the loading reader is intentionally suspended. Do not interpret these snapshots as current host state.
-
-## Native alert adapter fixture
-
-`Tests/UI/VerifyNativeOutcomeAlerts.swift` exercises the unchanged production notification adapter against real macOS delivery. It never links AppCoordinator or creates a power backend. Use only a uniquely identified QA `.app` whose bundle ID contains `acceptance`; do not use the installed Preview identity.
-
-1. Build Debug and prepare an isolated QA copy with its own state root, as below. Explicitly enable an alert category in its GUI and choose Allow in the native macOS approval UI. Record native authorization; the fixture itself never requests permission.
-2. Quit that QA app and verify every exact parent/helper PID and its NSWorkspace identity have exited before changing its bundle.
-3. Compile the fixture (set `build` to the existing derived-data products directory):
-
-   ```sh
-   build=/tmp/camlid-native-alerts/Build/Products/Debug
-   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swiftc -parse-as-library \
-     -I "$build" Tests/UI/VerifyNativeOutcomeAlerts.swift \
-     Packages/CamLidCore/Sources/CamLidApp/OutcomeNotifications.swift \
-     "$build/CamLidCore.o" -o /tmp/VerifyNativeOutcomeAlerts
-   ```
-
-4. Copy the executable into the QA bundle's `Contents/MacOS`; save its original Info.plist. Set `CFBundleExecutable=VerifyNativeOutcomeAlerts` and `CamLidQANotificationEvidence` to an absolute JSON output path. Keep the unique bundle identity unchanged, re-sign ad hoc and register the QA bundle. Launch that exact app through native GUI automation or Finder. Do not launch the executable as a bare command: native notification identity requires a bundle.
-5. After about 15 seconds the fixture writes evidence and exits. Require `passed=true`, `disabledSubmissions=0`, `ordinarySubmissions=5`, `afterSixthOrdinary=5`, `afterCriticalBypass=7`, `afterCriticalDuplicates=7`, `nativeDeliveredCount=7`, and no errors. The fixture removes only its own request IDs. Outcomes are injected; this is native adapter/budget evidence, not actual backend restoration or an Apple Critical Alerts entitlement test.
-6. Restore the original Info.plist only after fixture exit if continuing main-app QA; re-sign/register again. Restore QA permission Off. Optional cleanup mode sets `CamLidQANotificationCleanup=true` and a separate evidence output path: it removes only that acceptance identity's delivered notifications, checks zero remain, and submits no alerts. Never clear foreign notifications. Preserve sanitized evidence before removing the bundle/state.
+Record build/OS/hardware/case IDs/expected/actual/artifacts. Mark simulated vs native vs physical separately. M5 upgrade/uninstall and M6 security/recovery/privacy regression required; zero unresolved critical/high defects before M7 users. No support matrix row passes from a CLI acknowledgement alone.
 
 Native banner/consent checks still require observing the real main QA app separately. Keep a bounded observation immediately after emission; a later empty screenshot does not prove a transient banner was shown.
 

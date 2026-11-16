@@ -4,7 +4,7 @@
 
 ## Phase 0 — Decisions
 - [x] T001 Owner decides Q-A: Strict stays visible, labelled experimental. — 2026-11-05.
-- [x] T002 Run the measurement gate (User Story 2); record the result in the QA addendum; choose window or no window. — 2026-11-06: no window; the result is in `specs/017-release-readiness/qa-addendum.md`.
+- [x] T002 Run the measurement gate (User Story 2); record the result; choose window or no window. — 2026-11-06: no window.
 
 ## Phase 1 — Readiness and wording (US1)
 - [x] T010 [US1] Build kind comes from the build configuration: `ProtectionBuildKind.current` (DEBUG → development, otherwise release). The hardcoded `.preview` is gone. — 2026-11-05.

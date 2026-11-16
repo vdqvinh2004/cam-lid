@@ -52,11 +52,10 @@ Relevant future source or validation paths (not created now):
 - `Packages/CamLidCore/Tests/CamLidCoreTests/RecoveryTests.swift`
 - `Packages/CamLidCore/Sources/CamLidCore/PowerController.swift`
 - `CamLidCLI/RunCommand.swift`
-- `Tests/Hardware/RecoveryValidation.md`
 - `CamLidCLI/main.swift`
 - `specs/003-native-foundation/contracts/cli.md`
 - `CamLidCLI/RecoveryCommand.swift`
-- `Tests/Contracts/RecoveryCLITests.swift`
+- `Packages/CamLidCore/Tests/CamLidCLITests/RecoveryCLITests.swift`
 - `specs/003-native-foundation/quickstart.md`
 
 ## Phase 0: Research Decisions

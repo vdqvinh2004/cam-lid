@@ -32,7 +32,6 @@ Relevant future source or validation paths (not created now):
 - `CamLidApp/SettingsView.swift`
 - `CamLidApp/OnboardingView.swift`
 - `CamLidApp/Accessibility.swift`
-- `Tests/UI/MenuBarValidation.md`
 - `Packages/CamLidCore/Sources/CamLidCore/ActivityStore.swift`
 - `CamLidApp/ActivityLogView.swift`
 - `Packages/CamLidCore/Tests/CamLidCoreTests/ActivityStoreTests.swift`

@@ -6,9 +6,9 @@
 
 ## Phase 1: Setup
 
-- [X] T001 Capture QA baseline, source/OS versions, severity and reproduction for every user finding in docs/qa/qa-refinement-report.md (FR-001–017); no gate claims from code inspection.
+- [X] T001 Capture QA baseline, source/OS versions, severity and reproduction for every user finding (FR-001–017); no gate claims from code inspection.
 - [X] T002 [P] Inspect installed LidRun native dashboard/options/settings through bounded CUA navigation and document exact visible evidence or unresolved surface in specs/010-qa-ux-sensors/lidrun-comparison.md; no power/provider/license changes.
-- [X] T003 [P] Record source/model/build/reference/permission feasibility inventory for numerical temperature and lid candidate in docs/qa/sensor-support-matrix.md; vendor mocks are not qualification (FR-009–011).
+- [X] T003 [P] Record source/model/build/reference/permission feasibility inventory for numerical temperature and lid candidate; vendor mocks are not qualification (FR-009–011).
 
 ## Phase 2: Foundation
 
@@ -25,7 +25,7 @@ Independent test:30 visible open/dismiss cycles and native options without host 
 - [X] T007 [US1] Remove Options button/callback from Packages/CamLidCore/Sources/CamLidApp/DashboardView.swift and AppCoordinator.swift; retain status/mode/Stop/details and preview truth (FR-001,003).
 - [x] T008 [US1] Fix transient close delegate/focus/event lifecycle in Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift; scoped monitors only if proven necessary, clean on close/quit, ignore owned inside menus (FR-002). — **2026-11-03:** Done: the lifecycle is implemented and pinned by the same tests, including release of the content hierarchy on close (`closedSettingsReleasesItsContentHierarchy`, `popoverCloseReleasesContentBeforeNotifyingOwner`) and owned windows and nested menus not counting as outside clicks.
 - [X] T009 [US1] Serialize dashboard versus right/Control-click options and keyboard menu navigation in Packages/CamLidCore/Sources/CamLidApp/MenuBarController.swift; no activation on timer refresh (FR-001–003).
-- [x] T010 [US1] Run real outside/Escape/app-switch/status-toggle/nested-control30-cycle matrix in Tests/UI/QARefinementValidation.md; prove visible dismissal≤250 ms, not hidden AX presence (SC-001). — **2026-11-03:** Done, 150 cycles over five ways to close, all within 250 ms (max 93 ms), measured at operating-system level; found and fixed a real defect (Escape and app switch closed nothing when the Dashboard was opened from another app). See native matrix.
+- [x] T010 [US1] Run real outside/Escape/app-switch/status-toggle/nested-control30-cycle matrix; prove visible dismissal≤250 ms, not hidden AX presence (SC-001). — **2026-11-03:** Done, 150 cycles over five ways to close, all within 250 ms (max 93 ms), measured at operating-system level; found and fixed a real defect (Escape and app switch closed nothing when the Dashboard was opened from another app).
 
 ## Phase 4: US2 — direct preferences (P1)
 
@@ -38,21 +38,21 @@ Independent test: preset/custom persists and agrees with CLI through failure/con
 - [X] T015 [US2] Implement canonical presets/Custom-only fields and remove visible section label/Save Changes in Packages/CamLidCore/Sources/CamLidApp/SettingsView.swift; preserve AX group/unit/errors and loaded custom values (FR-004–005).
 - [X] T016 [US2] Replace Close/Quit dirty guards with valid-write settlement≤2 s and explicit failed/invalid disposition in Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift; update UpdateController.swift unresolved-edit deferral and tests (FR-008).
 - [X] T017 [US2] Record redacted applied/conflict/failure transitions once through existing history in Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift; test preference edits never renew cap/grace/wait or arm power (FR-016).
-- [x] T018 [US2] Validate all presets/custom, simultaneous CLI edits, storage failure, restart and native close/update states in Tests/UI/QARefinementValidation.md; healthy readback≤1 s (SC-002). — **2026-11-03:** Done for presets (18 choices read back in 363-441 ms), CLI edits both ways, restart and the update state. Found: a stop level above the start level was refused with a generic message (fixed); concurrent CLI edits answer `appUnavailable` and a Custom field does not follow a CLI change until the pane is reopened (both open, minor). Storage failure not tried live (tests only). See native matrix.
+- [x] T018 [US2] Validate all presets/custom, simultaneous CLI edits, storage failure, restart and native close/update states; healthy readback≤1 s (SC-002). — **2026-11-03:** Done for presets (18 choices read back in 363-441 ms), CLI edits both ways, restart and the update state. Found: a stop level above the start level was refused with a generic message (fixed); concurrent CLI edits answer `appUnavailable` and a Custom field does not follow a CLI change until the pane is reopened (both open, minor). Storage failure not tried live (tests only).
 
 ## Phase 5: US3 — real sensor readings (P1)
 
 Independent test: fresh typed lid and qualified named temperature; unsupported explicit. Temperature source qualification precedes integration.
 
 - [X] T019 [US3] Add missing/type/stale/per-source age/null/desktop/wake lid regressions in Packages/CamLidCore/Tests/CamLidAppTests/LidStateReaderTests.swift (FR-010–011).
-- [X] T020 [P] [US3] Complete read-only numerical-temperature candidate/reference/security/licensing feasibility in docs/qa/sensor-support-matrix.md; record manifest and source-resolution/max(2°C,resolution) reference tolerance or unsupported verdict (FR-009).
+- [X] T020 [P] [US3] Complete read-only numerical-temperature candidate/reference/security/licensing feasibility; record manifest and source-resolution/max(2°C,resolution) reference tolerance or unsupported verdict (FR-009).
 - [x] T021 [US3] Implement bounded read-only Boolean IOPMrootDomain lid candidate in Packages/CamLidCore/Sources/CamLidApp/LidStateReader.swift and LiveSensors.swift; fresh≤5 s, awake observation≤2 s, unknown fallback, no leaks (FR-010). — **2026-11-03 cleanup:** Done: LidStateReader reads IOPMrootDomain read-only and bounded.
 - [x] T022 [US3] Integrate only qualified read-only temperature source in Packages/CamLidCore/Sources/CamLidApp/TemperatureReader.swift with decode/error tests;2 s sampling, stale>10 s,200 ms read budget off main thread; unsupported paths remain explicit (FR-009). — **2026-11-03 cleanup:** Done: TemperatureReader supplies the CPU die reading shown in the Dashboard.
 - [X] T023 [US3] Extend SensorReadings/HealthSnapshot per-source availability/freshness in Packages/CamLidCore/Sources/CamLidCore/HealthMonitor.swift and Models.swift, compatibility tests for absent/null (FR-009–011).
 - [X] T024 [US3] Project named temperature+independent pressure+lid into ActivityStore.swift, DashboardView.swift, AppCoordinator.swift and shared CLI status; bounded availability-transition logs, no raw reason codes (FR-009–011).
 - [X] T025 [US3] Regress critical-pressure cache bypass/safety precedence/deadlines alongside temperature loss in Packages/CamLidCore/Tests/CamLidCoreTests/QAHealthSafetyTests.swift; temperature/CPU never healthy proof (FR-016).
-- [ ] T026 [US3] Run supervised physical lid transitions and same-sensor temperature/reference validation per exact model/OS row in docs/qa/sensor-support-matrix.md; blocked rows remain unqualified, no forced heating (SC-003).
-- [x] T027 [US3] Verify GUI/CLI values/unit/source/freshness and unsupported/stale state presentation in Tests/UI/QARefinementValidation.md (FR-011, SC-003). — **2026-11-03:** Done for the live case: the running Dashboard showed 53 percent, Normal, Open and 35.6 C while `camlid status --json` read 53, nominal, open and 36.3 C a few seconds later, and `pmset -g batt` said 53 percent. The CLI also reports source, sensor, age and reason code per reading. A stale or unsupported reading was not forced live; those states are covered by tests.
+- [ ] T026 [US3] Run supervised physical lid transitions and same-sensor temperature/reference validation per exact model/OS row; blocked rows remain unqualified, no forced heating (SC-003).
+- [x] T027 [US3] Verify GUI/CLI values/unit/source/freshness and unsupported/stale state presentation (FR-011, SC-003). — **2026-11-03:** Done for the live case: the running Dashboard showed 53 percent, Normal, Open and 35.6 C while `camlid status --json` read 53, nominal, open and 36.3 C a few seconds later, and `pmset -g batt` said 53 percent. The CLI also reports source, sensor, age and reason code per reading. A stale or unsupported reading was not forced live; those states are covered by tests.
 
 ## Phase 6: US5 — protection readiness (P1)
 
@@ -61,8 +61,8 @@ Independent test: all readiness fixtures refuse real actuation; physical success
 - [X] T028 [US5] Add capability/ownership/recovery/preview/lease truth regressions in Packages/CamLidCore/Tests/CamLidAppTests/ProtectionReadinessTests.swift and Packages/CamLidCore/Tests/CamLidCoreTests/ProtectionReadinessProjectionTests.swift (FR-014–015).
 - [X] T029 [US5] Project qualified support row/helper/trust/recovery/conflict blockers through Packages/CamLidCore/Sources/CamLidApp/AppCoordinator.swift and shared status; do not infer ownership from matching global value (FR-014).
 - [X] T030 [US5] Present blocker-specific protection row/details and explicit intent versus Protected in Packages/CamLidCore/Sources/CamLidApp/SettingsView.swift and DashboardView.swift (FR-014).
-- [X] T031 [US5] Audit existing M1 T003–T008 and M2 live-backend evidence in docs/qa/qa-refinement-report.md; require L01–L20/manual Sleep/independent recovery/support-row verdict before any live integration (FR-015).
-- [x] T032 [US5] After M1/M2 PASS only, validate integrated capability/arming/continuity/internal-display/restoration/completion-sleep using Tests/Hardware/PowerFeasibility.md and RecoveryFailureMatrix.md; record SC-006 evidence or blocked status, never add alternate power bypass. — **2026-11-03 cleanup:** Done by the owner-attended trials: arming, closed-lid continuity, restoration and completion sleep (spec 014 trials 1-9 and trial 8, spec 016 S1-S4).
+- [X] T031 [US5] Audit existing M1 T003–T008 and M2 live-backend evidence; require L01–L20/manual Sleep/independent recovery/support-row verdict before any live integration (FR-015).
+- [x] T032 [US5] After M1/M2 PASS only, validate integrated capability/arming/continuity/internal-display/restoration/completion-sleep; record SC-006 evidence or blocked status, never add alternate power bypass. — **2026-11-03 cleanup:** Done by the owner-attended trials: arming, closed-lid continuity, restoration and completion sleep (spec 014 trials 1-9 and trial 8, spec 016 S1-S4).
 
 ## Phase 7: US4 — agent badges (P2)
 
@@ -72,19 +72,19 @@ Independent test: four providers enrollment/readiness/evidence accurately projec
 - [X] T034 [US4] Create bounded provider projection in Packages/CamLidCore/Sources/CamLidApp/AgentBadgeView.swift: detectionEnabled separate from Active/Waiting/Inactive/Unknown and readiness; preserve adapter identity/freshness (FR-012).
 - [X] T035 [US4] Replace checkbox rows with native accessible toggle-button badges in Packages/CamLidCore/Sources/CamLidApp/SettingsView.swift and Accessibility.swift;32 pt minimum target,8 pt spacing, keyboard/state text (FR-012).
 - [X] T036 [US4] Apply badge enrollment through revision-safe patch flow in Packages/CamLidCore/Sources/CamLidApp/SettingsEditor.swift and AppCoordinator.swift; preserve conservative disabled-source unknown handling, no hook/provider writes/prompts (FR-013,016).
-- [x] T037 [US4] Run mouse/keyboard and four-provider disconnected/working/waiting/idle/stale/parallel native matrix in Tests/UI/QARefinementValidation.md (SC-004). — **2026-11-03:** Done with blocked rows: disconnected, working, parallel, idle, unknown and the idle-to-working transition were observed live; waiting and stale were not (no waiting Orca pane). See native matrix.
+- [x] T037 [US4] Run mouse/keyboard and four-provider disconnected/working/waiting/idle/stale/parallel native matrix (SC-004). — **2026-11-03:** Done with blocked rows: disconnected, working, parallel, idle, unknown and the idle-to-working transition were observed live; waiting and stale were not (no waiting Orca pane).
 
 ## Phase 8: Polish, AI QA and supervised users
 
 No final acceptance until mandatory supported-row and release predecessors pass.
 
 - [X] T038 Assert additive schema/backward compatibility and GUI/CLI config/status parity in Packages/CamLidCore/Tests/CamLidAppTests/QAStatusContractTests.swift; fixture cannot fake production sensors/power (FR-016–017).
-- [x] T039 Measure idle10 min/RSS/dashboard30 opens/dismissal/autosave; audit log rotation/redaction and temp/lid read overhead in docs/qa/performance-report.md and qa-refinement-report.md (SC-001–003,005). — **2026-11-03:** Idle footprint measured over 10 minutes: app 0.74 percent CPU average (peak 3.9), 87.8 MB peak, helper 0.00 percent and 7.4 MB. Log rotation and redaction not re-audited. See the native matrix document.
-- [x] T040 Complete light/dark/contrast/transparency/motion/text/scale/notch/long-label20-task/keyboard matrix in Tests/UI/QARefinementValidation.md; unavailable device rows blocked (SC-005). — **2026-11-03:** Done with blocked rows: dark, light, Increase Contrast with Reduce Transparency and Motion, window sizes and keyboard traversal observed; large text is not applicable on macOS. Blocked: second display, notch overflow, VoiceOver. See native matrix.
-- [X] T041 Replay existing40 saved Codex/OpenCode profiles plus Orca parallel fixtures and compare dispositions in docs/qa/agent-compatibility.md; no new paid requests, no full M3 claim (SC-004).
-- [X] T042 Run settled-source canonical scripts/verify-preview.py and packaging regressions; record source hash/report in docs/qa/qa-refinement-report.md; repeat only after changes/failures (FR-017).
-- [~] T043 Perform independent AI source/spec/contract/evidence review against L01–L20 in docs/qa/ai-quality-report.md; fix and rerun affected checks until zero critical/high; M6 full gate remains separate (SC-005). — **2026-11-03 cleanup:** Superseded: the M6 AI quality gate was replaced by owner-attended trials and a public pre-release (ADR 0004).
-- [~] T044 After M6 PASS/signing/per-device qualification, run five supervised M7 users and record uncoached≥4/5 refinement-flow success plus zero safety/restoration failures in docs/qa/user-test-report.md (SC-007). — **2026-11-03 cleanup:** Superseded: supervised M7 users are replaced by the "Qualify my Mac" issue template and early adopters (ADR 0004).
+- [x] T039 Measure idle10 min/RSS/dashboard30 opens/dismissal/autosave; audit log rotation/redaction and temp/lid read overhead (SC-001–003,005). — **2026-11-03:** Idle footprint measured over 10 minutes: app 0.74 percent CPU average (peak 3.9), 87.8 MB peak, helper 0.00 percent and 7.4 MB. Log rotation and redaction not re-audited.
+- [x] T040 Complete light/dark/contrast/transparency/motion/text/scale/notch/long-label20-task/keyboard matrix; unavailable device rows blocked (SC-005). — **2026-11-03:** Done with blocked rows: dark, light, Increase Contrast with Reduce Transparency and Motion, window sizes and keyboard traversal observed; large text is not applicable on macOS. Blocked: second display, notch overflow, VoiceOver.
+- [X] T041 Replay existing40 saved Codex/OpenCode profiles plus Orca parallel fixtures and compare dispositions; no new paid requests, no full M3 claim (SC-004).
+- [X] T042 Run settled-source canonical and packaging regressions; record source hash/report; repeat only after changes/failures (FR-017).
+- [~] T043 Perform independent AI source/spec/contract/evidence review against L01–L20; fix and rerun affected checks until zero critical/high; M6 full gate remains separate (SC-005). — **2026-11-03 cleanup:** Superseded: the M6 AI quality gate was replaced by owner-attended trials and a public pre-release (ADR 0004).
+- [~] T044 After M6 PASS/signing/per-device qualification, run five supervised M7 users and record uncoached≥4/5 refinement-flow success plus zero safety/restoration failures (SC-007). — **2026-11-03 cleanup:** Superseded: supervised M7 users are replaced by the "Qualify my Mac" issue template and early adopters (ADR 0004).
 - [X] T045 Update specs/010-qa-ux-sensors/tasks.md, docs/planning/roadmap.md and M4a/M5/M6 evidence handoff with final disposition; unsupported temperature/core backend remains open, no retroactive checked gates (FR-017).
 
 ## Dependencies & Execution Order
@@ -156,7 +156,7 @@ T006/T008 remain partial: deterministic event classification and monitor cleanup
 
 ### Final continuation evidence (2026-10-05)
 
-T042 remains complete: settled canonical310 Swift (182 Core/42 CLI/86 App),5 packaging tests,7 PASS checks, unchanged source hashes. T043 source review performed and detected issues remediated/rereviewed, but remains open because the backend/durable-journal High release gate is unresolved; full M6 separate. T039 ten-minute hidden307-test QA sample completed (0.9033% one-core CPU,56.640625MiB peak RSS); full latency/polling/flood/source-current matrix open. T018/T037 partial native310-source badge autosave/CLI agreement and ordinary quit/restart observed in a private QA app; actual IME/VoiceOver/uncertain-write/native full matrix open. T026 passive2h lid data has241 Closed samples; no transition/display-off/recovery qualification. All evidence scope is in docs/qa/qa-refinement-report.md, performance-report.md and independent-review-2026-10-05.md.
+T042 remains complete: settled canonical310 Swift (182 Core/42 CLI/86 App),5 packaging tests,7 PASS checks, unchanged source hashes. T043 source review performed and detected issues remediated/rereviewed, but remains open because the backend/durable-journal High release gate is unresolved; full M6 separate. T039 ten-minute hidden307-test QA sample completed (0.9033% one-core CPU,56.640625MiB peak RSS); full latency/polling/flood/source-current matrix open. T018/T037 partial native310-source badge autosave/CLI agreement and ordinary quit/restart observed in a private QA app; actual IME/VoiceOver/uncertain-write/native full matrix open. T026 passive2h lid data has241 Closed samples; no transition/display-off/recovery qualification.
 
 ## Approved UI simplicity increment (UX01-18)
 
@@ -166,9 +166,9 @@ T042 remains complete: settled canonical310 Swift (182 Core/42 CLI/86 App),5 pac
 - [X] T049 Add native SettingsToolbar.swift, pane sizing/title/selection and Command-W in AppCoordinator.swift/MenuBarController.swift; retain close guard (UX05,15).
 - [X] T050 Add typed metric badges, compact adaptive dashboard, explicit contextual Start/Stop, single capability notice and neutral Off in DashboardView.swift/AppCoordinator.swift; preserve deadlines and background behavior (UX07–12).
 - [X] T051 Correct no-session event-state projection and readable expandable Activity events/filters/export/secondary confirmed deletion in AppCoordinator.swift/ActivityLogView.swift (UX16–18).
-- [X] T052 Run settled canonical verifier, affected regression/build checks and scoped source/contract review; record evidence under docs/qa/preview-evidence/ui-simplicity and ui-simplicity-report.md.
+- [X] T052 Run settled canonical verifier, affected regression/build checks and scoped source/contract review; record evidence.
 - [~] T053 Exercise native updated preview: four panes, badge persistence, metric layout/Details, explicit Start/Stop, native close/reopen, event/filter and outside dismissal; capture exact app surfaces and actual measured height. — **2026-11-03 cleanup:** Superseded: the UI was reorganised after this task (three Settings panes, new icons, windows); see the 2026-11 inspection.
-- [X] T054 Record UX01-18 disposition, full appearance/VoiceOver/device/performance residuals and task handoff in ui-simplicity-review.md, quickstart.md and docs/qa/ui-simplicity-report.md. Original M1/M5/M6/M7 gates stay open.
+- [X] T054 Record UX01-18 disposition, full appearance/VoiceOver/device/performance residuals and task handoff in ui-simplicity-review.md, quickstart.md. Original M1/M5/M6/M7 gates stay open.
 
 Dependency order: T046 → T047 → T048–T051 (shared files sequential) → T052 → T053 → T054. T053 is a bounded preview review, not full T010/T040 or M7 acceptance. Scope-specific follow-up work remains explicitly recorded rather than inferred PASS.
 
@@ -183,18 +183,17 @@ session/power, and Off settings events staying Off in history.
 Mode label, quiet autosave, native toolbar, adaptive 290 pt empty dashboard,
 contextual Start/Stop, truthful no-session history. Canonical verifier:
 335 Swift (200 Core/42 CLI/93 App), 5 packaging, 7/7 checks PASS, source
-unchanged (`docs/qa/preview-evidence/ui-simplicity/report.json`; fresh rerun
+unchanged (fresh rerun
 `/tmp/camlid-ui-verify-check/` identical). Native bounded preview: 4 panes,
 badge persistence, 4 badges one row, footer gone, 290 pt stopped height, real
 outside dismissal, menu Start/Stop battery refusal with powerActuation false;
-8 screenshots under `docs/qa/preview-evidence/ui-simplicity/native/`.
+8 screenshots.
 Direct popover clicks via background CUA remain manual-check; full 30-cycle,
-IME, actual VoiceOver, appearance/device matrix open. See
-`docs/qa/ui-simplicity-report.md`. M1/M2/M5/M6/M7 gates stay open.
+IME, actual VoiceOver, appearance/device matrix open. M1/M2/M5/M6/M7 gates stay open.
 
 ## Current scope — passive supervision (2026-10-05)
 
-VoiceOver acceptance is excluded by explicit user request. Retain keyboard navigation, native control semantics, meaningful labels and non-color-only states. Historical VoiceOver “not run” observations above are historical, not current requirements. Observation covers all locally detected providers regardless of sleep selection. Settings badges select whether an agent may delay sleep; Enable all selects all providers. No bridge, hook, LaunchAgent or provider configuration setup is required. Process-only sources remain Unknown; disappearance never invents completed work. Current evidence and residuals: docs/qa/passive-supervision-report.md.
+VoiceOver acceptance is excluded by explicit user request. Retain keyboard navigation, native control semantics, meaningful labels and non-color-only states. Historical VoiceOver “not run” observations above are historical, not current requirements. Observation covers all locally detected providers regardless of sleep selection. Settings badges select whether an agent may delay sleep; Enable all selects all providers. No bridge, hook, LaunchAgent or provider configuration setup is required. Process-only sources remain Unknown; disappearance never invents completed work.
 
 ### Passive supervision implementation disposition
 
@@ -209,18 +208,17 @@ Installed version-only process checks:20 Codex +20 OpenCode lifetimes PASS; sema
 completion is not established. Native enable-all/mode/config/restart and Command-W observed;
 final keyboard/30-cycle250ms/appearance/device matrix remains partial, VoiceOver excluded.
 Ten-minute hidden observer sample:0.9267% one-core CPU,73.59375MiB RSS; unchanged observer
-paths, binary predates later completion-policy guard. Source-current supplemental scope
-and all residuals: docs/qa/passive-supervision-report.md. T010/T018/T037/T039/T040/T053 remain
+paths, binary predates later completion-policy guard. Source-current supplemental scope. T010/T018/T037/T039/T040/T053 remain
 open for their full acceptance scope; M1/M2/M5/M6/M7 and numeric sensor qualification remain
 open. No provider/background-service setup or power changes performed.
 
 ### Final native/performance fixes
 
-Current canonical341 declared Swift (200/42/99, one installed-provider case skipped here and passed separately),5 packaging,7/7 PASS and stable source: docs/qa/preview-evidence/passive-supervision-final-native/report.json. Hidden Settings projections stop relayout while hidden; unchanged menu-bar status reuses its image while menu enablement still updates. Image reuse/transition/reinstall and anchor screen-hit handling have red-to-green regressions. Local outside classification excludes anchor screen points even for missing/different event windows.
+Current canonical341 declared Swift (200/42/99, one installed-provider case skipped here and passed separately),5 packaging,7/7 PASS and stable source. Hidden Settings projections stop relayout while hidden; unchanged menu-bar status reuses its image while menu enablement still updates. Image reuse/transition/reinstall and anchor screen-hit handling have red-to-green regressions. Local outside classification excludes anchor screen points even for missing/different event windows.
 
-Native WindowServer observations:10 Command-D/Escape +10 real outside-click cycles on the340-source build; final341-source status run4 observed opens/closes followed by1 unresolved close. No delivered-HID/250ms/full30-cycle PASS. Source-current Off/Auto persisted revisions7/8; Command-W hid Settings. Full keyboard focus/appearance/IME/device rows remain open, VoiceOver excluded. Final341-source10min idle observation is pinned by the final-native manifest; summary belongs to passive-supervision-report.md. Prior1.0083% CPU/50.17MiB full sample failed the strict CPU target and prompted menu-bar profiling/fix.
+Native WindowServer observations:10 Command-D/Escape +10 real outside-click cycles on the340-source build; final341-source status run4 observed opens/closes followed by1 unresolved close. No delivered-HID/250ms/full30-cycle PASS. Source-current Off/Auto persisted revisions7/8; Command-W hid Settings. Full keyboard focus/appearance/IME/device rows remain open, VoiceOver excluded. Prior1.0083% CPU/50.17MiB full sample failed the strict CPU target and prompted menu-bar profiling/fix.
 
-Final measured341-source settled idle:600.016s,0.2033% CPU,58.0MiB max RSS PASS after an explicit120s settling interval. Immediate post-UI peak112.33MiB remains FAIL against strict peak100MiB. Source hashes unchanged after sample. T039 stays open for full scope. Native Tab/Space validates all four modes, all four agent selections and Enable all with CLI agreement; ignored providers remain visible in the dashboard. Keyboard Navigation was enabled briefly via the native shortcut and restored/independently verified off. These primary badge paths supersede earlier unsuccessful focus attempts; full keyboard/IME/focus-restoration matrix remains open. Evidence: final-native/keyboard-badges.json and passive-supervision-report.md.
+Final measured341-source settled idle:600.016s,0.2033% CPU,58.0MiB max RSS PASS after an explicit120s settling interval. Immediate post-UI peak112.33MiB remains FAIL against strict peak100MiB. Source hashes unchanged after sample. T039 stays open for full scope. Native Tab/Space validates all four modes, all four agent selections and Enable all with CLI agreement; ignored providers remain visible in the dashboard. Keyboard Navigation was enabled briefly via the native shortcut and restored/independently verified off. These primary badge paths supersede earlier unsuccessful focus attempts; full keyboard/IME/focus-restoration matrix remains open.
 
 ## Status dismissal follow-up — 2026-10-05
 
@@ -251,7 +249,7 @@ Evidence: unchanged candidate passed Debug60/Release30 visibility/child-exit cyc
 Clean Release (348-test PASS build), isolated QA, M4/macOS 27.0.1. No product changes retained (128/128 hashes match).
 
 - Baseline: canonical re-verify PASS, 348 tests, 7 checks, source unchanged.
-- First-frame (temporary gated probes, reverted): cold init ~132ms + presentation ~134ms dominate; view build ~9ms. Evidence docs/qa/preview-evidence/doall-firstframe-2026-10-06/.
+- First-frame (temporary gated probes, reverted): cold init ~132ms + presentation ~134ms dominate; view build ~9ms.
 - T010/T039: 30/30 visibility PASS; opening p95 635–712ms FAIL; dismissal 28 PASS + 1 FAIL (264ms escape) + 1 INCONCLUSIVE.
 - T018: CLI presets rev1→3→10, invalid rejected, concurrency clean, restart persistence PASS (normal quit/relaunch).
 - T037/T040: Cmd-comma/Cmd-W/Escape PASS; Tab UNQUALIFIED (AX route unavailable); true-Light dashboard + General readable (partial); Dark restored.
@@ -265,7 +263,7 @@ Clean Release (348-test PASS build), isolated QA, M4/macOS 27.0.1. No product ch
   (General 580×348/Timed/7, Agents 4 badges, Safety disabled-power + limits, Activity 14d/20MiB privacy);
   Cmd-W + Escape dismissal with child exit. Direct popover-click manual check and per-pane heights stay open.
 - T043 addendum: L01–L20 rechecked on current source (no actuation APIs, observation-only IOKit/CGDisplay,
-  14 known try!, semantic colors); zero new critical/high; M6 still blocked. See doall-coverage/T043-addendum.md.
+  14 known try!, semantic colors); zero new critical/high; M6 still blocked.
 - No task checkbox changed (blocked gates unchanged).
 
 ### Do-all round 3 — 2026-10-06 (same build/state, no product changes)
@@ -278,7 +276,7 @@ Clean Release (348-test PASS build), isolated QA, M4/macOS 27.0.1. No product ch
   AX pane clicks + list_windows bounds.
 - Native autosave probe: AX set_value path applies with CLI agreement (stable 30/30s at restored 7);
   tight ≤1s latency UNQUALIFIED (programmatic path, tool gaps); one uncommanded 7→9 flip under rapid
-  AX writes noted as T014 edge observation (converged, held). See doall-coverage/autosave/.
+  AX writes noted as T014 edge observation (converged, held).
 - All QA exited via normal CLI quit; observers stopped; 128/128 hashes match.
 
 ### Do-all round 4 — 2026-10-06 (same build/state family, no product changes)
@@ -291,7 +289,7 @@ Clean Release (348-test PASS build), isolated QA, M4/macOS 27.0.1. No product ch
   CLI paths clean; conflict handling rests on unit coverage + close-guard handshake.
 - Flood moderate: 100 seq p95 11ms + 30 parallel p95 27ms, 130/130 ok.
 - Pre-warm experiment REJECTED with data: idle 135 MiB (>100) and warm open 495–522ms (>200).
-  200ms + 100MiB jointly infeasible under fork-per-open; no product change. See PREWARM-VERDICT.md.
+  200ms + 100MiB jointly infeasible under fork-per-open; no product change.
 - Blocked gates re-verified still blocked: 0 signing identities; single Mac16,12/M4 (no device matrix);
   no qualified temp source; no users recruited; lid/physical untestable on in-use machine.
 
@@ -326,26 +324,25 @@ No product change, no further latency trials planned.
 - Details Tab+Space walk (4 iterations, owned focus): all no-ops, no focus ring ever visible.
   Product finding: dashboard popover controls lack keyboard operability (window shortcuts unaffected).
 - Edge sweep closed: 19 numeric bounds, modes/opt-ins/enrollment bounds, conflict, M6 live faults,
-  flood, crash drill, restart, light 4-pane, heights, idle-600s — all recorded under
-  docs/qa/preview-evidence/doall-coverage-2026-10-06/.
+  flood, crash drill, restart, light 4-pane, heights, idle-600s.
 - No task checkbox changed.
 
 ### UX refresh round — 2026-10-06 (user-tested, verified 358 PASS)
 
 - Start/Stop wording, compact dashboard, working-agents filter, thermal clock fix (live 63.8°C chip),
-  original menu-bar mark. Evidence docs/qa/preview-evidence/doall-coverage-2026-10-06/ux-refresh/.
+  original menu-bar mark.
 - Preview.app rebuilt + relaunched for user testing. No task checkbox changed.
 
 ### Provider marks round — 2026-10-06 (user-tested, verified 360 PASS)
 
 - Official per-provider Settings/dashboard marks (Orca user link, Claude/OpenAI/OpenCode paths),
-  trademark notice, fallback glyph. Evidence doall-coverage/agent-marks/.
+  trademark notice, fallback glyph.
 - Preview.app rebuilt + relaunched for user testing. No task checkbox changed.
 
 ### Provider glyph round — 2026-10-06 (user-tested, verified 360 PASS)
 
 - Extracted product glyphs (orca whale, codex cloud-terminal, claude-code burst) replace app
-  images; OpenCode terminal kept. Evidence doall-coverage/agent-marks/GLYPHS.md.
+  images; OpenCode terminal kept.
 - Preview.app rebuilt + relaunched for user testing. No task checkbox changed.
 
 ### Orca dynamic compatibility — 2026-10-06 (user-tested, verified 363 PASS)

@@ -1,7 +1,6 @@
 # Feature Specification: release readiness for v0.2
 
-**Status:** In progress, 2026-11-10. Code for specs 021, 022, 023 and 025 is complete and tested. Nothing is released or
-committed. The gate is in [tasks.md](tasks.md).
+**Status:** Committed as one change on `v0.2` on 2026-11-16; not released. Code for specs 021, 022, 023 and 025 is complete and tested. The gate is in [tasks.md](tasks.md).
 
 ## Scope
 

@@ -26,9 +26,6 @@ hardware or runtime gates. Shared architecture governs seams.
 
 ## Project Structure
 Feature docs: spec.md, plan.md, research.md, data-model.md, quickstart.md, tasks.md, checklists/.
-Relevant future source or validation paths (not created now):
-- `docs/qa/user-test-plan.md`
-- `docs/qa/user-test-report.md`
 
 ## Phase 0: Research Decisions
 See [research.md](research.md). Inherited primary-source findings and product decisions remain

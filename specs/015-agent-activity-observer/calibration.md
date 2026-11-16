@@ -1,6 +1,6 @@
 # Calibration (spec 015 T401)
 
-Measured with `scripts/agent-activity-calibrate.py` on the owner's Mac (Mac17,3, macOS 26A434), 2026-10-31.
+Measured on the owner's Mac (Mac17,3, macOS 26A434), 2026-10-31.
 Agent: Claude Code 2.1.314 with `claude-haiku-5-5`, prompts that need no tools, temporary working directory.
 Codex was not measured (quota exhausted); OpenCode was not measured (no login found).
 

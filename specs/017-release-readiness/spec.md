@@ -44,7 +44,7 @@ When a verified lease holds the Mac awake, `camlid status` and the Dashboard bot
 **Acceptance**
 1. Three minutes at 100 % CPU with a closed-lid session active: no `lidUnknown` stop.
 2. A stalled source in a test stops the session within the window limit.
-3. The gate result is recorded in the QA addendum.
+3. The gate result is recorded.
 
 **Why not stop at once, always:** healthy sessions end under load and users lose work.
 **Why not a window, always:** during a window a closed lid, possibly in a bag, stays awake. The product refuses that case.

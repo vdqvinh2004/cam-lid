@@ -8,8 +8,26 @@ struct AgentActivityProcess: Sendable, Equatable {
     let pid: Int32
     let startTime: Double
     let cpuSeconds: Double?
-    /// Started under Orca while Orca is observed: Orca reports it, so it is neither sampled nor counted here.
+    /// Started under an Orca process (its terminal host is `orca-terminal-host`, outside Orca.app since 1.4.258).
+    var underOrca = false
+    /// Left to Orca's report by `applyingOrcaReports`: neither sampled nor counted here.
     var orcaHosted = false
+    /// Anything running under Orca is counted as Orca, under no other provider.
+    var reportedProvider: String { underOrca ? "orca" : provider }
+}
+
+extension Array where Element == AgentActivityProcess {
+    /// Orca's fresh report decides for each provider it names an agent of: those processes under Orca are left to it,
+    /// neither sampled nor counted here, so their CPU never adds work on top of Orca's state. Any other process under
+    /// Orca (a provider Orca names no agent of, or every one while Orca is stale or unreachable) is sampled like any
+    /// terminal agent, so an agent Orca does not report is not invisible.
+    func applyingOrcaReports(reportedProviders: Set<String>?) -> [AgentActivityProcess] {
+        map { process in
+            var marked = process
+            marked.orcaHosted = process.underOrca && (reportedProviders?.contains(process.provider) ?? false)
+            return marked
+        }
+    }
 }
 
 extension NativeProcessList {
@@ -58,16 +76,34 @@ extension NativeProcessList {
         return (info.kp_eproc.e_ppid, name, info.kp_eproc.e_ucred.cr_uid)
     }
 
+    /// Names of the processes above `pid`, nearest first, read through `lookup` (parent pid and name, nil when unknown).
+    /// Bounded, so a corrupt table cannot loop.
+    static func ancestorNames(of pid: Int32, lookup: (Int32) -> (parent: Int32, name: String)?) -> [String] {
+        var names: [String] = []
+        var current = lookup(pid)?.parent ?? 0
+        var hops = 0
+        while current > 1, hops < 64, let entry = lookup(current) {
+            names.append(entry.name); current = entry.parent; hops += 1
+        }
+        return names
+    }
+
+    /// Whether a process runs inside Orca: its terminal host sits outside Orca.app since 1.4.258, so any ancestor named
+    /// `orca…` counts. Read from the kernel's table, so the root-owned `login` on the way does not end the walk.
+    static func runsUnderOrca(_ pid: Int32) -> Bool {
+        let names = ancestorNames(of: pid) { current in kernelEntry(current).map { (parent: $0.parent, name: $0.name) } }
+        return names.contains { $0.hasPrefix("orca") }
+    }
+
     private static let secondsPerTick: Double = {
         var timebase = mach_timebase_info_data_t()
         mach_timebase_info(&timebase)
         return Double(timebase.numer) / Double(timebase.denom) / 1_000_000_000
     }()
 
-    /// Outermost process of each agent (by process name), with the CPU time of it and every descendant. When Orca
-    /// observation is on, agent processes started under Orca (its terminal host is `orca-terminal-host-…`) are only
-    /// marked `orcaHosted`: Orca reports their state as lifecycle evidence, which takes precedence.
-    func activityProcesses(providerByName: [String: String], excludeUnderOrca: Bool) -> [AgentActivityProcess] {
+    /// Outermost process of each agent (by process name), with the CPU time of it and every descendant. Agents under an
+    /// Orca process are marked `underOrca`; `applyingOrcaReports` decides whether Orca's report covers them.
+    func activityProcesses(providerByName: [String: String]) -> [AgentActivityProcess] {
         let count = proc_listallpids(nil, 0)
         guard count > 0 else { return [] }
         let capacity = min(Self.maximumProcesses, Int(count) + 32)
@@ -91,15 +127,12 @@ extension NativeProcessList {
             children[parent, default: []].append(pid)
         }
         func ancestors(_ pid: Int32) -> [String] {
-            var names: [String] = []
-            var current = entries[pid]?.parent ?? 0
-            var hops = 0
             // Terminals start shells through a root-owned `login`, which the same-user scan cannot read; fall back to
             // the kernel's process table (what `ps` uses) so the walk reaches the terminal (for example Orca's host).
-            while current > 1, hops < 64, let entry = entries[current] ?? Self.kernelEntry(current).map({ Entry(parent: $0.parent, name: $0.name, start: 0) }) {
-                names.append(entry.name); current = entry.parent; hops += 1
+            Self.ancestorNames(of: pid) { current in
+                if let entry = entries[current] { return (parent: entry.parent, name: entry.name) }
+                return Self.kernelEntry(current).map { (parent: $0.parent, name: $0.name) }
             }
-            return names
         }
         func subtreeCPU(_ root: Int32) -> Double? {
             var total = 0.0
@@ -123,12 +156,9 @@ extension NativeProcessList {
             // plugin's `claude --output-format stream-json`, 2026-11-03) is not the owner's work and holds nothing.
             guard let provider = providerByName[entry.name], entry.hasTerminal else { continue }
             let above = ancestors(pid)
-            if excludeUnderOrca, above.contains(where: { $0.hasPrefix("orca") }) {
-                result.append(AgentActivityProcess(provider: provider, pid: pid, startTime: entry.start, cpuSeconds: nil, orcaHosted: true))
-                continue
-            }
             guard !above.contains(where: { providerByName[$0] == provider }) else { continue }
-            result.append(AgentActivityProcess(provider: provider, pid: pid, startTime: entry.start, cpuSeconds: subtreeCPU(pid)))
+            result.append(AgentActivityProcess(provider: provider, pid: pid, startTime: entry.start,
+                cpuSeconds: subtreeCPU(pid), underOrca: above.contains(where: { $0.hasPrefix("orca") })))
             if result.count >= 64 { break }
         }
         return result.sorted { ($0.provider, $0.pid) < ($1.provider, $1.pid) }

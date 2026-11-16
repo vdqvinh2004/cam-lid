@@ -35,7 +35,6 @@ Relevant future source or validation paths (not created now):
 - `Packages/CamLidCore/Sources/CamLidCore/ProcessDiscovery.swift`
 - `Packages/CamLidCore/Sources/CamLidCore/IntegrationInstaller.swift`
 - `Packages/CamLidCore/Tests/CamLidCoreTests/AgentTests.swift`
-- `docs/qa/agent-compatibility.md`
 
 ## Phase 0: Research Decisions
 See [research.md](research.md). Inherited primary-source findings and product decisions remain

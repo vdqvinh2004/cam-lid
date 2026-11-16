@@ -9,7 +9,7 @@
 - A helper source change without a `PowerHelperVersion` bump would reach users silently; the ADR 0005 rule is manual.
 - `camlid simulate` reads built-in defaults, not the user's stored configuration (`CommandContext` default in `Commands.swift`), so a simulation cannot reproduce a user's settings.
 - `camlid start --mode` overwrote the saved mode from `timed` to `auto` during testing.
-- Spec tracking: 28 tasks `[~]` and 6 `[ ]` across specs 002–011. Some notes link to `docs/qa` and `docs/planning`, which `.gitignore` excludes.
+- Spec tracking: 28 tasks `[~]` and 6 `[ ]` across specs 002–011.
 
 ## Requirements
 

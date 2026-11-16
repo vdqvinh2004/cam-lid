@@ -16,14 +16,22 @@ enum AgentCLIInstallation {
                  applicationDetector: applicationDetector).allDetected
     }
 
+    /// Directories a CLI may be installed in: this process's PATH plus the usual install locations. A GUI app gets
+    /// launchd's PATH, which has no shell-managed bin, so the places the installers themselves use are listed too.
+    static func searchDirectories(home: String, environmentPath: String) -> [String] {
+        Array(Set(environmentPath.split(separator: ":").map(String.init) + [
+            "/opt/homebrew/bin", "/usr/local/bin", home + "/.local/bin", home + "/.opencode/bin",
+            home + "/.bun/bin", home + "/.npm-global/bin",
+            // freebuff's native build; its npm shim (under nvm) runs it, but only a shell has that bin on PATH
+            home + "/.config/manicode",
+        ]))
+    }
+
     static func snapshot(directories: [String]? = nil,
         orcaExecutable: String = OrcaPoller.bundledExecutable.path,
         applicationDetector: @escaping @Sendable (String) -> Bool = Self.applicationInstalled) -> AgentInstallationSnapshot {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let paths = directories ?? Array(Set(
-            (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
-            + ["/opt/homebrew/bin", "/usr/local/bin", home + "/.local/bin", home + "/.opencode/bin",
-               home + "/.bun/bin", home + "/.npm-global/bin"]))
+        let paths = directories ?? searchDirectories(home: home, environmentPath: ProcessInfo.processInfo.environment["PATH"] ?? "")
         var cli = Set<String>()
         var apps = Set<String>()
 

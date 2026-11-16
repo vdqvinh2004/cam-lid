@@ -230,7 +230,7 @@ IPC/lifecycle/lease pause stays. No old launcher replay or new native qualificat
 
 **Latest actual failure:** thermal baseline97ec6c6d…/taskba1952455 failed3 despite client0/
 protocol cleanupAcknowledged: retained complete65540B stderr =580 Swift MainActor off-main
-warnings at ShortSleepQA/main.swift:21. A/B consumed, latches retained/rechecked; no root/
+warnings. A/B consumed, latches retained/rechecked; no root/
 lifecycle/Stop/kill/restoration/G2 or new task completion. Current policy/journal/lease absence
 unknown. Isolated runloop proposal
 map5eca77ef…/one-file patch. First approved inert batch failed935087cd… at compiler1/
@@ -390,7 +390,7 @@ pass). Native tasks below still require their own one-use approvals.
   native selector binding and the v8/v9 receipts. Document what the selector does with
   `enabled: true/false`, what a successful clear receipt looks like, and whether any code path
   could explain the observed `AppleClamshellCausesSleep = No` after cleanup. Output: a short
-  findings note appended to the plan or a new `docs/qa/` note. *Done when:* the R0 design has
+  findings note appended to the plan or a new note. *Done when:* the R0 design has
   a named hypothesis and the exact receipt fields to capture.
 
 - [x] **T002 — State model types.**
@@ -432,11 +432,7 @@ pass). Native tasks below still require their own one-use approvals.
 
 ## Phase 1 — R0 native experiments (one-use approval per boot)
 
-- [x] **T100 — R0 preparation (offline).** Pinned journal resets
-  (`reset-r0-clear-episode-journal-qa.py`, `reset-r0-attempt2-clear-episode-journal-qa.py`,
-  `reset-r0-attempt3-clear-episode-journal-qa.py`), open-lid session hold
-  (`r0-session-hold.py`), post-cleanup observer (`observe-r0-post-cleanup-sleep.py`) and
-  runbook.
+- [x] **T100 — R0 preparation (offline).** Pinned journal resets, open-lid session hold, post-cleanup observer and runbook.
   *Done when:* self-tests and read-only preflights pass with no native action.
   *Result:* all self-tests pass; attempt #1 and #2 reset preflights passed on their fresh
   boots; each later reset correctly refuses on the consumed previous boot. Nothing actuated
@@ -456,8 +452,7 @@ pass). Native tasks below still require their own one-use approvals.
   strict output was **`R0_POST_CLEANUP_NO_SLEEP`**, but the raw pmset log shows
   `Entering DarkWake state due to 'Clamshell Sleep'` at 19:32:41, `Display is turned off`,
   and a full wake at 19:33:22 on lid open. This is a **false negative** in the observer's
-  classifier, not a suppression event. Record:
-  attempt #2 adjudication.
+  classifier, not a suppression event. (attempt #2 adjudication).
   *Deviation:* observer counted only `Entering Sleep state`; fixed to count clamshell
   DarkWake and store raw pmset lines; self-test passes.
 
@@ -470,9 +465,7 @@ pass). Native tasks below still require their own one-use approvals.
   DarkWake, #3 full sleep (raw). The owner accepted the raw #3 evidence on 2026-10-20; R0 is
   met for behavioural same-boot clear effectiveness. The observer's open cue is fixed to a
   visible dialog (self-test passes). No further native action on this boot; reboot. G2/G3
-  still need separate approvals; M1 remains BLOCKED. Record:
-  attempt #3 adjudication and
-  owner acceptance.
+  still need separate approvals; M1 remains BLOCKED. (attempt #3 adjudication and owner acceptance).
   *Done when:* the memo records the decision and the roadmap reflects it.
 
 ## Phase 2 — G2 native qualification (separate approvals per episode/boot)

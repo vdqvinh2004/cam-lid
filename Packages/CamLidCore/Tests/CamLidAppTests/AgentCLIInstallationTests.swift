@@ -36,4 +36,20 @@ struct AgentCLIInstallationTests {
         #expect(snapshot.appDetected == ["codex"])
         #expect(snapshot.allDetected == ["codex", "freebuff", "pi"])
     }
+
+    /// A GUI app is launchd-launched with a PATH that has no shell-managed bin: freebuff must be found where its own
+    /// installer put the native build, with nothing on PATH.
+    @Test func freebuffIsFoundWhereItsInstallerPutsItWithoutAShellPath() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let install = home.appendingPathComponent(".config/manicode")
+        try FileManager.default.createDirectory(at: install, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let url = install.appendingPathComponent("freebuff")
+        try Data("#!/bin/sh\nexit 99\n".utf8).write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+        let directories = AgentCLIInstallation.searchDirectories(home: home.path, environmentPath: "/usr/bin:/bin:/usr/sbin:/sbin")
+        let snapshot = AgentCLIInstallation.snapshot(directories: directories, orcaExecutable: "/missing/orca",
+            applicationDetector: { _ in false })
+        #expect(snapshot.cliDetected.contains("freebuff"))
+    }
 }

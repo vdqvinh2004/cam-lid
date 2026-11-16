@@ -27,9 +27,7 @@ hardware or runtime gates. Shared architecture governs seams.
 ## Project Structure
 Feature docs: spec.md, plan.md, research.md, data-model.md, quickstart.md, tasks.md, checklists/.
 Relevant future source or validation paths (not created now):
-- `Tests/Contracts/CLITests.swift`
-- `docs/qa/performance-report.md`
-- `docs/qa/ai-quality-report.md`
+- `Packages/CamLidCore/Tests/CamLidCLITests/CLITests.swift`
 
 ## Phase 0: Research Decisions
 See [research.md](research.md). Inherited primary-source findings and product decisions remain

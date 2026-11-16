@@ -10,7 +10,7 @@
 - [x] T010 [FR-001] `.agents/skills/camlid/SKILL.md`, in English, 51 lines (under 80), no secrets.
 - [x] T011 [FR-002] Covers `status --json`, `run --`, `start` (auto and timed), `stop`, `diagnose --json` and `helper status --json`. The last one was missing and was added on 2026-11-09.
 - [x] T012 [FR-003] Rules: no settings changes, no stopping a session it did not start, no retry loops, helper admin commands go to the user.
-- [x] T013 [FR-004] Each command is run or parsed against the installed binary before each release. Checked 2026-11-09 on the installed build (run, stop, status, helper status, diagnose and a refused start); the same day the release zip's CLI ran the same commands against the isolated QA instance, including exit 4 when CamLid is not running ([qa-evidence.md](../024-release-readiness-v0.2/qa-evidence.md)). Run again before each release.
+- [x] T013 [FR-004] Each command is run or parsed against the installed binary before each release. Checked 2026-11-09 on the installed build (run, stop, status, helper status, diagnose and a refused start); the same day the release zip's CLI ran the same commands against the isolated QA instance, including exit 4 when CamLid is not running. Run again before each release.
 
 ## Phase 2 — Settings button and writer (FR-005 to FR-008, FR-010)
 - [x] T020 [FR-005] Toggle "Let AI agents use CamLid" in Settings › General, off by default. `SettingsView.swift`.

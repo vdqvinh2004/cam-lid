@@ -53,7 +53,7 @@
   stopped it and released the assertion. No prompt was seen on the desk, but the screen was not inspected.
 
 ## Phase 4 — Calibration (US4)
-- [x] T040 [US4] Calibration runs for Claude Code, Codex and OpenCode with `scripts/agent-activity-calibrate.py`; record in the QA addendum. — 2026-11-05: one valid run per agent, cheap models at low effort (Claude Haiku 5.5, Codex gpt-6-luna, OpenCode big-pickle with `--standalone`); see `specs/018-lid-open-and-run/qa-addendum.md`. Thresholds unchanged (T041).
+- [x] T040 [US4] Calibration runs for Claude Code, Codex and OpenCode. — 2026-11-05: one valid run per agent, cheap models at low effort (Claude Haiku 5.5, Codex gpt-6-luna, OpenCode big-pickle with `--standalone`). Thresholds unchanged (T041).
 - [ ] T041 [US4] Adjust thresholds only with recorded runs.
 - [x] T042 [US4] Fixture: a CPU-busy process that is not a recognised agent is not Working (ADR 0002). — 2026-11-05: reading agreed with the owner; `BusyNonAgentProcessTests`.
 

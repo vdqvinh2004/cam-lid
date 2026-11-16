@@ -19,7 +19,7 @@
 - **Labels:** badge/status text "(estimated)" for `activity` evidence; history records only provider, state and reason.
 
 ## Calibration
-`scripts/agent-activity-calibrate.swift`: samples a chosen agent process (CPU-time growth, children, session mtime)
+Calibration samples a chosen agent process (CPU-time growth, children, session mtime)
 every 2 s and prints a timeline; the owner runs it while doing "start a turn → wait for completion → leave idle" a few
 times per agent. Constants are set from those timelines and recorded in `calibration.md`.
 

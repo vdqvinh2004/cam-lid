@@ -4,7 +4,7 @@
 
 Evidence: full runs of the three test targets on 2026-11-10 (288, 371 and 68 tests pass, after the music hold change), and the 2026-11-09 full run (358 tests in 69 suites, also under CPU load); the ad-hoc 0.2.0 build,
 the tag refusal, and the skill command check on the installed build. Items marked owner need a real Mac or an owner
-decision. Live checks of 2026-11-09 and 2026-11-10 are in [qa-evidence.md](qa-evidence.md).
+decision.
 
 ## Code and tests (done)
 - [x] G01 R1 Settings write budget injected for tests; full suite passes under CPU load (previously failed).
@@ -20,7 +20,7 @@ decision. Live checks of 2026-11-09 and 2026-11-10 are in [qa-evidence.md](qa-ev
 - [x] G11 R18 Helper guard passes (`ok: helper version 1` in the candidate build).
 
 ## Checks that need a real Mac or the owner
-- [~] G12 R9 Display hold: done on the QA build (2026-11-09). The display assertion appears only with the option off and is released on stop (023 T013). R10 Music hold: Brave's "Playing audio" assertion appears and is released (023 T034). Brave, Spotify and Apple Music were measured with a read-only probe on 2026-11-10 and replayed through the hold logic. Not done: a full CamLid run per source, and the other Chromium browsers. See [qa-evidence.md](qa-evidence.md).
+- [~] G12 R9 Display hold: done on the QA build (2026-11-09). The display assertion appears only with the option off and is released on stop (023 T013). R10 Music hold: Brave's "Playing audio" assertion appears and is released (023 T034). Brave, Spotify and Apple Music were measured with a read-only probe on 2026-11-10 and replayed through the hold logic. Not done: a full CamLid run per source, and the other Chromium browsers.
 - [~] G13 R12 Settings General and Sleep diagnostics: the General top section and the Sleep diagnostics window were checked on the QA build. The lower sections (AI agents, Updates) need scrolling, which background input could not do; light and dark, and a VoiceOver walkthrough, were not run. Decision D3.
 - [ ] G14 R13 Owner reviews the privacy wording in README and SECURITY.md (021 T032).
 - [ ] G15 R14 One short closed-lid session with the replacement build, then restore (safety).
@@ -33,9 +33,9 @@ decision. Live checks of 2026-11-09 and 2026-11-10 are in [qa-evidence.md](qa-ev
 - [ ] G26 R25 Owner check after the next update of the skill manager: the CamLid folder in `~/.agents/skills` stays, and the manager's update or removal does not touch it. CamLid never edits `.skill-lock.json`.
 
 ## Decisions
-- [ ] G22 D1 Commit the v0.2 work on branch `v0.2`. `release.sh` refuses a dirty tree.
-- [ ] G23 D2 Version 0.2.0 in `project.yml` and the project file. Set in commit `66b3aaf`; the owner confirms the number.
-- [ ] G24 D3 How to run the GUI check (isolated QA state directory, or the owner). The isolated directory worked for the checks in qa-evidence.md; the owner decides.
+- [x] G22 D1 Commit the v0.2 work on branch `v0.2`, as one commit on 2026-11-16. `release.sh` refuses a dirty tree.
+- [x] G23 D2 Version 0.2.0 in `project.yml` and the project file. Set in commit `66b3aaf`; the owner confirmed 0.2.0 on 2026-11-16.
+- [ ] G24 D3 How to run the GUI check (isolated QA state directory, or the owner). The isolated directory worked for the checks; the owner decides.
 - [ ] G25 D4 Whether the v0.1.0 carry-over items (R23) block v0.2. Recommendation: no.
 
 ## Release steps (after the gate)
@@ -43,4 +43,4 @@ decision. Live checks of 2026-11-09 and 2026-11-10 are in [qa-evidence.md](qa-ev
 - [ ] S2 Owner uploads the zip, checksum and notes as a GitHub pre-release, then tags `v0.2.0` (ADR 0004).
 - [ ] S3 Move specs 021, 022, 023, 024 and 025 from "implemented" to "released"; update the spec index.
 
-Counts: 12 done, 4 partly (G12, G13, G18, G20), 10 open (G14–G17, G19, G22–G26), 3 release steps.
+Counts: 14 done, 4 partly (G12, G13, G18, G20), 8 open (G14–G17, G19, G24–G26), 3 release steps.

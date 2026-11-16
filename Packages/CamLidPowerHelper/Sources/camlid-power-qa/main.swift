@@ -141,8 +141,7 @@ private enum QAExit {
 /// hop from a non-main completion (an XPC reply), which is the condition the
 /// concurrency runtime reports as "data race detected: @MainActor function ... was
 /// not called on the main thread". The main run loop services the main queue on the
-/// main thread; the measured comparison lives in
-/// `docs/qa/preview-evidence/power-helper-best-effort-2026-10-19/race-probe-2026-10-19/`.
+/// main thread; the measured comparison was local QA evidence and is not kept.
 private func runMainForever() -> Never {
     while true { RunLoop.main.run(until: .distantFuture) }
 }

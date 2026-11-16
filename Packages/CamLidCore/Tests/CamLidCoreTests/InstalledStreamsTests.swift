@@ -6,8 +6,8 @@ import Testing
 /// Installed-stream regressions (M3 T008): real `codex exec --json` and
 /// `opencode run --format json` output captured 2026-10-05 (gpt-6-luna medium,
 /// opencode-go/longcat-2.5-preview-free) must flow through the adapters.
-/// Golden files live in Fixtures/Matrix/; full 20-run streams stay in
-/// docs/qa/preview-evidence/provider-matrix/ (not committed to the target).
+/// Golden files live in Fixtures/Matrix/; the full 20-run streams were
+/// local QA evidence and are not kept in the repository.
 private func matrixLines(_ name: String) throws -> [String] {
     let here = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let url = here

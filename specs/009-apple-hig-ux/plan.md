@@ -30,7 +30,7 @@ After design: PASS planning consistency; no added privileges/dependencies. Runti
 Feature artifacts: spec.md, plan.md, research.md, data-model.md, quickstart.md, contracts/interaction.md, tasks.md, checklists/requirements.md.
 
 Existing source to refine: `Packages/CamLidCore/Sources/CamLidApp/{DashboardView,SettingsView,ActivityLogView,OnboardingView,MenuBarController,Accessibility,AppCoordinator}.swift`.
-Validation: `Packages/CamLidCore/Tests/CamLidAppTests/`, `Tests/UI/HIGValidation.md`, `docs/qa/hig-review.md`; reused preview verifier and M6 performance report.
+Validation: `Packages/CamLidCore/Tests/CamLidAppTests/`.
 
 ## Phase 0: Research Decisions
 

@@ -41,7 +41,7 @@ not the only way to run. All nine rows pass on the exact model and OS build, evi
 
 ## Results on Mac17,3 / 26A434 (owner's Mac)
 Pre-trial finding (2026-10-31): the LidRun helper (`com.lidrun.app.helper`) resets `pmset disablesleep` 40–60 s after
-another process sets it (`scripts/g2-find-reverter.sh`: LidRun paused → held 81 s; LidWalk paused → reset after 47 s).
+another process sets it (LidRun paused → held 81 s; LidWalk paused → reset after 47 s).
 Trials run with the LidRun helper booted out.
 
 | # | Date | Result | Evidence |

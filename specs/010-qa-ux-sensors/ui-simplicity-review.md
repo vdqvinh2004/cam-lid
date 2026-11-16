@@ -188,13 +188,7 @@ The public HIG page renderer sometimes returned a JavaScript-only shell. Text wa
 
 ## Implementation disposition — 2026-10-05 continuation
 
-This review doc stays the investigation record. Implementation is recorded in
-`docs/qa/ui-simplicity-report.md` (code + 335-test/7-check verifier + bounded
-native preview) with fresh read-only continuation evidence in
-`docs/qa/preview-evidence/ui-simplicity/continuation-2026-10-05.json`,
-60 s perf sample, `Tests/UI/QARefinementValidation.md` continuation subset,
-`docs/qa/performance-report.md` supplemental note, and
-`docs/qa/independent-review-2026-10-05.md` UI addendum (no new Critical/High
+This review doc stays the investigation record. Implementation is recorded in the code, the 335-test/7-check verifier and the bounded native preview, with fresh read-only continuation evidence: a 60 s perf sample, a continuation subset, a supplemental note, and a UI addendum (no new Critical/High
 beyond the known no-backend/in-memory-journal release blocker).
 
 T046–T052 complete; T053 partial (full 30-cycle/IME/VoiceOver/appearance/device

@@ -116,15 +116,18 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var lastOrcaMetadataSuccess = -Double.infinity
     private var orcaMetadataIssue = "orcaMetadataNotObserved"
     private var orcaMetadataEpoch = UUID()
+    private var lastOrcaReportedProviders: Set<String> = []
     private var processPolling = false
     private var lastProcessPoll = -Double.infinity
     private var lastProcessSuccess = -Double.infinity
     private var lastProcessObservation = -Double.infinity
     private var processCandidates: [ProcessCandidate] = []
+    /// Agent processes found running inside Orca, whatever their provider: their presence counts under Orca.
+    private var orcaRunAgentCount = 0
     /// Spec 015: outside-observed working/idle tasks for directly run agents, by provider.
     private var activityTasks: [String: [AgentTask]] = [:]
     private var activityMemory: [String: AgentActivityMemory] = [:]
-    private let sampleActivityNow: @Sendable (_ excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double)
+    private let sampleActivityNow: @Sendable (_ reportedOrcaProviders: Set<String>?) -> (processes: [AgentActivityProcess], at: Double)
     private var installationSnapshot: AgentInstallationSnapshot?
     private var lifetimeTracker = LifetimeRuleTracker()
     private var lifetimeProcessSnapshot: LifetimeProcessSnapshot?
@@ -165,8 +168,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
          holdTransportFactory: (() -> any PowerHoldTransport)? = nil,
          closedLidSupportRow: (() -> String?)? = nil,
          systemIdentity: (() -> (model: String?, osBuild: String?))? = nil,
-         activitySampler: (@Sendable (_ excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double))? = nil) {
-        self.sampleActivityNow = activitySampler ?? { AppCoordinator.sampleActivity(NativeProcessList(), excludeUnderOrca: $0) }
+         activitySampler: (@Sendable (_ reportedOrcaProviders: Set<String>?) -> (processes: [AgentActivityProcess], at: Double))? = nil) {
+        self.sampleActivityNow = activitySampler ?? { AppCoordinator.sampleActivity(NativeProcessList(), reportedOrcaProviders: $0) }
         self.healthReader = healthReader
         // A QA copy never changes the shared helper, never reaches it, never registers a login item, never takes the shortcut.
         self.isQACopy = locations.isQA
@@ -874,7 +877,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private func badgeStates() -> [AgentBadgeState] {
         AgentBadgeState.providers.map { provider in
             AgentBadgeState(provider: provider, enabled: config.adapterEnrollment.contains(provider), tasks: observedTasks(provider: provider, now: uptime()), evidenceAgeSeconds: agents.lastReceipt(provider: provider).map { max(0, uptime() - $0) },
-                processCount: uptime() - lastProcessObservation <= 15 ? processCandidates.filter { $0.provider == provider }.count : 0,
+                processCount: uptime() - lastProcessObservation <= 15 ? AppCoordinator.processCount(for: provider, candidateProviders: processCandidates.map(\.provider), orcaRunAgents: orcaRunAgentCount) : 0,
                 cliDetected: installationSnapshot?.cliDetected.contains(provider),
                 appDetected: installationSnapshot?.appDetected.contains(provider) ?? false,
                 observationKnown: uptime() - lastProcessSuccess <= 15
@@ -901,6 +904,11 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             return $0.observedState == "Unknown"
                 || (activityProviders.contains($0.provider) && !activityClassified($0.provider))
         }
+    }
+
+    /// Processes shown for one provider. Anything running under Orca counts under "orca" only, never under its own provider.
+    nonisolated static func processCount(for provider: String, candidateProviders: [String], orcaRunAgents: Int) -> Int {
+        candidateProviders.filter { $0 == provider }.count + (provider == "orca" ? orcaRunAgents : 0)
     }
 
     /// External observations stay visible independently of sleep selection.
@@ -1345,26 +1353,35 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let scanLifetimeRules = hasLifetimeRules && session?.requestedMode == .auto
         let lifetimeNames = NativeProcessList.kernelNames(of: config.lifetimeRules ?? [])
         let sampleActivity = sampleActivityNow
-        let excludeUnderOrca = config.orcaMetadataAllowed
+        let reportedOrcaProviders = orcaReportedProviders()
         Task { [weak self] in
-            let (candidates, complete, installation, lifetime, activity) = await Task.detached(priority: .utility) {
+            let (candidates, complete, installation, lifetime, activity, orcaRunning) = await Task.detached(priority: .utility) {
                 let installation = AgentCLIInstallation.snapshot()
                 let processList = NativeProcessList()
                 let snapshot = processList.agentSnapshot()
                 let candidates = ProcessDiscovery(provider: InMemoryProcessList(records: snapshot.records),
                     patterns: AgentProviderCatalog.processPatterns, maxFallbackEntries: 20).discover()
                 let lifetime = scanLifetimeRules ? processList.lifetimeSnapshot(ruleNames: lifetimeNames) : nil
-                return (candidates, snapshot.complete, installation, lifetime, sampleActivity(excludeUnderOrca))
+                // Anything running inside Orca is Orca's, whichever agent it is, so its presence is not its own provider's.
+                let orcaRunning = candidates.filter { $0.provider != "orca" && NativeProcessList.runsUnderOrca($0.identity.pid) }
+                return (candidates, snapshot.complete, installation, lifetime, sampleActivity(reportedOrcaProviders), orcaRunning)
             }.value
             guard let self else { return }
             self.processPolling = false
             self.installationSnapshot = installation
             self.lifetimeProcessSnapshot = lifetime
-            let orcaHosted = Set(activity.processes.filter(\.orcaHosted).map(\.pid))
-            self.receiveProcessSnapshot(candidates.filter { !orcaHosted.contains($0.identity.pid) }, complete: complete, observedAt: started)
+            let orcaRunPIDs = Set(orcaRunning.map { $0.identity.pid })
+            self.orcaRunAgentCount = orcaRunning.count
+            self.receiveProcessSnapshot(candidates.filter { !orcaRunPIDs.contains($0.identity.pid) }, complete: complete, observedAt: started)
             self.receiveActivity(activity.processes, at: activity.at)
             // Presence never fabricates working/idle/completion or an Auto hold.
         }
+    }
+
+    /// Providers Orca named an agent of in its last successful query, while that query is fresh and Orca observation is on.
+    private func orcaReportedProviders() -> Set<String>? {
+        guard config.orcaMetadataAllowed, uptime() - lastOrcaMetadataSuccess <= 15 else { return nil }
+        return lastOrcaReportedProviders
     }
 
     private func pollOrcaMetadata() {
@@ -1400,6 +1417,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 complete: true, observedAt: snapshot.receivedAt), now: now)
             for event in events { try receiveObservation(event) }
             lastOrcaMetadataSuccess = snapshot.receivedAt
+            lastOrcaReportedProviders = snapshot.reportedProviders
             orcaMetadataIssue = "none"
         } catch { invalidateOrcaMetadata(issue: "orcaMetadataRejected") }
     }
@@ -1433,13 +1451,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     nonisolated static let activityProviders: Set<String> = ["claude", "codex", "opencode", "freebuff", "pi",
                                                              "copilot-cli", "aider", "gemini-cli", "amp", "goose"]
 
-    nonisolated static func sampleActivity(_ list: NativeProcessList, excludeUnderOrca: Bool) -> (processes: [AgentActivityProcess], at: Double) {
+    nonisolated static func sampleActivity(_ list: NativeProcessList, reportedOrcaProviders: Set<String>?) -> (processes: [AgentActivityProcess], at: Double) {
         let observed = activityProviders
         var byName: [String: String] = [:]
         for info in AgentProviderCatalog.providers where observed.contains(info.id) {
             for name in info.processNames { byName[name] = info.id }
         }
-        return (list.activityProcesses(providerByName: byName, excludeUnderOrca: excludeUnderOrca), ContinuousTime.now)
+        return (list.activityProcesses(providerByName: byName).applyingOrcaReports(reportedProviders: reportedOrcaProviders), ContinuousTime.now)
     }
 
     /// Classifies each observed agent process and keeps the result as `activity` tasks. A process that is gone has
@@ -1449,20 +1467,20 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         var memory: [String: AgentActivityMemory] = [:]
         let previous = Dictionary(activityTasks.values.flatMap { $0 }.map { ($0.id, $0.state) }, uniquingKeysWith: { a, _ in a })
         for process in processes where !process.orcaHosted {
-            let key = "activity-\(process.provider)-\(process.pid)-\(String(process.startTime.bitPattern, radix: 16))"
+            let key = "activity-\(process.reportedProvider)-\(process.pid)-\(String(process.startTime.bitPattern, radix: 16))"
             var state = activityMemory[key] ?? AgentActivityMemory()
             let result = AgentActivityClassifier.step(&state, AgentActivitySample(at: at, alive: true, cpuSeconds: process.cpuSeconds,
                 processAgeSeconds: Date().timeIntervalSince1970 - process.startTime),
                 threshold: AgentActivityClassifier.busyThreshold(for: process.provider))
             memory[key] = state
-            guard let task = try? AgentTask(id: key, sessionID: "activity-\(process.provider)", runID: key,
+            guard let task = try? AgentTask(id: key, sessionID: "activity-\(process.reportedProvider)", runID: key,
                 state: result.state, evidenceKind: .activity, confidence: .inferred,
                 unknownUntilMonotonic: result.state == .unknown ? AgentActivityClassifier.unknownHoldDeadline(state) : nil) else { continue }
-            tasks[process.provider, default: []].append(task)
+            tasks[process.reportedProvider, default: []].append(task)
             // History keeps the start and end of work only (sampling noise between idle and unknown is not news).
             if (previous[key] == .working) != (result.state == .working) {
                 record(category: .stateTransition, newState: sessionStateForRecord(),
-                       reasons: ["agentStateChanged", "\(process.provider):\(result.state.rawValue)"])
+                       reasons: ["agentStateChanged", "\(process.reportedProvider):\(result.state.rawValue)"])
             }
         }
         activityMemory = memory

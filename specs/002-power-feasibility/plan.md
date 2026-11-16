@@ -29,12 +29,6 @@ hardware or runtime gates. Shared architecture governs seams.
 ## Project Structure
 Feature docs: spec.md, plan.md, research.md, data-model.md, quickstart.md, tasks.md, checklists/.
 Relevant future source or validation paths (not created now):
-- `docs/qa/feasibility-report.md`
-- `docs/qa/agent-compatibility.md`
-- `Tests/Hardware/PowerFeasibility.md`
-- `docs/qa/backend-comparison.md`
-- `Tests/Hardware/RecoveryFailureMatrix.md`
-- `docs/qa/recovery-design.md`
 - `docs/planning/limitations.md`
 - `specs/002-power-feasibility/research.md`
 

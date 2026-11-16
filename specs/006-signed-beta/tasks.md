@@ -22,7 +22,7 @@ Shared constitution, product requirements and limitation register apply; depende
 
 **Independent Test**: Fresh signed/notarized install, denial, migration, helper mismatch, OS build change, tampered update rejection and uninstall cleanup verified.
 
-- [~] T002 [US2] Configure signed/notarized beta and optional helper install/remove/migration; document tampered update rejection and fresh install/denial/upgrade/uninstall in docs/qa/packaging-report.md (FR-013, FR-019). — **2026-11-03 cleanup:** Superseded by ADR 0004: ad-hoc signed GitHub releases, no Developer ID or notarization; the helper installs and removes from Settings.
+- [~] T002 [US2] Configure signed/notarized beta and optional helper install/remove/migration; document tampered update rejection and fresh install/denial/upgrade/uninstall (FR-013, FR-019). — **2026-11-03 cleanup:** Superseded by ADR 0004: ad-hoc signed GitHub releases, no Developer ID or notarization; the helper installs and removes from Settings.
 
 ## Dependencies & Execution Order
 
@@ -51,7 +51,7 @@ These tasks decompose T001/T002 preparation; checking them does not close the pa
 
 - [x] T003 Implement and pin Sparkle 2.10.0 information-only driver, eligibility/safety/state controller, native Updates window/menu and shared CLI status; verify component deferral/retry/late-result/no-trust cases (T001 preparation).
 - [x] T004 Add signed-candidate xcconfig, safe local bundle audit/archive tool and meaningful packaging regressions; prove preview cannot become beta and output overwrite refuses (T002 preparation).
-- [x] T005 Verify fresh native Updates unavailable state, GUI/CLI agreement, framework embedding and source-hashed Debug/Release builds; record actual versus stub/blocked cases in docs/qa/packaging-report.md.
+- [x] T005 Verify fresh native Updates unavailable state, GUI/CLI agreement, framework embedding and source-hashed Debug/Release builds; record actual versus stub/blocked cases.
 
 T001 pending: actual signed current/available/offline/error feeds and integrated protected-work install deferral. T002 pending: real Developer ID/notarization/feed key, tampered signed update, fresh install/denial/upgrade/uninstall/migration and conditional selected-helper lifecycle. M1/M4a prerequisites remain open; no external publication authorized.
 

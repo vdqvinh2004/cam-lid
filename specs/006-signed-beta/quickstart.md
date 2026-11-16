@@ -16,15 +16,6 @@ SPECIFY_FEATURE_DIRECTORY=specs/006-signed-beta rtk .specify/scripts/bash/check-
 ```
 This check resolves documents only. M6 and M7 remain separate quality/user gates.
 
-Preview validation from repository root:
-
-```sh
-rtk python3 scripts/verify-preview.py --build-directory /tmp/camlid-m5-verify
-rtk python3 scripts/package-beta.py --app /tmp/camlid-m5-verify/xcode/Build/Products/Release/CamLid.app
-```
-
-`--output-directory /tmp/NEW-camlid-preview` creates a local preview zip only if the destination is new. Omit the flag for read-only audit. Preview output is never a signed beta. `--mode beta --team-id TEAM --gates /path/to/current-evidence.json` audits a separately signed/notarized candidate and refuses missing trust/gates. Credentials are not accepted by this tool. Source Info keys SUFeedURL/SUPublicEDKey/CamLidUpdateTeamID expand from CAMLID_UPDATE_FEED_URL/CAMLID_UPDATE_PUBLIC_KEY/DEVELOPMENT_TEAM at build time; no placeholder feed is contacted. `Config/Beta.xcconfig` enables manual Developer ID signing/hardened runtime for credentialed candidate builds only.
-
 Open native Check for Updates… to inspect status. CLI `camlid status --json` includes `updates`. No update installation, power helper, notarization submission or publication occurs in the preview.
 
 

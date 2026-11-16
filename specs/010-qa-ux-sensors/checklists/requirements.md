@@ -31,4 +31,4 @@
 
 ## Notes
 
-One document validation pass complete. All45 implementation/acceptance tasks remain unchecked. Numerical-temperature source qualification, LidRun native window inspection, M1 hardware backend/recovery and final accessibility/user gates remain outstanding; these are executable gates with conservative failure outcomes, not unresolved product scope. Detailed primary sources in research.md and docs/planning/qa-refinement-research.md. No extension hooks registered (extensions.yml absent).
+One document validation pass complete. All45 implementation/acceptance tasks remain unchecked. Numerical-temperature source qualification, LidRun native window inspection, M1 hardware backend/recovery and final accessibility/user gates remain outstanding; these are executable gates with conservative failure outcomes, not unresolved product scope. Detailed primary sources in research.md. No extension hooks registered (extensions.yml absent).

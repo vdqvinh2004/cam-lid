@@ -12,7 +12,7 @@ Implemented 2026-11-09, not committed. Evidence is the focused and full CamLidCo
 - [x] T010 [FR-001] Settings › General › New sessions: "Let the display sleep during sessions", bound to `allowDisplaySleep` through the existing `setAllowDisplaySleep` (`SettingsView.swift`).
 - [x] T011 [FR-003] `DisplaySleepChoice` (`KeepAwakeAssertion.swift`) reads the setting while no session runs and holds it until the session ends. Test `theDisplayChoiceIsReadWhileIdleAndHeldDuringASession`.
 - [x] T012 [FR-002] `AppCoordinator` reconciles a second `KeepAwakeAssertion` for `PreventUserIdleDisplaySleep` with its own reason. The same create, read-back and release path. Released at quit.
-- [x] T013 [FR-004] Code evidence and a live check: with the option off, the QA build holds `PreventUserIdleDisplaySleep` named "CamLid keeps the display on while a session runs" during a timed session and releases it on stop (2026-11-09, `pmset`). The on-screen "CamLid is active" wording was not seen on 2026-11-09 (`SleepDiagnosticsCopy.swift`); on 2026-11-10 the QA copy showed the row with "Active now" during a timed session ([qa-evidence.md](../024-release-readiness-v0.2/qa-evidence.md)).
+- [x] T013 [FR-004] Code evidence and a live check: with the option off, the QA build holds `PreventUserIdleDisplaySleep` named "CamLid keeps the display on while a session runs" during a timed session and releases it on stop (2026-11-09, `pmset`). The on-screen "CamLid is active" wording was not seen on 2026-11-09 (`SleepDiagnosticsCopy.swift`); on 2026-11-10 the QA copy showed the row with "Active now" during a timed session.
 - [x] T014 [SC-001, SC-002] Tests in `DisplayHoldTests`: no display assertion by default; with the option off, exactly one held and released at the end.
 
 ## Phase 2 — Copyable diagnostics (US2; FR-005, FR-006)
@@ -25,7 +25,7 @@ Implemented 2026-11-09, not committed. Evidence is the focused and full CamLidCo
 - [x] T031 [T081] Implemented as a switch in Watched programs, "Keep Auto awake while a Chromium browser plays audio", not as a new rule row. Tradeoff: no new rule kind and no config field; the switch is a preference, like the update check.
 - [~] T032 [T082] Superseded by spec 025. The hold no longer waits 60 s after playback: it bridges 10 s between samples, then Sleep when done applies. It still counts only for Auto sessions, through the policy's hold reason, now `musicPlayback`. Activity records start and end only as state transitions; not checked in the history.
 - [x] T033 [T082] Tests in `AudioPlaybackSignalTests`: holds while the signal exists, ends after the quiet period, never holds without a signal, ignores other assertions and other apps.
-- [~] T034 [T083] Live check with Brave on this Mac (2026-11-09): its "Playing audio" assertion appears while audio plays and is released after pause. CamLid's hold decision was not isolated (Orca had two working tasks). Other browsers not run ([qa-evidence.md](../024-release-readiness-v0.2/qa-evidence.md)).
+- [~] T034 [T083] Live check with Brave on this Mac (2026-11-09): its "Playing audio" assertion appears while audio plays and is released after pause. CamLid's hold decision was not isolated (Orca had two working tasks). Other browsers not run.
 
 ## Phase 4 — Verification and records
 - [x] T040 Focused suites pass; full CamLidCore run: 354 tests in 69 suites pass.

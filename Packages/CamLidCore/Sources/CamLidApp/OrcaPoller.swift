@@ -7,6 +7,8 @@ struct OrcaMetadataSnapshot: Sendable {
     let statuses: [OrcaUIStatus]
     let queryStartedAt: Double
     let receivedAt: Double
+    /// CamLid provider ids of the agents this report names: its state decides for those providers only.
+    var reportedProviders: Set<String> = []
 }
 
 public enum OrcaPollError: Error, Sendable {
@@ -48,7 +50,8 @@ public struct OrcaPoller: Sendable {
         let started = clock()
         guard started.isFinite else { throw OrcaPollError.invalid }
         let bytes = try readBytes(consent: consent)
-        let rows = try Self.decode(status: bytes.status, worktrees: bytes.worktrees)
+        let decoded = try Self.decodeReporting(status: bytes.status, worktrees: bytes.worktrees)
+        let rows = decoded.rows
         let runtime = try JSONDecoder().decode(StatusEnvelope.self, from: bytes.status).result.runtime.runtimeId
         let statuses = rows.map { row in
             // Opaque runtime/pane identity only; never persist a provider title or raw pane key.
@@ -68,9 +71,18 @@ public struct OrcaPoller: Sendable {
         }
         let received = clock()
         guard received.isFinite, received >= started, received - started <= 4.5 else { throw OrcaPollError.timeout }
-        return OrcaMetadataSnapshot(statuses: statuses, queryStartedAt: started, receivedAt: received)
+        return OrcaMetadataSnapshot(statuses: statuses, queryStartedAt: started, receivedAt: received,
+                                    reportedProviders: decoded.providers)
     }
     public static func decode(status: Data, worktrees: Data) throws -> [OrcaWorktreeRow] {
+        try decodeReporting(status: status, worktrees: worktrees).rows
+    }
+    /// Orca names some agent types differently from CamLid's provider ids. Only `gemini` (Gemini CLI) is mapped here;
+    /// Orca's `opencode-go` is not yet checked against CamLid's `opencode`.
+    /// shortcut: an unmapped name leaves its processes to both sampling and Orca's report, so add the alias once verified.
+    static let providerIDs = ["gemini": "gemini-cli"]
+    /// The rows plus the CamLid provider ids of the agents they name.
+    static func decodeReporting(status: Data, worktrees: Data) throws -> (rows: [OrcaWorktreeRow], providers: Set<String>) {
         guard status.count <= 65_536, worktrees.count <= 65_536 else { throw OrcaPollError.tooLarge }
         let state = try JSONDecoder().decode(StatusEnvelope.self, from: status)
         guard state.ok, state.result.target.kind == "local" else { throw OrcaPollError.remote }
@@ -84,6 +96,7 @@ public struct OrcaPoller: Sendable {
         guard response.ok, !response.result.truncated,
             response._meta.runtimeId == state.result.runtime.runtimeId else { throw OrcaPollError.invalid }
         var output: [OrcaWorktreeRow] = []
+        var providers: Set<String> = []
         var panes: Set<String> = []
         for workspace in response.result.worktrees where workspace.hostId == "local" {
             for row in workspace.agents {
@@ -97,9 +110,10 @@ public struct OrcaPoller: Sendable {
                     : row.state == "done" ? "idle" : ["working", "waiting", "idle", "unknown"].contains(row.state) ? row.state : "unknown"
                 output.append(OrcaWorktreeRow(sessionID: row.paneKey, runID: "main", host: "local",
                     restoredUnconfirmed: row.restoredUnconfirmed ?? false, agentState: state))
+                if let type = row.agentType { providers.insert(Self.providerIDs[type] ?? type) }
             }
         }
-        return output
+        return (output, providers)
     }
     static func run(executable: URL, arguments: [String], timeout: Double = 2, maximumBytes: Int = 65_536) throws -> Data {
         guard FileManager.default.isExecutableFile(atPath: executable.path) else { throw OrcaPollError.unavailable }
@@ -174,5 +188,6 @@ private struct WorktreeEnvelope: Decodable {
     struct Row: Decodable {
         let paneKey: String; let state: String
         let interrupted: Bool?; let restoredUnconfirmed: Bool?
+        let agentType: String?
     }
 }

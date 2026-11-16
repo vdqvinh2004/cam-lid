@@ -3,7 +3,7 @@
 /// Unit-level lifecycle/edge cases using inline JSON plus the evidence
 /// normalizer, asserting states via normalizer outcomes and
 /// `PolicyEngine.holdsSession`. No 20-run provider evidence is recorded here
-/// and nothing is written to docs/qa: installed-version runs belong to a
+/// and no evidence file is written: installed-version runs belong to a
 /// separate validation pass.
 import Foundation
 import Testing

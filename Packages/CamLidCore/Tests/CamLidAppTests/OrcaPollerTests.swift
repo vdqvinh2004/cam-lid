@@ -13,6 +13,14 @@ struct OrcaPollerTests {
         #expect(rows.first?.agentState == "idle")
         #expect(rows.first?.host == "local")
     }
+    /// The providers the report names decide for their agents; Orca's `gemini` is CamLid's `gemini-cli`, and a remote
+    /// host's agents are not this Mac's.
+    @Test func theReportNamesTheProvidersItsLocalAgentsRunAs() throws {
+        let worktrees = Data(#"{"ok":true,"_meta":{"runtimeId":"test"},"result":{"truncated":false,"worktrees":[{"hostId":"local","agents":[{"paneKey":"one","state":"working","agentType":"claude"},{"paneKey":"two","state":"done","agentType":"gemini"},{"paneKey":"three","state":"idle"},{"paneKey":"four","state":"working","agentType":"pi"}]},{"hostId":"remote","agents":[{"paneKey":"foreign","state":"working","agentType":"codex"}]}]}}"#.utf8)
+        let decoded = try OrcaPoller.decodeReporting(status: status, worktrees: worktrees)
+        #expect(decoded.rows.count == 4)
+        #expect(decoded.providers == ["claude", "gemini-cli", "pi"])
+    }
     @Test func truncationRejectsRegardlessOfVersion() throws {
         let worktrees = Data(#"{"ok":true,"_meta":{"runtimeId":"test"},"result":{"truncated":true,"worktrees":[]}}"#.utf8)
         #expect(throws: (any Error).self) { try OrcaPoller.decode(status: status, worktrees: worktrees) }

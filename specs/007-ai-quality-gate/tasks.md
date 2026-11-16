@@ -16,11 +16,11 @@ Shared constitution, product requirements and limitation register apply; depende
 
 **Independent Test**: CLI/GUI contracts, safety/security/privacy/recovery, performance, native computer-use and physical evidence audited; zero critical/high defects.
 
-- [~] T001 [US1] Add contract checks for schema, exit codes, revisions, invalid configs, trust/payload bounds, unavailable/recovery states and GUI agreement in Tests/Contracts/CLITests.swift (FR-017, SC-004). Implemented as Packages/CamLidCore/Tests/CamLidCLITests/CLITests.swift (runnable SwiftPM target covering the same contract surface). — **2026-11-03 cleanup:** Superseded (ADR 0004): the CLI contract is covered by the test suites.
-- [~] T002 [P] [US1] Measure idle CPU/RSS and 30 dashboard opens, validate hidden-UI polling/log floods, record reference hardware in docs/qa/performance-report.md (SC-005). — **2026-11-03 cleanup:** Superseded: performance was observed during the trials (idle CPU about 0-1 percent of a core); no formal report is planned.
-- [~] T003 [US1] Run independent AI contract/safety/recovery/privacy/security review and native computer-use walkthrough; audit integrated physical rows in docs/qa/ai-quality-report.md (FR-020, SC-006). — **2026-11-03 cleanup:** Superseded by the owner-attended trials and public source (ADR 0004).
-- [~] T004 [US1] Audit all L01–L20 and update readiness/revoked approval/uninstall/version mismatch plus candidate recovery failure reruns in docs/qa/ai-quality-report.md; document joint/OS-hang residuals instead of solved claims (FR-022, FR-023, FR-024, SC-008). — **2026-11-03 cleanup:** Superseded (see T003).
-- [~] T005 [US1] Resolve all critical/high findings, rerun affected checks and record PASS before user trial in docs/qa/ai-quality-report.md (SC-006). — **2026-11-03 cleanup:** Superseded (see T003).
+- [~] T001 [US1] Add contract checks for schema, exit codes, revisions, invalid configs, trust/payload bounds, unavailable/recovery states and GUI agreement in Packages/CamLidCore/Tests/CamLidCLITests/CLITests.swift (FR-017, SC-004). Implemented as a runnable SwiftPM target covering the same contract surface. — **2026-11-03 cleanup:** Superseded (ADR 0004): the CLI contract is covered by the test suites.
+- [~] T002 [P] [US1] Measure idle CPU/RSS and 30 dashboard opens, validate hidden-UI polling/log floods, record reference hardware (SC-005). — **2026-11-03 cleanup:** Superseded: performance was observed during the trials (idle CPU about 0-1 percent of a core); no formal report is planned.
+- [~] T003 [US1] Run independent AI contract/safety/recovery/privacy/security review and native computer-use walkthrough; audit integrated physical rows (FR-020, SC-006). — **2026-11-03 cleanup:** Superseded by the owner-attended trials and public source (ADR 0004).
+- [~] T004 [US1] Audit all L01–L20 and update readiness/revoked approval/uninstall/version mismatch plus candidate recovery failure reruns; document joint/OS-hang residuals instead of solved claims (FR-022, FR-023, FR-024, SC-008). — **2026-11-03 cleanup:** Superseded (see T003).
+- [~] T005 [US1] Resolve all critical/high findings, rerun affected checks and record PASS before user trial (SC-006). — **2026-11-03 cleanup:** Superseded (see T003).
 
 ## Dependencies & Execution Order
 
@@ -43,7 +43,7 @@ Current authorization permits scoped preview implementation and QA; external pub
 
 T001 partial: library contracts plus real socket/app-state/CLI binary tests now exist; complete integrated GUI/backend agreement remains unverified. T002–T005 remain open: no physical/signing/accessibility/performance gate can be inferred from preview tests.
 
-- [x] T006 Add scripts/verify-preview.py: isolated Swift tests/Debug/Release builds/actual CLI integration/read-only preflight, evidence logs and source hash manifest, explicit M1/M6-not-passed fields.
+- [x] T006 Add isolated Swift tests/Debug/Release builds/actual CLI integration/read-only preflight, evidence logs and source hash manifest, explicit M1/M6-not-passed fields.
 
 ## Added M4a dependency (2026-10-05)
 
