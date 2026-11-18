@@ -1,6 +1,6 @@
 # Feature Specification: Automatic update setting
 
-**Status:** Decided 2026-11-09; implemented for v0.2, the release after 0.1.0, not released yet. Off by default. When on,
+**Status:** Decided 2026-11-09; released in v0.2.0 (GitHub pre-release) on 2026-11-18. Off by default. When on,
 one check per day. Install mode is deferred. Plan: [plan.md](plan.md). Tasks: [tasks.md](tasks.md). [ADR 0004](../../docs/adr/0004-distribution-through-github-releases.md) is amended for
 the daily check (see its Amendment).
 

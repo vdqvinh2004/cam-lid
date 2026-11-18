@@ -1,6 +1,6 @@
 # Feature Specification: music hold (browsers, Spotify, Apple Music)
 
-**Status:** Implemented for v0.2 (not released). Revised 2026-11-10: a browser needs its playback assertion as well as its
+**Status:** Released in v0.2.0 (GitHub pre-release) on 2026-11-18. Revised 2026-11-10: a browser needs its playback assertion as well as its
 output, and Apple Music ends its hold at its playback assertion once that assertion has been seen on this Mac. Spotify keeps
 the output signal alone. The timings were measured live on this Mac with a read-only probe: four Spotify runs, one Apple Music cycle, and
 one Brave test. Apple Music and Brave come from a single cycle each, not from a repeated test. Revised 2026-11-16: once a browser or Safari has held its playback assertion while its output ran, the hold lasts while the output runs, so muted playback counts (FR-006).

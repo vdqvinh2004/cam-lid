@@ -1,6 +1,6 @@
 # Feature Specification: Agent skill for the CamLid command
 
-**Status:** Decided 2026-11-09; implemented for v0.2, the release after 0.1.0, not released yet. The skill file, the Settings
+**Status:** Decided 2026-11-09; released in v0.2.0 (GitHub pre-release) on 2026-11-18. The skill file, the Settings
 button, the bundled copy and the release check are in place. The file goes to the home folder (changed 2026-11-09 from a project folder). Open: SC-001 (an agent run) and the GUI check. Plan:
 [plan.md](plan.md). Tasks: [tasks.md](tasks.md).
 
