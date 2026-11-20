@@ -56,3 +56,12 @@ page. The request is the same as the manual one: no account, no cookies, and no 
 Install is still excluded. The app never downloads or installs an update, and no in-app updater is added until the owner
 has a Developer ID (see the consequences above and [spec 020](../../specs/020-v1-gates/spec.md), gate G1). Until the
 setting ships, decision 4 stands as written.
+
+## Amendment (2026-11-18): in-app install (spec 026)
+
+Decision 4 is amended for v0.3. The owner decided (D1, 2026-11-18) that an install needs no Developer ID. After a click on
+*Update to <version>*, CamLid downloads the release from GitHub, checks its SHA-256 against the published checksum, checks
+that the unpacked app is signed by the release certificate the running app is signed with, with the same identifier and
+the version the release names, replaces the app and starts the new version. Nothing is installed without that click, and an
+update never changes the root helper. Notarization stays out of scope, and gate G1 stays open. This amendment leaves
+the admin-install gap in SECURITY.md open. Spec 021 named it a precondition of install mode; the owner accepted it for 0.3 on 2026-11-18.

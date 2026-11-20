@@ -18,7 +18,8 @@ within about a week.
   was installed with.
 - A way to leave the sleep setting changed after a session, an app crash, a helper crash or a restart.
 - The installer or uninstaller doing more than its fixed operations, or touching files it should not.
-- Anything that makes the app send data off the Mac (it should not; the only request is the update check, which you click or, if you turn it on, once a day).
+- The music and audio holds reading anything but CoreAudio's per-process output flag (no audio content, no new permission).
+- Anything that makes the app send data off the Mac (it should not; the requests are the update check, which you click or, if you turn it on, once a day, and from 0.3 on the release download that you start with *Update to <version>*).
 
 ## What the helper is meant to guarantee
 It accepts a fixed set of operations (inspect, acquire, renew, release) from the pinned app only; it holds a 30-second

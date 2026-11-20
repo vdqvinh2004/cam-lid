@@ -61,7 +61,7 @@ Packages/CamLidCore/
                       NativeProcessList.swift, SettingsView.swift, SettingsEditor.swift,
                       UtilityUICoordinator.swift; new OutcomeNotifications.swift,
                       LoginItemController.swift
-  Tests/               existing Core/CLI/App test directories
+  Packages/CamLidCore/Tests/                existing Core/CLI/App test directories
 ```
 
 **Structure Decision**: Reuse concrete components. Core owns portable typed contracts/policy; App owns platform collection and actual services; CLI requests typed operations. Do not import App into CLI or add a diagnostics daemon. Share DTO via Core and collect on the app's existing service; utility UI renders returned snapshot. Retain offline diagnosis behavior only if already supported, explicitly labeling absent app ownership. Extract the bounded subprocess helper only if both existing Orca and diagnostics truly need it.

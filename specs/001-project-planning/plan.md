@@ -27,7 +27,7 @@ hardware or runtime gates. Shared architecture governs seams.
 ## Project Structure
 Feature docs: spec.md, plan.md, research.md, data-model.md, quickstart.md, tasks.md, checklists/.
 Relevant future source or validation paths (not created now):
-- Shared planning artifacts in docs/planning/, project constitution and eight milestone folders.
+- Shared planning artifacts (kept outside the repository), project constitution and eight milestone folders.
 
 ## Phase 0: Research Decisions
 See [research.md](research.md). Inherited primary-source findings and product decisions remain

@@ -3,6 +3,8 @@
 Preview commands are implemented where documented in README; live power/helper operations remain gated. CLI uses running app's shared policy;
 reads do not launch protection or modify power. JSON stdout, diagnostics stderr, schemaVersion 1.
 
+The commands and reply rules added in v0.3 (parity with the app, and the rules for agents) are in [CLI contract v0.3](../../031-cli-parity/contracts/cli-v0.3.md).
+
 | Command | Behavior |
 | --- | --- |
 | `camlid status --json` | Mode, effective state/reason, revision, tasks, health/freshness, lease/cleanup, deadlines, support row |

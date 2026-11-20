@@ -101,14 +101,14 @@ Packages/CamLidPowerHelper/
 │   ├── NativeHelperEnvironment.swift      # read-only global policy access
 │   ├── LeasePowerMechanism.swift          # observation protocol + lid-specific adapter
 │   └── PowerLeaseService.swift            # active-session conflict stop/reason
-└── Tests/CamLidPowerServiceTests/
+└── (local) CamLidPowerServiceTests/
     ├── LidSpecificMechanismTests.swift
     └── PowerServiceTests.swift
 
-Tests/Experiments/BestEffortLidSession/
+(local) experiment BestEffortLidSession/
 ├── Sources/BestEffortLidSession/
 │   └── BestEffortProductModel.swift       # reasons, journal intent, re-arm basis, presentation
-└── Tests/BestEffortLidSessionTests/
+└── (local) BestEffortLidSessionTests/
     ├── BestEffortProductModelTests.swift
     └── SimulatedLidSessionTests.swift
 ```

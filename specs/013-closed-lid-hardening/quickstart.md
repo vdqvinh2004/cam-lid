@@ -28,8 +28,8 @@ Expected:
 ## 2. Best-effort model tests
 
 ```bash
-swift test --package-path Tests/Experiments/BestEffortLidSession
-swift test -c release --package-path Tests/Experiments/BestEffortLidSession
+# local experiment, not tracked: run swift test in its folder
+# local experiment, not tracked: run swift test -c release in its folder
 ```
 
 Expected:
@@ -66,7 +66,7 @@ The 40-run private archive is an explicitly opted-in historical test, not a mand
 or current product-source qualification. See the committed fixture README for its invocation.
 
 For candidate staging, use the existing `Packages/CamLidPowerHelper/Support/stage-local-candidate.py`
-with newly compiled helper/client paths under `.pi/qa-builds` and `--lid-specific-best-effort`.
+with newly compiled helper/client paths under the local QA build folder (ignored) and `--lid-specific-best-effort`.
 It signs locally and never installs or registers the bundle. Every rebuild requires a new
 review/freeze; do not update pins automatically or reuse a prior approval.
 The current exact freeze, source manifest and human-only read-only root-journal gate are in

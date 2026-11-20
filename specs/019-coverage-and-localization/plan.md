@@ -10,7 +10,7 @@
 | Start mode | `Commands.start` and the mode handling | Stop writing the mode; keep `config set mode` |
 | Spec hygiene | `specs/*/tasks.md`, `specs/README.md` | Scripted link check for ignored paths |
 | Audio hold | New rule type next to watched programs; signal reader behind a protocol, with a fake for tests | Built only if T070 finds a reliable signal |
-| Audio research | `docs/research/` (ignored; kept local) | Result recorded in a spec note; code only if the research says yes |
+| Audio research | the local research folder (kept outside the repository) | Result recorded in a spec note; code only if the research says yes |
 
 ## Test strategy
 

@@ -29,7 +29,7 @@ hardware or runtime gates. Shared architecture governs seams.
 ## Project Structure
 Feature docs: spec.md, plan.md, research.md, data-model.md, quickstart.md, tasks.md, checklists/.
 Relevant future source or validation paths (not created now):
-- `docs/planning/limitations.md`
+- the local limitations record (kept outside the repository)
 - `specs/002-power-feasibility/research.md`
 
 ## Phase 0: Research Decisions

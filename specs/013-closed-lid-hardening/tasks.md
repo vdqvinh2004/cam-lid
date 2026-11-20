@@ -69,7 +69,7 @@ blocked; full G2, app integration and shipping/qualification gates are unchanged
   Add `intent` to `BestEffortJournalEntry` and specific reasons
   `pendingCurrentBootEnable`, `pendingCurrentBootRestore`, `previousBootAbnormalBaseline` and
   `previousBootSuperseded` in
-  `Tests/Experiments/BestEffortLidSession/Sources/BestEffortLidSession/BestEffortProductModel.swift`.
+  the local best-effort experiment source (not tracked).
   *Done when:* the model can distinguish the four cases without reading the clamshell property.
 
 - [x] **T202 — Prove no blind clear/retry on pending states.**

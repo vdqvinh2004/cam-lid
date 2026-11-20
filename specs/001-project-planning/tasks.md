@@ -17,9 +17,9 @@ Shared constitution, product requirements and limitation register apply; depende
 **Independent Test**: All linked planning artifacts and eight prerequisite checks pass; no runtime claim.
 
 - [x] T001 [US1] Initialize Spec Kit 1.0.7 and project governance in .specify/memory/constitution.md (DOC-001).
-- [x] T002 [US1] Capture source research and shared product/architecture/limitation decisions in docs/planning/product-spec.md and docs/research/ (DOC-002).
+- [x] T002 [US1] Capture source research and shared product/architecture/limitation decisions in the local product spec and research folder, kept outside the repository (DOC-002).
 - [x] T003 [US1] Define native UX direction in design-system/camlid/MASTER.md (DOC-002).
-- [x] T004 [US1] Split M0–M7 into eight specs folders and validate migration/coverage in docs/planning/planning-review.md (DOC-001, DOC-SC-001).
+- [x] T004 [US1] Split M0–M7 into eight specs folders and validate migration/coverage in the local planning review, kept outside the repository (DOC-001, DOC-SC-001).
 ## Dependencies & Execution Order
 
 Prerequisites: None. Tasks in setup/foundation precede story work. Tasks inside each story stay ordered unless [P] explicitly marks separate files.

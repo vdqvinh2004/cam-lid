@@ -74,7 +74,7 @@ Presentation mapping:
 
 No projection may render `Protected`; a UI test asserts the string is unreachable. The offline
 implementation lives in
-`Tests/Experiments/BestEffortLidSession/Sources/BestEffortLidSession/BestEffortProductModel.swift`
+the local best-effort experiment source (not tracked)
 with `BestEffortProductModelTests.swift` (51 tests in the package pass, including these).
 
 ### D3 — Session lifecycle

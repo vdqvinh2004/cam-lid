@@ -35,8 +35,7 @@ for everyone who does not turn the setting on.
    - At most one request per day. A newer release appears in the Updates window with the Releases link.
    - Offline, nothing is shown outside the Updates window.
    - Switching back to Off stops scheduled checks at once.
-3. **Not disturbed while the Mac is held awake.** Check does not run during a session or a sleep hold. It waits and
-   tries again later.
+3. **Checks run during a session.** Check only asks GitHub. It changes no sleep setting and downloads nothing, so a session does not hold it. A recovery still makes it wait and try again later.
 
 ## Requirements
 
@@ -44,7 +43,7 @@ for everyone who does not turn the setting on.
   never turns Check on.
 - **FR-002** Check uses the same request as the manual check: the same endpoint, no cookies, no account, and an
   ephemeral session.
-- **FR-003** Check runs at most once per 24 hours, and not while a session or hold is active.
+- **FR-003** Check runs at most once per 24 hours. Only a recovery holds it; a session, a hold, agent activity and unsaved Settings do not.
 - **FR-004** Check never downloads a file and never changes the app or the helper.
 - **FR-005** The setting is in Settings › General, with a plain description of the request it makes. It persists across
   restarts.
@@ -54,15 +53,16 @@ for everyone who does not turn the setting on.
 ## Success criteria
 
 - **SC-001** With the setting Off, a test shows no request except the manual check.
-- **SC-002** With Check on, a test shows at most one request per 24 hours, and none while a session is active.
+- **SC-002** With Check on, a test shows at most one request per 24 hours, and none while a recovery is running.
 - **SC-003** Switching to Off stops scheduled checks immediately.
 
 ## Decisions (owner, 2026-11-09)
 
 1. **Amend ADR 0004 for an opt-in daily check.** Done: the amendment is recorded in ADR 0004. Install stays excluded.
 2. **Interval: once a day (24 hours).** Recorded as FR-003.
-3. **Install mode: deferred.** It is not in the next version. It needs the Developer ID decision first (spec 020, gate
-   G1), and the admin-install gap in SECURITY.md under "Known limits" must be closed before it ships.
+3. **Install mode: deferred for 0.2; for v0.3 superseded by [spec 026](../026-in-app-update/spec.md)** (owner decision D1, 2026-11-18: no Developer ID needed). It was not in 0.2. It needed the Developer ID decision first (spec 020, gate
+   G1), and the admin-install gap in SECURITY.md under "Known limits" was to be closed before it shipped. The owner accepted the gap for 0.3 on 2026-11-18 (spec 026).
+4. **Checks run during a session (owner, 2026-11-18).** The owner chose this over the session rule. A check only asks GitHub, so a session no longer holds it. An install still asks before it stops a session (spec 026, D6). A recovery still holds a check.
 
 ## Remaining before release
 

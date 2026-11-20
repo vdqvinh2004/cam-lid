@@ -22,7 +22,7 @@ Shared constitution, product requirements and limitation register apply; depende
 - [x] T004 [US1] Compare documented timed/session-bound backend candidates before persistent SleepDisabled; prove that assertion timeout does not restore separate global state (FR-022, FR-023, SC-008).
 - [x] T005 [US1] Test helper SIGSTOP/crash loop/delayed restart/stalled IPC and measure deadline/release/verified restore separately; OS/power-service hangs simulated, no fixed restart guarantee (FR-022, FR-023, SC-008). — **Review 2026-10-31:** closed by 014 G2 trials 4, 4b, 5 and 7 (SIGTERM, SIGKILL, SIGSTOP hang, reboot) with measured restore times; no fixed guarantee for OS/power-service hangs, as before.
 - [x] T006 [US1] Design minimum independent recovery/serialization/trust topology for persistent candidate; suspended owner must not strand cleanup; reject backend on mandatory failure (FR-023).
-- [x] T007 [US1] Disposition L01–L20 in docs/planning/limitations.md before backend decision, including global same-value ownership residual, unsupported builds, sensor/agent gaps, manual Sleep, permission/storage faults and joint failure (FR-021, FR-024, FR-025, SC-008).
+- [x] T007 [US1] Disposition L01–L20 in the local limitations record before backend decision, including global same-value ownership residual, unsupported builds, sensor/agent gaps, manual Sleep, permission/storage faults and joint failure (FR-021, FR-024, FR-025, SC-008).
 - [x] T008 [US1] Choose backend and support rows, or record blocked core feature in specs/002-power-feasibility/research.md; require complete M1 evidence before source setup (FR-021).
 
 ## Continuity-first scope work — 2026-10-11

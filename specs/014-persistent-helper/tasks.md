@@ -4,7 +4,7 @@
 
 ## Phase 0 — Alignment
 - [x] T001 Mark admission / one-use sections of specs 012 and 013 as superseded by 014 (keep evidence). — done 2026-10-30 (notice added to 012/013 spec, plan, tasks).
-- [x] T002 Update `specs/README.md`, `docs/planning/limitations.md` and `roadmap.md` for the new deployment model. — done 2026-10-30 (`specs/README.md`; local planning docs).
+- [x] T002 Update `specs/README.md`, the local limitations record and roadmap for the new deployment model. — done 2026-10-30 (`specs/README.md`; local planning docs).
 - [x] T003 Resolve ADR open questions: identity pinning for contributors, historical 012/013 on GitHub, Strict helper arguments. — resolved by default 2026-10-30, owner may override: see ADR 0001 "Resolved defaults".
 
 ## Phase 1 — Helper core

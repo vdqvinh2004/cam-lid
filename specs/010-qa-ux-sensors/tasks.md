@@ -85,7 +85,7 @@ No final acceptance until mandatory supported-row and release predecessors pass.
 - [X] T042 Run settled-source canonical and packaging regressions; record source hash/report; repeat only after changes/failures (FR-017).
 - [~] T043 Perform independent AI source/spec/contract/evidence review against L01–L20; fix and rerun affected checks until zero critical/high; M6 full gate remains separate (SC-005). — **2026-11-03 cleanup:** Superseded: the M6 AI quality gate was replaced by owner-attended trials and a public pre-release (ADR 0004).
 - [~] T044 After M6 PASS/signing/per-device qualification, run five supervised M7 users and record uncoached≥4/5 refinement-flow success plus zero safety/restoration failures (SC-007). — **2026-11-03 cleanup:** Superseded: supervised M7 users are replaced by the "Qualify my Mac" issue template and early adopters (ADR 0004).
-- [X] T045 Update specs/010-qa-ux-sensors/tasks.md, docs/planning/roadmap.md and M4a/M5/M6 evidence handoff with final disposition; unsupported temperature/core backend remains open, no retroactive checked gates (FR-017).
+- [X] T045 Update specs/010-qa-ux-sensors/tasks.md, the local roadmap and M4a/M5/M6 evidence handoff with final disposition; unsupported temperature/core backend remains open, no retroactive checked gates (FR-017).
 
 ## Dependencies & Execution Order
 

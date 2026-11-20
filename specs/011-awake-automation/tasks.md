@@ -7,7 +7,7 @@
 
 ## Phase 1: Setup
 
-- [x] T001 Record the user's lid-open display preference amendment in docs/planning/product-spec.md, docs/planning/architecture.md and specs/003-native-foundation/tasks.md T015; preserve default display sleep, closed-lid FR-003, M1/M2 backend ownership and all release gates (FR-005–007).
+- [x] T001 Record the user's lid-open display preference amendment in the local product spec and architecture, kept outside the repository, and specs/003-native-foundation/tasks.md T015; preserve default display sleep, closed-lid FR-003, M1/M2 backend ownership and all release gates (FR-005–007).
 - [x] T002 Record accepted baseline and M1/M2 integration readiness in specs/011-awake-automation/evidence/integration-readiness.md; identify qualified backend/executor or explicitly keep live tasks blocked; no backend duplication, provider setup, actuation or simulated PASS for hardware (FR-005/022).
 
 ## Phase 2: Foundation
@@ -98,8 +98,8 @@
 
 - [x] T040 Run integrated Core/CLI/App suites and existing simulator policy/security/recovery cases; record invalid UID/frame/replay, malformed config, privacy, continuous-clock/wake and critical safety results; confirm no new dependency, foreign resource change, arguments/output collection or Preview actuation (FR-021–022, SC-001–007).
 - [x] T041 Inspect all affected native surfaces using specs/011-awake-automation/quickstart.md at small/large sizes, light/dark, keyboard/labels/hover/disclosure/loading/error states; verify active pickers, no Auto countdown, readable menu icon, detection-only Agent settings and no duplicated mode controls; record artifacts (FR-019–020, SC-008).
-- [x] T042 Audit supervised physical evidence for affected power/display/sleep/lease support rows and update docs/planning/limitations.md; distinguish simulator/native/physical outcomes and leave unavailable support unclaimed (FR-005/022, SC-002–005).
-- [x] T043 Update README.md, docs/planning/roadmap.md, specs/README.md with actual feature dispositions, command help links, migrations/limits and M5/M6 regression status; M8 cannot claim integrated PASS with unresolved critical/high defects or replace M7 user gate (FR-022, SC-001–008).
+- [x] T042 Audit supervised physical evidence for affected power/display/sleep/lease support rows and update the local limitations record; distinguish simulator/native/physical outcomes and leave unavailable support unclaimed (FR-005/022, SC-002–005).
+- [x] T043 Update README.md, the local roadmap, specs/README.md with actual feature dispositions, command help links, migrations/limits and M5/M6 regression status; M8 cannot claim integrated PASS with unresolved critical/high defects or replace M7 user gate (FR-022, SC-001–008).
 
 ## Dependencies & execution order
 

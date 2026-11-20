@@ -13,7 +13,7 @@ Strict's power mechanism is separate from its admission rules. It disables only 
 root-domain selector `kPMSetClamshellSleepState` (12) and covers idle sleep with a `PreventUserIdleSystemSleep`
 assertion that has an OS timeout. On 2026-10-31 the owner chose to research the mechanism on its own, reusing the
 helper Standard already installs once. Attended experiments on Mac17,3 / macOS 26A434 (kernel xnu-13432; details in
-the local research note `docs/research/strict-lid-mechanism-2026-10-31.md`) found:
+the strict-lid research note kept outside the repository) found:
 
 | | Result |
 |---|---|

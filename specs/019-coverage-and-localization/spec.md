@@ -1,6 +1,8 @@
 # Feature Specification: v0.3 — coverage, Vietnamese, maintenance
 
-**Status:** Planned. Starts after v0.2 ships.
+**Status:** Implemented on v0.3, except the owner's attended tests (US6), the second-Mac qualification (FR-002) and the replay record (FR-004, T031). See tasks.md.
+
+> **2026-11-19:** Vietnamese (FR-001, User Story 1) moved to [spec 028](../028-vietnamese-ui/spec.md). The general audio hold (FR-007, User Story 7) moved to [spec 029](../029-general-audio-hold/spec.md). Their tasks are tracked there. T070 and T071 stay here as the research record.
 
 ## Problem
 
