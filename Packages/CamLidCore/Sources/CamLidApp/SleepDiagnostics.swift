@@ -16,12 +16,12 @@ public struct SleepAssertion: Sendable, Equatable, Identifiable {
     public var holdsDisplaySleep: Bool { type == "PreventUserIdleDisplaySleep" }
     public var effect: String {
         switch type {
-        case "PreventUserIdleSystemSleep": return "Keeps system awake"
-        case "PreventUserIdleDisplaySleep": return "Keeps system and display awake"
-        case "PreventSystemSleep": return "System sleep request"
-        case "UserIsActive": return "Recent input postpones display sleep"
-        case "ExternalMedia": return "External device activity"
-        default: return "Other power activity"
+        case "PreventUserIdleSystemSleep": return tr("Keeps system awake")
+        case "PreventUserIdleDisplaySleep": return tr("Keeps system and display awake")
+        case "PreventSystemSleep": return tr("System sleep request")
+        case "UserIsActive": return tr("Recent input postpones display sleep")
+        case "ExternalMedia": return tr("External device activity")
+        default: return tr("Other power activity")
         }
     }
 }
@@ -45,7 +45,7 @@ public struct SleepDiagnosticsSnapshot: Sendable, Equatable {
         let statusDictionary = status?.takeRetainedValue() as? [String: NSNumber]
         guard processResult == kIOReturnSuccess, statusResult == kIOReturnSuccess,
               let processDictionary, let statusDictionary else {
-            return Self(error: "macOS sleep requests could not be read (\(processResult), \(statusResult)). Try Refresh.")
+            return Self(error: trf("macOS sleep requests could not be read (%@, %@). Try Refresh.", processResult, statusResult))
         }
         return Self(assertions: project(processes: processDictionary, status: statusDictionary))
     }
@@ -143,11 +143,11 @@ public final class SleepDiagnosticReader: @unchecked Sendable {
            let value = line.split(whereSeparator: \.isWhitespace).last, ["0", "1"].contains(value) {
             result.coverage["global"] = .complete
             if value == "1" { result.blockers.append(DiagnosticBlocker(id: "global-sleepDisabled", type: "SleepDisabled",
-                effect: .global, source: "pmset", explanation: "System-wide sleep is disabled. CamLid does not change this setting.")) }
+                effect: .global, source: "pmset", explanation: tr("System-wide sleep is disabled. CamLid does not change this setting."))) }
         } else { result.errors.append("globalSettingUnknown") }
         if let line = settingsLines.first(where: { $0.split(whereSeparator: \.isWhitespace).first == "sleep" }) {
             let text = String(line)
-            if let marker = text.range(of: "(sleep prevented by ") {
+            if let marker = text.range(of: tr("(sleep prevented by ")) {
                 let tail = text[marker.upperBound...]
                 if let close = tail.firstIndex(of: ")") {
                     var seen = Set<String>()
@@ -164,13 +164,13 @@ public final class SleepDiagnosticReader: @unchecked Sendable {
             }
         }
         if let line = assertions.split(separator: "\n").first(where: { $0.hasPrefix("Kernel Assertions:") }) {
-            let value = line.dropFirst("Kernel Assertions:".count).trimmingCharacters(in: .whitespaces)
+            let value = line.dropFirst(tr("Kernel Assertions:").count).trimmingCharacters(in: .whitespaces)
             if value == "None" || value == "0x0" { result.coverage["kernel"] = .complete }
             else if value.hasPrefix("0x"), let equals = value.firstIndex(of: "="),
                     let flags = UInt64(value[value.index(value.startIndex, offsetBy: 2)..<equals], radix: 16) {
                 result.coverage["kernel"] = .complete
                 if flags != 0 { result.blockers.append(DiagnosticBlocker(id: "kernel-requests", type: "KernelAssertions", effect: .kernel,
-                    source: "pmset", explanation: "macOS reports active kernel or device sleep requests. No reliable process owner is available."))
+                    source: "pmset", explanation: tr("macOS reports active kernel or device sleep requests. No reliable process owner is available.")))
                 }
             } else { result.errors.append("kernelFormatUnknown") }
         } else { result.errors.append("kernelCoverageUnknown") }

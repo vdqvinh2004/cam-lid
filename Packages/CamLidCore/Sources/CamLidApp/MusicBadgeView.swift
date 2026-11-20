@@ -8,7 +8,7 @@ extension MusicSource {
     /// The name on a chip or a badge. Browsers are one source because the Chromium browsers share one audio signal.
     var chipTitle: String {
         switch self {
-        case .browser: "Chromium browsers"
+        case .browser: tr("Chromium")
         case .spotify: "Spotify"
         case .appleMusic: "Apple Music"
         case .safari: "Safari"
@@ -88,9 +88,9 @@ struct MusicSourceChip: View {
         .help(source.help)
         .accessibilityIdentifier("camlid.music." + source.rawValue)
         .accessibilityLabel(source.chipTitle)
-        .accessibilityValue(enabled ? "Keeps Auto awake while it plays" : "Ignored for sleep")
-        .accessibilityHint(enabled ? "Click to stop keeping Auto awake while it plays"
-            : "Click to keep Auto awake while it plays")
+        .accessibilityValue(enabled ? tr("Keeps Auto awake while it plays") : tr("Ignored for sleep"))
+        .accessibilityHint(enabled ? tr("Click to stop keeping Auto awake while it plays")
+            : tr("Click to keep Auto awake while it plays"))
         .accessibilityAddTraits(enabled ? .isSelected : [])
     }
 }
@@ -103,10 +103,38 @@ struct DashboardMusicBadge: View {
         BadgeShell(title: source.chipTitle, tone: .activity, mark: {
             MusicMarkView(source: source, size: AgentBadgeMetrics.markSize)
         }, accessory: {
-            Text("playing").font(.caption).foregroundStyle(.secondary)
+            Text(tr("playing")).font(.caption).foregroundStyle(.secondary)
         })
-        .help("Playing: keeps an Auto session awake while it plays")
-        .accessibilityLabel("\(source.chipTitle), playing")
+        .help(tr("Playing: keeps an Auto session awake while it plays"))
+        .accessibilityLabel(trf("%@, playing", source.chipTitle))
         .accessibilityIdentifier("camlid.playing." + source.rawValue)
+    }
+}
+
+/// Spec 029: "Any audio" in Settings › Agents. On, an Auto session also stays awake while any other app plays audio.
+struct AnyAudioChip: View {
+    let enabled: Bool
+    let onToggle: @MainActor @Sendable (Bool) -> Void
+
+    var body: some View {
+        Button {
+            onToggle(!enabled)
+        } label: {
+            BadgeShell(title: tr("Any audio"), tone: enabled ? .selected : .neutral, mark: {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(.system(size: AgentBadgeMetrics.markSize * 0.8))
+                    .frame(width: AgentBadgeMetrics.markSize, height: AgentBadgeMetrics.markSize)
+                    .accessibilityHidden(true)
+            }, accessory: {
+                EmptyView()
+            })
+        }
+        .buttonStyle(.plain)
+        .help(tr("Keeps an Auto session awake while any app plays audio. Off by default."))
+        .accessibilityIdentifier("camlid.music.anyAudio")
+        .accessibilityLabel(tr("Any audio"))
+        .accessibilityValue(enabled ? tr("Keeps Auto awake while any app plays audio") : tr("Ignored for sleep"))
+        .accessibilityHint(enabled ? tr("Click to stop keeping Auto awake while other apps play audio")
+                                   : tr("Click to keep Auto awake while other apps play audio"))
     }
 }

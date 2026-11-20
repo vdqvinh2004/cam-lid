@@ -93,7 +93,7 @@ public enum Commands {
         guard !argv.isEmpty else { return ("", CLIOptions()) }
         var args = argv
         var name = args.removeFirst()
-        if ["agents", "config", "logs", "watch", "helper"].contains(name),
+        if CommandCatalog.groups.contains(name),
            let next = args.first, !next.hasPrefix("-") {
             name += " " + args.removeFirst()
         }
@@ -109,6 +109,8 @@ public enum Commands {
                 let key = String(token.dropFirst(2))
                 if let eq = key.firstIndex(of: "=") {
                     flags[String(key[..<eq])] = String(key[key.index(after: eq)...])
+                } else if CommandCatalog.switchFlags.contains(key) {
+                    flags[key] = "true"
                 } else if i + 1 < args.count, !args[i + 1].hasPrefix("-"), args[i + 1] != "--" {
                     flags[key] = args[i + 1]
                     i += 1
@@ -138,7 +140,11 @@ public enum Commands {
     public static func runWithRealIO(argv: [String], channel: (any IPCChannel)?, settingsURL: URL? = nil,
                                      mayChangeHelper: Bool = false) -> CLIResult {
         if argv.first == "run" { return CommandRun.execute(arguments: Array(argv.dropFirst()), channel: channel) }
-        let (name, options) = parse(argv: argv)
+        let (parsed, options) = parse(argv: argv)
+        // No arguments at all print the listing, so an agent that runs `camlid` learns the interface from the reply.
+        let name = argv.isEmpty ? "commands" : parsed
+        if name == "commands" || name == "help" { return CommandCatalog.listing() }
+        if let refusal = CommandCatalog.check(name, options) { return refusal }
         // Only the installed app changes the shared helper; a QA copy's tool never does (see `StateLocations`).
         if !mayChangeHelper, name.hasPrefix("helper"), name != "helper status" { return fail(2, command: name, reason: "qaCopy") }
         var context = CommandContext(
@@ -161,13 +167,21 @@ public enum Commands {
             guard let channel else { return fail(4, command: name, reason: "appUnavailable") }
             var transmitted = options
             if command == .configSet {
-                guard let path = options.flags["file"] else { return fail(2, command: name, reason: "missingFile") }
-                do {
-                    let bytes = try DiskFileReader().readFile(atPath: path)
-                    guard let content = String(data: bytes, encoding: .utf8) else { return fail(2, command: name, reason: "invalidFile") }
-                    transmitted.flags["file"] = "remote-patch"
+                if let path = options.flags["file"] {
+                    do {
+                        let bytes = try DiskFileReader().readFile(atPath: path)
+                        guard let content = String(data: bytes, encoding: .utf8) else { return fail(2, command: name, reason: "invalidFile") }
+                        transmitted.flags["patchJSON"] = content
+                    } catch { return fail(2, command: name, reason: "invalidFile") }
+                } else {
+                    // `config set <key> <value>`: one setting, checked against the known keys before anything is sent.
+                    guard options.positionals.count == 2 else { return fail(2, command: name, reason: "missingFile") }
+                    guard let content = shorthandPatch(key: options.positionals[0], value: options.positionals[1]) else {
+                        return fail(2, command: name, reason: "unknownSetting", detail: options.positionals[0])
+                    }
                     transmitted.flags["patchJSON"] = content
-                } catch { return fail(2, command: name, reason: "invalidFile") }
+                }
+                transmitted.flags["file"] = "remote-patch"
             }
             do {
                 let payload = try JSONEncoder().encode(transmitted)
@@ -191,7 +205,52 @@ public enum Commands {
             catch CLIFileWriteError.overwriteRefused { return fail(2, command: name, reason: "overwriteRefused") }
             catch { return fail(2, command: name, reason: "exportFailed") }
         }
+        if name == "version" { return versionWithRealIO(channel: channel) }
+        if CommandCatalog.operated.contains(name) {
+            guard let channel else { return CLIReply.refused(name, reason: "appUnavailable") }
+            return operateWithRealIO(name: name, options: options, channel: channel)
+        }
         return dispatch(name, options: options, context: &context)
+    }
+
+    /// Sends one app-side operation (`session duration`, `logs list`, and the rest of the catalog) to the app.
+    static func operateWithRealIO(name: String, options: CLIOptions, channel: any IPCChannel) -> CLIResult {
+        do {
+            let payload = try JSONEncoder().encode(OperateRequest(name: name, options: options))
+            return try JSONDecoder().decode(CLIResult.self, from: channel.send(command: .operate, payload: payload))
+        } catch let error as IPCError {
+            return ipcFail(error, command: name)
+        } catch {
+            return CLIReply.refused(name, reason: "invalidAppReply")
+        }
+    }
+
+    /// `camlid version`: this tool's build always, and the running app's and the bundled helper's when the app answers.
+    static func versionWithRealIO(channel: (any IPCChannel)?) -> CLIResult {
+        let tool = BuildInfo.enclosingApp(executable: Bundle.main.executableURL)
+        var app: Any = NSNull()
+        var helper: Any = NSNull()
+        if let channel, let payload = try? JSONEncoder().encode(OperateRequest(name: "version", options: CLIOptions())),
+           let answer = try? channel.send(command: .operate, payload: payload),
+           let result = try? JSONDecoder().decode(CLIResult.self, from: answer), result.exitCode == 0,
+           let object = try? JSONSerialization.jsonObject(with: Data(result.json.utf8)) as? [String: Any] {
+            app = object["app"] ?? NSNull()
+            helper = object["helper"] ?? NSNull()
+        }
+        return CLIReply.read("version", [
+            "cli": ["version": tool.version ?? "unknown", "build": tool.build ?? "unknown"],
+            "app": app,
+            "helper": helper,
+        ])
+    }
+
+    /// The JSON patch for `config set <key> <value>`. The value is read as JSON when it parses (true, 60, ["codex"]) and as
+    /// text otherwise (timed). Keys outside the settings file are refused, so a typo cannot pass silently.
+    static func shorthandPatch(key: String, value: String) -> String? {
+        guard CommandCatalog.settingKeys.contains(key) else { return nil }
+        let parsed = (try? JSONSerialization.jsonObject(with: Data(value.utf8), options: [.fragmentsAllowed])) ?? value
+        guard let data = try? JSONSerialization.data(withJSONObject: [key: parsed], options: [.fragmentsAllowed]) else { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// Test seam for real-tempdir coverage: callers inject disk readers/writers
@@ -214,7 +273,8 @@ public enum Commands {
         switch name {
         case "sleep": return sleepCommand(options: options, context: context)
         case "diagnose": return diagnose(options: options, context: context)
-        case "watch list", "watch add", "watch remove": return watch(name: name, options: options, context: &context)
+        case "watch list", "watch add", "watch remove", "watch enable", "watch disable":
+            return watch(name: name, options: options, context: &context)
         case "watch": return fail(2, command: name, reason: "missingSubcommand")
         case "status": return status(context: &context)
         case "agents", "agents list": return agentsList()
@@ -232,7 +292,12 @@ public enum Commands {
         case "simulate": return simulate(options: options, context: context)
         case "event", "bridge":
             return fail(3, command: name, reason: "externalObservationOnly")
-        default: return fail(2, command: name.isEmpty ? "none" : name, reason: "unknownCommand")
+        case "commands", "help": return CommandCatalog.listing()
+        case "version": return versionWithRealIO(channel: context.channel)
+        default:
+            // A catalogued command that needs the app, reached without one.
+            if let spec = CommandCatalog.spec(name), spec.needsApp { return fail(4, command: name, reason: "appUnavailable") }
+            return fail(2, command: name.isEmpty ? "none" : name, reason: "unknownCommand")
         }
     }
 
@@ -301,6 +366,31 @@ public enum Commands {
             context.revision += 1
             return cliJSON(0, ["command": "watchAdd", "accepted": true,
                 "ruleID": rule.id.uuidString, "revision": context.revision])
+        case "watch enable", "watch disable":
+            let command = name == "watch enable" ? "watchEnable" : "watchDisable"
+            guard options.flags.isEmpty, options.positionals.count == 1,
+                  let id = UUID(uuidString: options.positionals[0]) else {
+                return fail(2, command: command, reason: "invalidRuleID")
+            }
+            guard let index = rules.firstIndex(where: { $0.id == id }) else {
+                return fail(2, command: command, reason: "ruleNotFound")
+            }
+            let enabled = name == "watch enable"
+            guard rules[index].enabled != enabled else {
+                return CLIReply.done(command, changed: false,
+                    ["id": id.uuidString, "enabled": enabled, "revision": context.revision])
+            }
+            var updated = rules
+            updated[index].enabled = enabled
+            do {
+                try LifetimeRule.validateCollection(updated)
+                var patch = ConfigPatch()
+                patch.lifetimeRules = updated
+                context.config = try context.config.applying(patch)
+            } catch {
+                return fail(2, command: command, reason: "invalidRule")
+            }
+            return CLIReply.done(command, changed: true, ["id": id.uuidString, "enabled": enabled, "revision": context.revision])
         case "watch remove":
             guard options.flags.isEmpty, options.positionals.count == 1,
                   let id = UUID(uuidString: options.positionals[0]) else {
@@ -340,6 +430,9 @@ public enum Commands {
             context.config.lifetimeRules = state.lifetimeRules
             let result = watch(name: name, options: options, context: &context)
             guard result.exitCode == 0, name != "watch list" else { return result }
+            // A switch that changes nothing is not written, so the revision does not move.
+            if let object = try? JSONSerialization.jsonObject(with: Data(result.json.utf8)) as? [String: Any],
+               object["changed"] as? Bool == false { return result }
 
             let patch = try JSONEncoder().encode(WatchRulesPatch(lifetimeRules: context.config.lifetimeRules ?? []))
             let request = CLIOptions(flags: [
@@ -422,11 +515,9 @@ public enum Commands {
 
     /// History commands report unavailable until the M4 store lands.
     /// Never synthetic data: empty sessions + available:false, exit 4.
+    /// `agents list` needs the app. Without it the reply says so, as every app-backed command does.
     static func agentsList() -> CLIResult {
-        cliJSON(4, [
-            "command": "agentsList", "available": false,
-            "sessions": [Any](), "reason": "storeUnavailableM4",
-        ])
+        CLIReply.refused("agentsList", reason: "appUnavailable")
     }
 
     static func configGet(context: CommandContext) -> CLIResult {
@@ -481,11 +572,14 @@ public enum Commands {
                 "diff": configDiff(old: context.config, new: next),
             ])
         }
+        // A patch that changes nothing is accepted and writes nothing: no new revision, and changed is false.
+        guard next != context.config else {
+            return CLIReply.done("configSet", changed: false, ["revision": context.revision])
+        }
         context.config = next
         context.revision += 1
-        return cliJSON(0, [
-            "command": "configSet", "accepted": true, "revision": context.revision,
-            "effectiveState": "ready", "reasonCodes": ["configApplied"],
+        return CLIReply.done("configSet", changed: true, [
+            "revision": context.revision, "effectiveState": "ready", "reasonCodes": ["configApplied"],
         ])
     }
 
@@ -494,26 +588,18 @@ public enum Commands {
     /// enforced via SafetyPolicy; closed-lid is refused (exit 3) unless the
     /// health snapshot is capability-verified AND the user opted in.
     static func start(options: CLIOptions, context: inout CommandContext) -> CLIResult {
-        let modeRaw = options.flags["mode"] ?? "auto"
-        guard let mode = RequestedMode(rawValue: modeRaw), mode != .off else {
-            return fail(2, command: "start", reason: "invalidMode", detail: modeRaw)
+        // The same rules the app applies to a start request (see `StartRequest`), so a refusal here is one there too.
+        let request: StartRequest
+        switch StartRequest.parse(options) {
+        case .refused(let refusal): return refusal
+        case .accepted(let value): request = value
         }
-        var durationSeconds: Double?
-        let infinite = mode == .manual && options.flags["duration"] == nil
-            || mode == .timed && options.flags["duration"] == "infinite"
-        if let raw = options.flags["duration"] {
-            if !infinite {
-                guard let parsed = parseDuration(raw), parsed.isFinite, parsed > 0 else {
-                    return fail(2, command: "start", reason: "invalidDuration", detail: raw)
-                }
-                durationSeconds = parsed
-            }
-        }
-        if mode == .timed, durationSeconds == nil, !infinite {
-            return fail(2, command: "start", reason: "durationRequired")
-        }
+        let mode = request.mode
+        let modeRaw = mode.rawValue
+        let infinite = request.minutes == 0
+        let durationSeconds = request.minutes.flatMap { $0 > 0 ? Double($0 * 60) : nil }
         let health: HealthSnapshot = context.health ?? (try! HealthSnapshot())
-        let closedLid = options.flags["closed-lid"] != nil || options.flags["closedLid"] != nil
+        let closedLid = request.closedLid
         if closedLid || health.lidState == .closed {
             guard health.capabilityVerified, context.config.closedLidOptIn else {
                 return fail(3, command: "start", reason: "closedLidDenied",
@@ -797,10 +883,9 @@ public enum Commands {
         }
     }
 
+    /// A refusal with the reason's hint and retry advice (see `CLIReasons`). The caller's exit code wins.
     static func fail(_ code: Int, command: String, reason: String, detail: String? = nil) -> CLIResult {
-        var dict: [String: Any] = ["command": command, "accepted": false, "reason": reason]
-        if let detail { dict["detail"] = detail }
-        return cliJSON(code, dict)
+        CLIReply.refused(command, reason: reason, exit: code, detail: detail)
     }
 
     static func cliJSON(_ exitCode: Int, _ dict: [String: Any]) -> CLIResult {
@@ -902,13 +987,6 @@ public enum Commands {
         return data
     }
 
-    /// Bare numbers are seconds; `30m`/`2h`/`45s` suffixes supported.
-    static func parseDuration(_ raw: String) -> Double? {
-        if raw.hasSuffix("h"), let value = Double(raw.dropLast()) { return value * 3600 }
-        if raw.hasSuffix("m"), let value = Double(raw.dropLast()) { return value * 60 }
-        if raw.hasSuffix("s"), let value = Double(raw.dropLast()) { return value }
-        return Double(raw)
-    }
 }
 
 /// Strict patch shape for F11 wrong-type rejection. Optional fields accept

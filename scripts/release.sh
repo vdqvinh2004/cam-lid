@@ -146,11 +146,21 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - **Copy diagnostics (new in 0.2).** The Sleep diagnostics window copies a plain-text report. It holds no prompts, transcripts, command output or environment values.
 - **Music hold (new in 0.2).** Music that may delay sleep (Settings › Agents) can keep an Auto session awake while a Chromium browser, Safari, Spotify or Apple Music plays audio, and until Sleep when done after it stops. Each source is off by default. Chromium browsers: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Safari is detected by its media playback. Firefox is not detected.
 
+- **Vietnamese interface (new in 0.3).** Settings › General › Language: System (the default, follows macOS), English or Tiếng Việt. The change applies at once. The copied diagnostics report stays in English.
+- **Any audio (new in 0.3, off by default).** Settings › Agents › *Any audio* keeps an Auto session awake while any other app plays sound. The hold starts after three seconds of output and ends a minute after the sound stops. CamLid reads only whether a process is producing output, never its content.
+- **Update to a new release (new in 0.3).** When *Check for Updates…* finds a newer release, *Update to <version>* downloads it from GitHub, checks its checksum and signature, replaces CamLid and restarts. Nothing downloads without your click, and a running session asks first. Builds 0.1 and 0.2 have no installer: update those by hand once.
+- **Update notice (new in 0.3).** The Dashboard shows "CamLid <version> is available" when the last check found a newer release.
+- **About CamLid (new in 0.3).** The menu offers the standard About window: version, copyright and the repository link.
+- **Command line (changed in 0.3).** \`camlid start --mode\` no longer saves the mode; \`camlid config set mode\` does. \`camlid simulate --use-current-config\` uses your saved settings.
+
 ### Known limits
 - **Tested on one Mac:** Mac17,3, macOS 27.0.1 (build 26A434), Apple silicon. On any other Mac or macOS build, closed-lid operation
   stays off until you choose "Allow on this untested Mac" in Settings › Closed Lid.
 - **Strict mode is experimental**, limited to tested Macs. The README says what it changes.
 - **Not notarized by Apple.** The project has no Apple Developer account, so the first launch needs the steps below.
+- Vietnamese text needs a native review before it is trusted; the glossary is in specs/028-vietnamese-ui.
+- Any audio is not yet checked live on each app (Spotify, Apple Music, Firefox, Chrome, Safari). It stays off by default until it is.
+- The helper installer runs CamLid's own binary as root before that binary's signature is checked (SECURITY.md, Known limits).
 - Apple silicon only, macOS 14 or later.
 - The lid-open hold and \`camlid run\` were checked on one Mac only.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.

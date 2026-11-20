@@ -83,11 +83,11 @@ public struct MenuBarStatus: Sendable, Equatable {
 
     public var accessibilityLabel: String {
         if keepingAwakeWithLidOpen && state == .protected && !leaseVerified {
-            return "CamLid: \(CamLidAccessibility.StatusStyle.keepingAwakeWithLidOpen.text)"
+            return trf("CamLid: %@", CamLidAccessibility.StatusStyle.keepingAwakeWithLidOpen.text)
         }
         let reason: String?
         if state == .protected, !leaseVerified {
-            reason = "protection unverified"
+            reason = tr("protection unverified")
         } else {
             reason = reasonText
         }
@@ -227,17 +227,17 @@ public final class MenuBarController: NSObject {
             }
         }
 
-        let modeText = activeMode.map { " · " + ($0 == .manual ? "Timed" : $0.rawValue.capitalized) + " session" } ?? ""
+        let modeText = activeMode.map { trf(" · %@ session", $0 == .manual ? tr("Timed") : tr($0.rawValue.capitalized)) } ?? ""
         let countdownText: String
         if showsInfinite {
-            countdownText = ", no time limit"
+            countdownText = tr(", no time limit")
         } else if let timerText {
-            countdownText = ", \(timerText) remaining"
+            countdownText = trf(", %@ remaining", timerText)
         } else {
             countdownText = ""
         }
         let workingText = activeMode == .auto
-            ? (status.activityHolding ? ", working" : ", not working") : ""
+            ? (status.activityHolding ? tr(", working") : tr(", not working")) : ""
         let label = status.accessibilityLabel + modeText + countdownText + workingText
         button.setAccessibilityLabel(label)
         button.setAccessibilityValue(label)
@@ -311,14 +311,14 @@ public final class MenuBarController: NSObject {
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
     }
 
-    private func installApplicationMenu() {
+    func installApplicationMenu() {
         let root = NSMenu()
-        let application = NSMenuItem(title: "CamLid", action: nil, keyEquivalent: "")
+        let application = NSMenuItem(title: tr("CamLid"), action: nil, keyEquivalent: "")
         application.submenu = buildMenu()
         root.addItem(application)
-        let window = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
-        let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(NSMenuItem(title: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
+        let window = NSMenuItem(title: tr("Window"), action: nil, keyEquivalent: "")
+        let windowMenu = NSMenu(title: tr("Window"))
+        windowMenu.addItem(NSMenuItem(title: tr("Close Window"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
         window.submenu = windowMenu
         root.addItem(window)
         NSApp.windowsMenu = windowMenu
@@ -329,11 +329,11 @@ public final class MenuBarController: NSObject {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        let dashboard = NSMenuItem(title: "Show Dashboard", action: #selector(didSelectDashboard), keyEquivalent: "d")
+        let dashboard = NSMenuItem(title: tr("Show Dashboard"), action: #selector(didSelectDashboard), keyEquivalent: "d")
         dashboard.target = self
         menu.addItem(dashboard)
         let start = NSMenuItem(
-            title: "Auto", action: #selector(didSelectStart),
+            title: tr("Auto"), action: #selector(didSelectStart),
             keyEquivalent: ""
         )
         start.tag = 1
@@ -344,7 +344,7 @@ public final class MenuBarController: NSObject {
         menu.addItem(start)
 
         let stop = NSMenuItem(
-            title: "Stop", action: #selector(didSelectStop),
+            title: tr("Stop"), action: #selector(didSelectStop),
             keyEquivalent: "."
         )
         stop.tag = 2
@@ -357,9 +357,8 @@ public final class MenuBarController: NSObject {
         menu.addItem(.separator())
 
         // MASTER Quick Options: Settings…; Activity Log…; separator; Quit.
-        // (Check for Updates… / About CamLid arrive with the real app shell.)
         let settings = NSMenuItem(
-            title: "Settings…", action: #selector(didSelectSettings),
+            title: tr("Settings…"), action: #selector(didSelectSettings),
             keyEquivalent: ","
         )
         settings.target = self
@@ -367,25 +366,29 @@ public final class MenuBarController: NSObject {
         menu.addItem(settings)
 
         let log = NSMenuItem(
-            title: "Activity Log…", action: #selector(didSelectActivityLog),
+            title: tr("Activity Log…"), action: #selector(didSelectActivityLog),
             keyEquivalent: "l"
         )
         log.target = self
         menu.addItem(log)
 
-        let diagnostics = NSMenuItem(title: "Why is my Mac awake?…", action: #selector(didSelectSleepDiagnostics), keyEquivalent: "")
+        let diagnostics = NSMenuItem(title: tr("Why is my Mac awake?…"), action: #selector(didSelectSleepDiagnostics), keyEquivalent: "")
         diagnostics.target = self; menu.addItem(diagnostics)
 
-        let welcome = NSMenuItem(title: "Welcome & Safety…", action: #selector(didSelectWelcome), keyEquivalent: "")
+        let welcome = NSMenuItem(title: tr("Welcome & Safety…"), action: #selector(didSelectWelcome), keyEquivalent: "")
         welcome.target = self; menu.addItem(welcome)
-        let updates = NSMenuItem(title: "Check for Updates…", action: #selector(didSelectUpdates), keyEquivalent: "")
+        let updates = NSMenuItem(title: tr("Check for Updates…"), action: #selector(didSelectUpdates), keyEquivalent: "")
         updates.target = self
         updates.setAccessibilityIdentifier("camlid.menu.updates")
         menu.addItem(updates)
+        let about = NSMenuItem(title: tr("About CamLid"), action: #selector(didSelectAbout), keyEquivalent: "")
+        about.target = self
+        about.setAccessibilityIdentifier("camlid.menu.about")
+        menu.addItem(about)
         menu.addItem(.separator())
 
         let quit = NSMenuItem(
-            title: "Quit CamLid", action: #selector(didSelectQuit),
+            title: tr("Quit CamLid"), action: #selector(didSelectQuit),
             keyEquivalent: "q"
         )
         quit.target = self
@@ -397,6 +400,7 @@ public final class MenuBarController: NSObject {
     @objc private func didSelectDashboard() { onToggleDashboard?() }
     @objc private func didSelectSleepDiagnostics() { actions?.menuBarOpenSleepDiagnostics() }
     @objc private func didSelectUpdates() { actions?.menuBarOpenUpdates() }
+    @objc private func didSelectAbout() { AboutPanel.show() }
     @objc private func didSelectWelcome() { actions?.menuBarShowWelcome() }
     @objc private func didSelectStart() { actions?.menuBarStartProtection() }
     @objc private func didSelectStop() { actions?.menuBarStopProtection() }

@@ -27,8 +27,8 @@ import CamLidCore
 
     /// The music reason names each source with the words of its Settings chip (it said "a browser" for Chromium).
     @Test func musicReasonUsesTheChipWording() {
-        #expect(AppCoordinator.musicReasonText([.browser]) == "Music is playing in Chromium browsers.")
-        #expect(AppCoordinator.musicReasonText([.safari, .browser]) == "Music is playing in Chromium browsers and Safari.")
+        #expect(AppCoordinator.musicReasonText([.browser]) == "Music is playing in Chromium.")
+        #expect(AppCoordinator.musicReasonText([.safari, .browser]) == "Music is playing in Chromium and Safari.")
         #expect(MusicSource.allCases.allSatisfy { $0.name == $0.chipTitle })
     }
 

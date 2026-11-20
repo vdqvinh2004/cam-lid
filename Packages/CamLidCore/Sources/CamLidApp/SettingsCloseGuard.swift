@@ -39,11 +39,11 @@ final class SettingsCloseGuard: NSObject, NSWindowDelegate {
         guard sender.attachedSheet == nil else { return }
         let pending = installationPending()
         let alert = NSAlert()
-        alert.messageText = pending ? "Settings write still finishing" : "Unapplied preference edits"
-        alert.informativeText = pending ? "The write may apply later. Keep editing or wait for its result; discarding input cannot cancel an installation already in progress." : "Applied changes are saved. Retry failed edits, keep editing, or discard only unapplied input."
-        alert.addButton(withTitle: "Keep Editing")
-        alert.addButton(withTitle: pending ? "Wait Again" : "Retry")
-        if !pending { alert.addButton(withTitle: "Discard Unapplied Input") }
+        alert.messageText = pending ? tr("Settings write still finishing") : tr("Unapplied preference edits")
+        alert.informativeText = pending ? tr("The write may apply later. Keep editing or wait for its result; discarding input cannot cancel an installation already in progress.") : tr("Applied changes are saved. Retry failed edits, keep editing, or discard only unapplied input.")
+        alert.addButton(withTitle: tr("Keep Editing"))
+        alert.addButton(withTitle: pending ? tr("Wait Again") : tr("Retry"))
+        if !pending { alert.addButton(withTitle: tr("Discard Unapplied Input")) }
         alert.beginSheetModal(for: sender) { [weak self, weak sender] response in
             guard let self, let sender else { return }
             if response == .alertFirstButtonReturn { self.onKeepOpen() }

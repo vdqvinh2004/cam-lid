@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import CamLidCore
 @testable import CamLidApp
 
 @MainActor final class ProbeStub: UpdateProbeDriver {
@@ -14,11 +15,17 @@ import Testing
     func finish(_ outcome: UpdateProbeOutcome) { let callback = completion; completion = nil; callback?(outcome) }
 }
 @MainActor private final class UpdateContextBox { var value = UpdateSafetyContext() }
+@MainActor private final class ControllerInstallerStub: UpdateInstalling {
+    var canInstall = true
+    var installs = 0
+    func install(_ assets: UpdateAssets, version: String, current: ReleaseVersion,
+                 completion: @escaping @MainActor (UpdateInstallOutcome) -> Void) { installs += 1 }
+}
 
 @Suite("Information-only updates") @MainActor
 struct UpdateControllerTests {
-    @Test func blockersDeferOneExplicitRequest() {
-        for key in [\UpdateSafetyContext.sessionActive, \.agentWorkActive, \.recoveryRequired, \.unsavedSettings] {
+    @Test func aRecoveryDefersOneExplicitCheck() {
+        for key in [\UpdateSafetyContext.recoveryRequired] {
             let box = UpdateContextBox(); box.value[keyPath: key] = true
             let driver = ProbeStub()
             let controller = UpdateController(safety: { box.value }, makeDriver: { driver })
@@ -32,17 +39,58 @@ struct UpdateControllerTests {
             #expect(driver.checks == 1)
         }
     }
-    @Test func activityAppearingDuringCheckDefersResult() {
-        let box = UpdateContextBox(); let driver = ProbeStub()
+    @Test func aRunningSessionDoesNotDeferAnExplicitCheck() {
+        let box = UpdateContextBox(); box.value.sessionActive = true
+        let driver = ProbeStub()
         let controller = UpdateController(safety: { box.value }, makeDriver: { driver })
-        controller.check(); box.value.agentWorkActive = true; controller.refreshSafety()
-        driver.finish(.available("2.0"))
-        #expect(controller.snapshot.phase == .deferred)
-        box.value.agentWorkActive = false; controller.refreshSafety()
+        #expect(controller.canCheck)
+        controller.check()
+        #expect(driver.checks == 1)
+        driver.finish(.available("2.0", nil))
+        #expect(controller.snapshot.phase == .available)
+    }
+    @Test func unsavedSettingsDoNotHoldACheckOrItsResult() {
+        let box = UpdateContextBox(); let driver = ProbeStub()
+        box.value.unsavedSettings = true
+        let controller = UpdateController(safety: { box.value }, makeDriver: { driver })
+        controller.check()
+        #expect(driver.checks == 1)
+        driver.finish(.available("2.0", nil))
         #expect(controller.snapshot.phase == .available)
         #expect(controller.snapshot.version == "2.0")
-        #expect(driver.checks == 1)
-        #expect(!controller.snapshot.installationAvailable)
+        #expect(!controller.canInstall)
+    }
+
+    @Test func aRunningSessionDoesNotHoldAnInstallAndTheUserAgreesFirst() {
+        let box = UpdateContextBox(); let driver = ProbeStub(); let installer = ControllerInstallerStub()
+        let controller = UpdateController(safety: { box.value }, makeDriver: { driver }, installer: installer)
+        let zip = URL(string: "https://github.com/vdqvinh2004/cam-lid/releases/download/v2.0/CamLid-2.0-macos-arm64.zip")!
+        let sha = URL(string: "https://github.com/vdqvinh2004/cam-lid/releases/download/v2.0/CamLid-2.0-macos-arm64.zip.sha256")!
+        controller.check(); driver.finish(.available("2.0", UpdateAssets(zipURL: zip, checksumURL: sha)))
+        box.value.sessionActive = true
+        #expect(controller.canInstall)
+        controller.installAvailable(endingSession: false)    // a click without the agreement does nothing
+        #expect(installer.installs == 0)
+        #expect(controller.snapshot.phase == .available)
+        controller.installAvailable(endingSession: true)     // with the agreement the install starts; the session ends at restart
+        #expect(installer.installs == 1)
+        #expect(controller.snapshot.phase == .preparing)
+    }
+
+    @Test func aRecoveryHoldsTheInstallAndTheReleaseStaysOffered() {
+        let box = UpdateContextBox(); let driver = ProbeStub(); let installer = ControllerInstallerStub()
+        let controller = UpdateController(safety: { box.value }, makeDriver: { driver }, installer: installer)
+        let zip = URL(string: "https://github.com/vdqvinh2004/cam-lid/releases/download/v2.0/CamLid-2.0-macos-arm64.zip")!
+        let sha = URL(string: "https://github.com/vdqvinh2004/cam-lid/releases/download/v2.0/CamLid-2.0-macos-arm64.zip.sha256")!
+        controller.check(); driver.finish(.available("2.0", UpdateAssets(zipURL: zip, checksumURL: sha)))
+        box.value.recoveryRequired = true
+        controller.refreshSafety()
+        #expect(controller.snapshot.phase == .available && controller.snapshot.reason == "recoveryRequired")
+        #expect(!controller.canInstall)
+        controller.installAvailable(endingSession: true)
+        #expect(installer.installs == 0)
+        box.value.recoveryRequired = false; controller.refreshSafety()
+        #expect(controller.snapshot.reason == "updateAvailable" && controller.canInstall)
     }
     @Test func repeatedClicksDoNotQueueChecks() {
         let driver = ProbeStub()
@@ -51,13 +99,13 @@ struct UpdateControllerTests {
         #expect(driver.checks == 1)
     }
     @Test func outcomesAndRetryNeverInventCurrent() {
-        for (outcome, phase) in [(UpdateProbeOutcome.current, UpdatePhase.current), (.available("2"), .available),
+        for (outcome, phase) in [(UpdateProbeOutcome.current, UpdatePhase.current), (.available("2", nil), .available),
                                   (.noCompatibleUpdate, .unavailable), (.offline, .offline), (.failed, .error)] {
             let driver = ProbeStub()
             let controller = UpdateController(safety: { UpdateSafetyContext() }, makeDriver: { driver })
             controller.check(); driver.finish(outcome)
             #expect(controller.snapshot.phase == phase)
-            #expect(!controller.snapshot.installationAvailable)
+            #expect(!controller.canInstall)
             #expect(controller.canCheck)
             controller.check(); #expect(driver.checks == 2)
         }
@@ -72,7 +120,7 @@ struct UpdateControllerTests {
 
     @Test func theControllerStartsReadyAndNeverInstalls() {
         let controller = UpdateController(safety: { UpdateSafetyContext() }, makeDriver: { ProbeStub() })
-        #expect(controller.snapshot.phase == .ready && controller.canCheck && !controller.snapshot.installationAvailable)
+        #expect(controller.snapshot.phase == .ready && controller.canCheck && !controller.canInstall)
     }
 }
 
@@ -92,7 +140,7 @@ struct GitHubReleaseCheckTests {
 
     @Test func theNewestPublishedReleaseDecidesAndPreReleasesCount() {
         let newer = body([["tag_name": "v0.2.0", "draft": false, "prerelease": true], ["tag_name": "v0.1.0", "draft": false]])
-        #expect(GitHubReleaseDriver.outcome(status: 200, body: newer, current: current) == .available("0.2.0"))
+        #expect(GitHubReleaseDriver.outcome(status: 200, body: newer, current: current) == .available("0.2.0", nil))
         let same = body([["tag_name": "v0.1.0", "draft": false, "prerelease": true]])
         #expect(GitHubReleaseDriver.outcome(status: 200, body: same, current: current) == .current)
         let older = body([["tag_name": "v0.0.9", "draft": false]])
@@ -101,7 +149,7 @@ struct GitHubReleaseCheckTests {
 
     @Test func draftsAndUnreadableTagsAreSkipped() {
         let mixed = body([["tag_name": "v9.0.0", "draft": true], ["tag_name": "nightly"], ["tag_name": "v0.3.0", "draft": false]])
-        #expect(GitHubReleaseDriver.outcome(status: 200, body: mixed, current: current) == .available("0.3.0"))
+        #expect(GitHubReleaseDriver.outcome(status: 200, body: mixed, current: current) == .available("0.3.0", nil))
         #expect(GitHubReleaseDriver.outcome(status: 200, body: body([["tag_name": "v9.0.0", "draft": true]]), current: current) == .noCompatibleUpdate)
     }
 

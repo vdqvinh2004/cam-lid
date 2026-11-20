@@ -114,8 +114,9 @@ struct ControlIntegrationTests {
             }.value
             #expect(binary.0 == 0 && binary.1.contains("\"powerActuation\":false"))
         }
+        // Manual is read as Timed, and a Timed start needs its duration, so this is refused before any session starts.
         let start = await Task.detached { Commands.runWithRealIO(argv: ["start", "--mode", "manual"], channel: channel) }.value
-        #expect(start.exitCode == 3)
+        #expect(start.exitCode == 2 && start.json.contains("durationRequired"))
         let history = root.appendingPathComponent("export.json")
         let export = await Task.detached { Commands.runWithRealIO(argv: ["logs", "export", "--output", history.path], channel: channel) }.value
         #expect(export.exitCode == 0)

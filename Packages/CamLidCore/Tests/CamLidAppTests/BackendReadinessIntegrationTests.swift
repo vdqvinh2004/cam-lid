@@ -43,7 +43,13 @@ struct BackendReadinessIntegrationTests {
             #expect(status["reasonCodes"] as? [String] == readiness?["blockerCodes"] as? [String])
         }
 
-        let initial = try object(await cli(["status"]))
+        // The control socket answers once its listener is up and the main actor is free; a first read that races either is retried.
+        var initialReply = await cli(["status"])
+        for _ in 0..<20 where initialReply.json.contains("\"accepted\":false") {
+            try await Task.sleep(nanoseconds: 50_000_000)
+            initialReply = await cli(["status"])
+        }
+        let initial = try object(initialReply)
         checkUnavailable(initial)
         #expect(initial["activeSessionMode"] is NSNull)
 
@@ -59,19 +65,30 @@ struct BackendReadinessIntegrationTests {
             let sessionID = try #require(session["id"] as? String)
             let deadline = session["capDeadlineMonotonic"] as? Double
 
-            for command in [AllowlistedCommand.start] {
-                let reply = try await Task.detached {
-                    try JSONDecoder().decode(CLIResult.self,
-                        from: channel.send(command: command, payload: Data()))
-                }.value
-                #expect(reply.exitCode == 3)
-                let denied = try object(reply)
-                #expect(denied["accepted"] as? Bool == false)
-                #expect(denied["reason"] as? String == "sessionAlreadyActive")
+            // A start with no flags asks for Auto. The Auto session that runs changes nothing, so that start is an accepted
+            // no-op, and no power is claimed. A Timed session is a different session, so asking for Auto is refused.
+            let rawStart = try await Task.detached {
+                try JSONDecoder().decode(CLIResult.self, from: channel.send(command: .start, payload: Data()))
+            }.value
+            let rawObject = try object(rawStart)
+            if mode == .auto {
+                #expect(rawStart.exitCode == 0)
+                #expect(rawObject["outcome"] as? String == "alreadyRunning")
+                #expect(rawObject["changed"] as? Bool == false)
+                #expect(rawObject["powerActuation"] as? Bool == false)
+            } else {
+                #expect(rawStart.exitCode == 3)
+                #expect(rawObject["accepted"] as? Bool == false)
+                #expect(rawObject["reason"] as? String == "sessionAlreadyActive")
             }
-            let start = await cli(["start", "--mode", mode.rawValue])
-            #expect(start.exitCode == 3)
-            #expect(try object(start)["reason"] as? String == "sessionAlreadyActive")
+            // A Timed session runs its own duration, so a different one is refused until --replace names the switch.
+            let start = mode == .auto
+                ? await cli(["start", "--mode", "auto"])
+                : await cli(["start", "--mode", "timed", "--duration", "45m"])
+            #expect(start.exitCode == (mode == .auto ? 0 : 3))
+            if mode != .auto {
+                #expect(try object(start)["reason"] as? String == "sessionAlreadyActive")
+            }
 
             let marker = root.appendingPathComponent("must-not-launch-" + mode.rawValue)
             // Only an Auto session admits a command, and only with a verified backend. The lid-open assertion is

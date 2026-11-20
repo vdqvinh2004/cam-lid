@@ -33,14 +33,14 @@ final class AppPermissions {
 
     func open(_ permission: AppPermission) {
         guard permission == .notifications else {
-            settingsError = "Accessibility observation was removed; CamLid does not need this permission."
+            settingsError = tr("Accessibility observation was removed; CamLid does not need this permission.")
             return
         }
-        guard supported else { settingsError = "System Settings is unavailable in this host."; return }
+        guard supported else { settingsError = tr("System Settings is unavailable in this host."); return }
         settingsError = nil
         if !openSettings(permission.settingsURL),
            !openSettings(URL(fileURLWithPath: "/System/Applications/System Settings.app")) {
-            settingsError = "Couldn’t open System Settings. Open Notifications from the Apple menu."
+            settingsError = tr("Couldn’t open System Settings. Open Notifications from the Apple menu.")
         }
     }
 }

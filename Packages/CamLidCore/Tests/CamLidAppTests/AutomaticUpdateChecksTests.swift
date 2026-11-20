@@ -49,15 +49,11 @@ struct AutomaticUpdateChecksTests {
         }
     }
 
-    @Test func aSessionOrRecoveryWaitsAndTheNextTickTriesAgain() {
+    @Test func aRecoveryWaitsAndTheNextTickTriesAgain() {
         withDefaults { defaults in
             let world = World(), driver = ProbeStub()
             let updates = controller(world, driver, defaults)
             updates.setAutomaticChecks(true)
-            world.context.sessionActive = true
-            updates.runScheduledCheckIfDue()
-            #expect(driver.checks == 0)
-            world.context.sessionActive = false
             world.context.recoveryRequired = true
             updates.runScheduledCheckIfDue()
             #expect(driver.checks == 0)
@@ -67,13 +63,23 @@ struct AutomaticUpdateChecksTests {
         }
     }
 
-    @Test func agentActivityAndUnsavedSettingsDoNotDelayTheDailyCheck() {
+    @Test func unsavedSettingsDoNotDelayTheDailyCheck() {
         withDefaults { defaults in
             let world = World(), driver = ProbeStub()
             let updates = controller(world, driver, defaults)
             updates.setAutomaticChecks(true)
-            world.context.agentWorkActive = true
             world.context.unsavedSettings = true
+            updates.runScheduledCheckIfDue()
+            #expect(driver.checks == 1)
+        }
+    }
+
+    @Test func aSessionDoesNotDelayTheDailyCheck() {
+        withDefaults { defaults in
+            let world = World(), driver = ProbeStub()
+            let updates = controller(world, driver, defaults)
+            updates.setAutomaticChecks(true)
+            world.context.sessionActive = true
             updates.runScheduledCheckIfDue()
             #expect(driver.checks == 1)
         }

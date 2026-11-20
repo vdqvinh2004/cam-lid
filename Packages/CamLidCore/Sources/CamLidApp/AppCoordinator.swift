@@ -36,14 +36,14 @@ enum TerminationDrainDecision {
 @MainActor
 public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActions {
     private let menuBar = MenuBarController()
-    private var config: Configuration = (try? Configuration()) ?? uncheckedDefaultConfig()
-    private let history: AsyncHistoryRecorder
+    private(set) var config: Configuration = (try? Configuration()) ?? uncheckedDefaultConfig()
+    let history: AsyncHistoryRecorder
     private let sensors = LiveSensorProvider()
     private let healthReader: (() -> HealthSnapshot)?
-    private let loginItem: LoginItemController
+    let loginItem: LoginItemController
     /// True for a QA copy: its folders, helper, login item and shortcut are its own (see `StateLocations`).
-    private let isQACopy: Bool
-    private let helper: HelperController
+    let isQACopy: Bool
+    let helper: HelperController
     private var holdReconciler = PowerHoldReconciler()
     private var holdTransport: (any PowerHoldTransport)?
     private let keepAwake = KeepAwakeAssertion()
@@ -53,14 +53,24 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var displayChoice = DisplaySleepChoice()
     /// Spec 025: the music hold. Its switches are preferences, set from Settings.
     private var musicHold = MusicPlaybackHold()
-    private var musicHolding: Set<MusicSource> = []
+    private(set) var musicHolding: Set<MusicSource> = []
+    /// Whether the general audio hold is holding the Mac awake now (spec 029), as `status` reports it.
+    private(set) var audioHoldingNow = false
+    /// Spec 029: the "Any audio" rule, and the display names of the processes it holds for (empty while it does not hold).
+    private var anyAudio = AudioOutputHold()
+    private var anyAudioNames: [String] = []
     /// Wall-clock budget for one settings write (spec 024). The app keeps 0.7 s; the test fixtures raise it, because a
     /// budget that short fails under CPU load and the tests then report a save that did not happen.
     var settingsWriteBudget: Double = 0.7
     /// Wall-clock budget for a control reply, which waits on the main actor. The app keeps 0.8 s; the control tests raise
     /// it, because other main-actor work under load can exceed it and the test then reports the service as unavailable.
     var controlAllowance: Double = 0.8
-    private static func musicKey(_ source: MusicSource) -> String { "CamLidMusicHold." + source.rawValue }
+    static func musicKey(_ source: MusicSource) -> String { "CamLidMusicHold." + source.rawValue }
+    /// Spec 029: the "Any audio" chip. Off by default.
+    static let anyAudioKey = "CamLidAnyAudioHold"
+    /// Spec 028: the language choice, System by default.
+    static let languageKey = "CamLidLanguage"
+    var language: AppLanguage { AppLanguage(rawValue: preferences.string(forKey: Self.languageKey) ?? "") ?? .system }
     private let shortcut = GlobalHotKey()
     private var commandAdmissions = CommandAdmissions()
     /// Identifies this app instance in admissions: a relaunch makes older receipts stale.
@@ -72,7 +82,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private let closedLidSupportRow: () -> String?
     private let systemIdentity: () -> (model: String?, osBuild: String?)
     private static let untestedAcknowledgementKey = "CamLidUntestedClosedLidAcknowledgement"
-    private let outcomeNotifications: OutcomeNotifications
+    let outcomeNotifications: OutcomeNotifications
     private let permissions: AppPermissions
     private var latestHealth: HealthSnapshot?
     private var latestReason: String?
@@ -85,13 +95,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var terminationConfirmed = false
     private var terminationDeferredHistory: [StoredTransition] = []
 
-    private var session: ProtectionSession?
+    private(set) var session: ProtectionSession?
     private var sessionBatteryDeadline: Double?
     private var sessionTimerMinutes: Int?
     private var sessionSleepDelayMinutes: Int?
     private var agents = RuntimeAgentStore()
     private let controlServer: LocalControlServer
-    private let preferences: any PreferenceStore
+    let preferences: any PreferenceStore
     private let configURL: URL
     private let settingsWriter: @Sendable (Data, URL) throws -> Void
     private let settingsInstaller: @Sendable (URL, URL) throws -> Void
@@ -100,7 +110,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var settingsPreparationCount = 0
     var hasPendingSettingsInstallation: Bool { settingsInstallToken != nil }
     var hasPendingSettingsWork: Bool { settingsPreparationCount > 0 || hasPendingSettingsInstallation }
-    private var revision = 1
+    private(set) var revision = 1
     private var safety = SafetyPolicy()
     private var cpu = CPUObserver()
     private var lastReportedState: EffectiveState = .off
@@ -136,20 +146,27 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     private var utilityUI: UtilityUIProcess?
     private var activityOutcome: String?
-    private lazy var updates = UpdateController(defaults: preferences, safety: { [weak self] in
-        guard let self else { var state = UpdateSafetyContext(); state.recoveryRequired = true; return state }
-        return self.updateSafetyContext()
-    })
+    /// Start time of the session the user agreed to end for an install (spec 026). Nil when there is no agreement.
+    var agreedSessionStart: Double?
+    lazy var updates: UpdateController = {
+        let controller = UpdateController(home: self.agentSkillHome, defaults: self.preferences, safety: { [weak self] in
+            guard let self else { var state = UpdateSafetyContext(); state.recoveryRequired = true; return state }
+            return self.updateSafetyContext()
+        })
+        // Spec 026: after the swap script starts, a session the user agreed to end is ended, then the app quits.
+        controller.onInstallLaunched = { [weak self] in self?.endAgreedSessionAndQuit() }
+        return controller
+    }()
     /// Spec 022: the folder the skill file goes under. A QA run uses its own folder, never the real home.
     private let agentSkillHome: URL
-    private lazy var agentSkill = AgentSkillInstaller(home: agentSkillHome, defaults: preferences, bundled: {
+    lazy var agentSkill = AgentSkillInstaller(home: agentSkillHome, defaults: preferences, bundled: {
         Bundle.main.url(forResource: "SKILL", withExtension: "md").flatMap { try? Data(contentsOf: $0) }
     })
-    private var refusalNotice: String?
-    private var authorityUnavailable = false
-    private var terminationFlowActive = false
+    var refusalNotice: String?
+    private(set) var authorityUnavailable = false
+    private(set) var terminationFlowActive = false
 
-    private static let onboardedKey = "CamLidOnboarded"
+    static let onboardedKey = "CamLidOnboarded"
     private static let configKey = "CamLidConfigurationV1"
 
     public override convenience init() {
@@ -214,6 +231,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     // MARK: - Lifecycle
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        Localization.isVietnamese = Localization.resolve(language)
         start()
         if !isQACopy { _ = shortcut.register { [weak self] in self?.toggleAutoFromShortcut() } }
     }
@@ -232,7 +250,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if let helper = utilityUI, helper.isRunning {
             Task { @MainActor in
-                guard await helper.prepareToQuit() else { sender.reply(toApplicationShouldTerminate: false); return }
+                guard await helper.prepareToQuit() else { self.updates.installQuitWasCancelled(); sender.reply(toApplicationShouldTerminate: false); return }
                 self.utilityUI = nil
                 let reply = self.applicationShouldTerminate(sender)
                 if reply != .terminateLater { sender.reply(toApplicationShouldTerminate: reply == .terminateNow) }
@@ -268,10 +286,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "Pending changes could not be confirmed"
-            alert.informativeText = "CamLid could not confirm every settings and activity-history write before the quit deadline. An in-flight settings install may still apply after CamLid quits, and pending history may be lost. Keep CamLid open to let pending work finish, or quit with those changes unconfirmed."
-            alert.addButton(withTitle: "Keep Open")
-            alert.addButton(withTitle: "Quit Without Pending History")
+            alert.messageText = tr("Pending changes could not be confirmed")
+            alert.informativeText = tr("CamLid could not confirm every settings and activity-history write before the quit deadline. An in-flight settings install may still apply after CamLid quits, and pending history may be lost. Keep CamLid open to let pending work finish, or quit with those changes unconfirmed.")
+            alert.addButton(withTitle: tr("Keep Open"))
+            alert.addButton(withTitle: tr("Quit Without Pending History"))
             let response = await present(alert)
             let choice: TerminationDrainDecision.Choice = response == .alertSecondButtonReturn
                 ? .quitWithoutPendingHistory : .keepOpen
@@ -295,6 +313,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     }
     func sealTerminationHistory() { terminationHistorySealed = true; history.sealMutations() }
     func cancelTerminationFlow() {
+        updates.installQuitWasCancelled()
         terminationHistorySealed = false; terminationFlowActive = false; terminationConfirmed = false; history.resumeMutations()
         let deferred = terminationDeferredHistory; terminationDeferredHistory.removeAll(keepingCapacity: true)
         for transition in deferred {
@@ -352,37 +371,27 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         guard case .saved = await applySettingsPatchAsync(patch, expectedRevision: expectedRevision) else {
             refusalNotice = "Mode not started. Settings could not be confirmed; retry."; refresh(); return
         }
+        // A running session of another mode is switched, as `camlid start --replace` does. If the new one cannot start, the
+        // running session keeps going, and the notice says why.
+        if session != nil {
+            if let block = startBlock(for: mode, health: currentHealth(), endingCurrentSession: true) {
+                showStartBlock(block); return
+            }
+            menuBarStopProtection()
+        }
         await startPreviewSession()
     }
 
     func startPreviewSession(mode requested: RequestedMode? = nil) async {
         guard !authorityUnavailable, !terminationFlowActive else { return }
         refusalNotice = nil
-        guard (requested ?? config.mode) != .off else {
-            refusalNotice = "Choose a mode before starting."
-            refresh(); toggleDashboard(show: true); return
-        }
-        if config.closedLidOptIn, !closedLidAllowed {
-            refusalNotice = "Closed lid isn’t available yet. Settings › Closed Lid shows what is missing."
-            record(category: .configuration, newState: sessionStateForRecord(), reasons: ["backendUnverified"])
-            refresh()
-            toggleDashboard(show: true)
+        let mode = requested ?? config.mode
+        let health = currentHealth()
+        if let block = startBlock(for: mode, health: health) {
+            showStartBlock(block)
             return
         }
-        guard session == nil else { return }
-        let health = currentHealth()
-        if let reason = config.batteryEntryRefusal(health: health) {
-            refusalNotice = switch reason {
-            case "batteryEntryLow": "Battery is below the start level. Connect the charger or check the entry level in Safety settings."
-            case "batteryUnknown": "Battery reading is unavailable. Connect the charger or retry after readings recover."
-            case "notCharging": "Connect the charger, or turn off Require charger and enable Allow battery sessions in Safety settings."
-            default: "Power source is unavailable. Retry after readings recover."
-            }
-            record(category: .configuration, newState: sessionStateForRecord(), reasons: [reason])
-            refresh(); toggleDashboard(show: true); return
-        }
         helper.refresh()
-        let mode = requested ?? config.mode
         let now = uptime()
         sessionBatteryDeadline = health.powerSource == .battery
             ? now + Double(min(config.runCapMinutes, config.batteryCapMinutes)) * 60 : nil
@@ -409,6 +418,38 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
     }
 
+    /// Why a session of `mode` cannot start now, or nil when it can. `endingCurrentSession` asks about the start that follows
+    /// the running session's end, so a switch is refused before anything stops.
+    func startBlock(for mode: RequestedMode, health: HealthSnapshot, endingCurrentSession: Bool = false) -> StartBlock? {
+        if authorityUnavailable { return .appUnavailable }
+        if terminationFlowActive { return .applicationTerminating }
+        if mode == .off { return .modeOff }
+        if config.closedLidOptIn, !closedLidAllowed { return .closedLidNotPermitted }
+        if session != nil, !endingCurrentSession { return .alreadyRunning }
+        if let reason = config.batteryEntryRefusal(health: health) { return .battery(reason) }
+        return nil
+    }
+
+    /// Shows why a start was refused, as the Dashboard does. A block without a notice leaves the Dashboard as it is.
+    private func showStartBlock(_ block: StartBlock) {
+        guard let notice = block.notice else { return }
+        refusalNotice = notice
+        if let reason = block.recordedReason {
+            record(category: .configuration, newState: sessionStateForRecord(), reasons: [reason])
+        }
+        refresh()
+        toggleDashboard(show: true)
+    }
+
+    /// Whether the running session already is what `request` asks for: its mode, and for Timed its timer after the safety cap.
+    private func runningSessionMatches(_ request: StartRequest) -> Bool {
+        guard let running = session, running.requestedMode == request.mode else { return false }
+        guard request.mode == .timed else { return true }
+        let asked = request.minutes ?? 0
+        let target = asked == 0 ? 0 : min(asked, timerMaximumMinutes(now: uptime()))
+        return target == sessionTimerMinutes
+    }
+
     public func menuBarStopProtection() {
         guard session != nil, !terminationFlowActive else { return }
         record(category: .stateTransition, newState: .ready, reasons: ["sessionStopped"])
@@ -420,6 +461,33 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     public func menuBarOpenSettings() { showSettings() }
     public func menuBarOpenSleepDiagnostics() { showUtility(.sleepDiagnostics) }
     public func menuBarOpenActivityLog() { showActivityLog() }
+    /// Ends the session the user agreed to end for the install, then quits. If a session started after the agreement, nothing
+    /// is ended and the install is cancelled, because the user did not agree to that one.
+    private func endAgreedSessionAndQuit() {
+        let consented = agreedSessionStart
+        agreedSessionStart = nil
+        guard Self.restartMayProceed(consented: consented, current: session?.startedAtMonotonic) else {
+            updates.installQuitWasCancelled(reason: "sessionNotAgreed"); return
+        }
+        if session != nil { menuBarStopProtection() }
+        // The install is refused while Settings are pending, so this only happens if such work started during the download.
+        guard !hasPendingSettingsWork, utilityUI?.settingsDirty != true else { updates.installQuitWasCancelled(); return }
+        // AppKit's terminate stalled here: the swap waited for this process, and the Updates window never got the quit command.
+        // The install therefore exits directly, after its records are flushed.
+        utilityUI?.killForInstall()
+        utilityUI = nil
+        record(category: .configuration, newState: .off, reasons: ["appQuit", releaseHoldForQuit()])
+        Task { @MainActor in
+            _ = await history.flush(timeout: 2)
+            exit(0)
+        }
+    }
+    /// The restart may go ahead when no session is running, or when the running one is the session the user agreed to end.
+    /// Without an agreement, or for a session that started later, it may not.
+    static func restartMayProceed(consented: Double?, current: Double?) -> Bool {
+        guard let current else { return true }
+        return consented == current
+    }
     public func menuBarQuit() {
         // Without a qualified row no power state is owned. With one, closing the helper connection below makes
         // the helper restore at once, so an immediate terminate is still safe.
@@ -444,31 +512,51 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     public var menuBarCanStop: Bool { session != nil }
     public var menuBarActiveMode: RequestedMode? { session?.requestedMode }
 
+    /// The Dashboard's timer choice. A refusal shows a notice here; the CLI calls `adjustTimer` and reports the reason instead.
     @discardableResult
     func changeTimerDuration(_ minutes: Int, expectedRevision: Int) -> Bool {
+        guard case .failure(let failure) = adjustTimer(minutes, expectedRevision: expectedRevision) else { return true }
+        refusalNotice = failure == .noTimedSession ? "Timer not changed. Retry in a running Timed session."
+            : "Timer not changed. Retry the change."
+        refresh()
+        return false
+    }
+
+    /// Restarts the running Timed session's timer at `minutes` (0 is Infinite), within the safety limits. Asking for the
+    /// duration the session already runs changes nothing, and does not restart its countdown.
+    func adjustTimer(_ minutes: Int, expectedRevision: Int) -> Result<TimerAdjust, SessionAdjustFailure> {
+        guard !authorityUnavailable else { return .failure(.appUnavailable) }
+        guard !terminationFlowActive else { return .failure(.applicationTerminating) }
+        guard !hasPendingSettingsWork else { return .failure(.settingsPending) }
+        guard revision == expectedRevision else { return .failure(.revisionConflict) }
+        guard TimerRules.isTimer(minutes) else { return .failure(.invalidDuration) }
         let now = uptime()
-        let maximum = timerMaximumMinutes(now: now)
-        guard !authorityUnavailable, !terminationFlowActive, !hasPendingSettingsWork,
-              revision == expectedRevision, var active = session,
-              let duration = active.restartTimer(minutes: minutes, maximumMinutes: maximum, now: now) else {
-            refusalNotice = "Timer not changed. Retry in a running Timed session."; refresh(); return false
+        guard var updated = session,
+              let applied = updated.restartTimer(minutes: minutes, maximumMinutes: timerMaximumMinutes(now: now), now: now) else {
+            return .failure(.noTimedSession)
         }
-        sessionTimerMinutes = duration
-        session = active
+        let capApplied = minutes > 0 && applied < minutes
         let batteryLimited = sessionBatteryDeadline != nil || latestHealth?.powerSource != .ac
         let batteryRemaining = sessionBatteryDeadline.map { max(0, Int(($0 - now) / 60)) }
-        if minutes > 0, let batteryRemaining, batteryRemaining < duration {
-            refusalNotice = "Timer capped at \(batteryRemaining) min remaining by the battery safety limit. Connect power for a longer timer."
-        } else if minutes > 0, duration < minutes {
-            refusalNotice = batteryLimited
-                ? "Timer capped at \(duration) min by the battery safety limit. Connect power for a longer timer."
-                : "Timer capped at \(duration) min by the session limit."
+        let notice: String?
+        if minutes > 0, let batteryRemaining, batteryRemaining < applied {
+            notice = String(format: "Timer capped at %lld min remaining by the battery safety limit. Connect power for a longer timer.", batteryRemaining)
+        } else if capApplied {
+            notice = batteryLimited
+                ? String(format: "Timer capped at %lld min by the battery safety limit. Connect power for a longer timer.", applied)
+                : String(format: "Timer capped at %lld min by the session limit.", applied)
         } else {
-            refusalNotice = nil
+            notice = nil
         }
-        record(category: .configuration, newState: active.effectiveState, reasons: ["sessionTimerChanged"])
+        let changed = applied != sessionTimerMinutes
+        if changed {
+            sessionTimerMinutes = applied
+            session = updated
+            record(category: .configuration, newState: updated.effectiveState, reasons: ["sessionTimerChanged"])
+        }
+        refusalNotice = notice
         refresh()
-        return true
+        return .success(TimerAdjust(minutes: applied, changed: changed, capApplied: capApplied, notice: notice))
     }
 
     /// Longest finite timer the active session can accept without extending
@@ -487,26 +575,42 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let maximum = timerMaximumMinutes(now: now)
         guard let deadline = sessionBatteryDeadline else {
             guard power != .ac, maximum < config.runCapMinutes else { return nil }
-            return "Battery safety limit: \(maximum) min. Connect power for a longer timer."
+            return trf("Battery safety limit: %lld min. Connect power for a longer timer.", maximum)
         }
         let remaining = max(0, Int((deadline - now) / 60))
-        if remaining <= 0 { return "Battery safety limit reached. Connect power to start another timer." }
-        return "Battery safety limit: \(maximum) min · \(remaining) min remaining."
+        if remaining <= 0 { return tr("Battery safety limit reached. Connect power to start another timer.") }
+        return trf("Battery safety limit: %lld min · %lld min remaining.", maximum, remaining)
     }
 
+    /// The Dashboard's sleep-delay choice. A refusal shows a notice here; the CLI calls `adjustSleepDelay` and reports the reason.
     @discardableResult
     func changeSleepDelay(_ minutes: Int, expectedRevision: Int) -> Bool {
-        guard !authorityUnavailable, !terminationFlowActive, !hasPendingSettingsWork,
-              revision == expectedRevision, var active = session,
-              active.changeSleepDelay(minutes: minutes, previousMinutes: sessionSleepDelayMinutes ?? config.completionDelayMinutes) else {
-            refusalNotice = "Sleep delay not changed. Retry in a running Auto session."; refresh(); return false
+        guard case .failure(let failure) = adjustSleepDelay(minutes, expectedRevision: expectedRevision) else { return true }
+        refusalNotice = failure == .revisionConflict ? "Settings changed. Retry the sleep delay."
+            : "Sleep delay not changed. Retry in a running Auto session."
+        refresh()
+        return false
+    }
+
+    /// Sets the running Auto session's delay after work ends, measured from completion. Asking for the delay it has changes nothing.
+    func adjustSleepDelay(_ minutes: Int, expectedRevision: Int) -> Result<SleepAdjust, SessionAdjustFailure> {
+        guard !authorityUnavailable else { return .failure(.appUnavailable) }
+        guard !terminationFlowActive else { return .failure(.applicationTerminating) }
+        guard !hasPendingSettingsWork else { return .failure(.settingsPending) }
+        guard revision == expectedRevision else { return .failure(.revisionConflict) }
+        guard TimerRules.sleepDelay.contains(minutes) else { return .failure(.invalidDuration) }
+        let previous = sessionSleepDelayMinutes ?? config.completionDelayMinutes
+        guard var active = session, active.requestedMode == .auto,
+              active.changeSleepDelay(minutes: minutes, previousMinutes: previous) else {
+            return .failure(.noAutoSession)
         }
+        guard minutes != previous else { return .success(SleepAdjust(minutes: minutes, changed: false)) }
         sessionSleepDelayMinutes = minutes
         session = active
         refusalNotice = nil
         record(category: .configuration, newState: active.effectiveState, reasons: ["sessionSleepDelayChanged"])
         refresh()
-        return true
+        return .success(SleepAdjust(minutes: minutes, changed: true))
     }
 
     // MARK: - Live evaluation
@@ -557,6 +661,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         return ClosedLidPermit.decide(model: system.model, osBuild: system.osBuild, rows: [], acknowledgement: stored)
     }
 
+    /// Whether the untested-Mac acknowledgement is recorded for this Mac and macOS build.
+    var untestedAcknowledgementStored: Bool { preferences.data(forKey: Self.untestedAcknowledgementKey) != nil }
+
     /// Records or withdraws the user's acceptance of closed lid on this untested model and macOS build (FR-017).
     /// Only reachable from the confirmed Settings action.
     func setUntestedAcknowledgement(_ accepted: Bool) {
@@ -576,32 +683,42 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     var closedLidCapabilityText: String {
         let permit = closedLidPermit()
         if config.powerMode == .strict {
-            if strictRow == nil { return "Can’t keep your Mac awake · Strict isn’t tested on this Mac" }
-        } else if !permit.allowsActuation { return "Can’t keep your Mac awake · this Mac isn’t tested" }
+            if strictRow == nil { return tr("Can’t keep your Mac awake · Strict isn’t tested on this Mac") }
+        } else if !permit.allowsActuation { return tr("Can’t keep your Mac awake · this Mac isn’t tested") }
         switch helper.state {
         case "installed": break
-        case "notInstalled": return "Can’t keep your Mac awake · helper not installed"
-        case "needsReauthorization": return "Can’t keep your Mac awake · reinstall the helper after this update"
-        case "needsHelperUpdate": return "Can’t keep your Mac awake · the helper has an update to install"
-        case "installedNotLoaded": return "Can’t keep your Mac awake · the helper is installed but not running"
-        default: return "Can’t keep your Mac awake · the helper needs attention in Settings › Closed Lid"
+        case "notInstalled": return tr("Can’t keep your Mac awake · helper not installed")
+        case "needsReauthorization": return tr("Can’t keep your Mac awake · reinstall the helper after this update")
+        case "needsHelperUpdate": return tr("Can’t keep your Mac awake · the helper has an update to install")
+        case "installedNotLoaded": return tr("Can’t keep your Mac awake · the helper is installed but not running")
+        default: return tr("Can’t keep your Mac awake · the helper needs attention in Settings › Closed Lid")
         }
-        if !config.closedLidOptIn { return "Closed lid is off · turn it on in Settings › Closed Lid" }
-        if config.powerMode == .strict { return "Closed lid ready · Strict (experimental)" }
-        if case .qualified = permit { return "Closed lid ready · tested Mac" }
-        return "Closed lid ready · untested Mac"
+        if !config.closedLidOptIn { return tr("Keep awake with the lid closed is off · the helper is ready") }
+        if config.powerMode == .strict { return tr("Closed lid ready · Strict (experimental)") }
+        if case .qualified = permit { return tr("Closed lid ready · tested Mac") }
+        return tr("Closed lid ready · untested Mac")
+    }
+
+    /// The Dashboard's Turn On: the same validated settings write as the Settings toggle, at the revision the Dashboard showed.
+    private func enableClosedLid(expectedRevision: Int) {
+        var patch = ConfigPatch(); patch.closedLidOptIn = true
+        Task { @MainActor in
+            let result = await self.applySettingsPatchAsync(patch, expectedRevision: expectedRevision)
+            if case .failed(let message) = result { self.refusalNotice = message }
+            self.refresh()
+        }
     }
 
     /// The fix for whatever `closedLidCapabilityText` says is missing, offered right on the Dashboard.
     var closedLidCapabilityAction: CapabilityAction? {
         guard !helper.busy else { return nil }
         let tested = config.powerMode == .strict ? strictRow != nil : closedLidPermit().allowsActuation
-        guard tested else { return .openClosedLidSettings }
-        switch helper.state {
-        case "installed": return config.closedLidOptIn ? nil : .openClosedLidSettings
-        case "notInstalled": return .installHelper
-        case "needsReauthorization", "needsHelperUpdate", "installedNotLoaded": return .reinstallHelper
-        default: return .openClosedLidSettings
+        switch ClosedLidOffer.offer(helperState: helper.state, optionOn: config.closedLidOptIn, macAllowed: tested) {
+        case .none: return nil
+        case .installHelper: return .installHelper
+        case .reinstallHelper: return .reinstallHelper
+        case .turnOn: return .enableClosedLid
+        case .openSettings: return .openClosedLidSettings
         }
     }
 
@@ -661,40 +778,40 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         guard config.closedLidOptIn, let session else { return nil }
         let permit = closedLidPermit()
         let system = systemIdentity()
-        let identity = "\(system.model ?? "unknown Mac"), macOS \(system.osBuild ?? "unknown build")"
+        let identity = "\(system.model ?? tr("unknown Mac")), macOS \(system.osBuild ?? tr("unknown build"))"
         if config.powerMode == .strict, strictRow == nil {
-            return "Strict isn’t tested on this Mac (\(identity)). Choose Standard in Settings › Closed Lid."
+            return trf("Strict isn’t tested on this Mac (%@). Choose Standard in Settings › Closed Lid.", identity)
         }
         if config.powerMode == .standard, !permit.allowsActuation {
-            return "Closed lid is off on this untested Mac (\(identity)). To allow it, see Settings › Closed Lid."
+            return trf("Closed lid is off on this untested Mac (%@). To allow it, see Settings › Closed Lid.", identity)
         }
-        if helper.state != "installed" { return "Closed lid needs the helper. Install it in Settings › Closed Lid." }
+        if helper.state != "installed" { return tr("Closing the lid will sleep this Mac until the closed-lid helper is installed. Install it in Settings › Closed Lid.") }
         // The helper's refusal explains closed lid while the session runs, even when the lid is open and it does not
         // stop the session. A stopped session keeps the reason it latched.
         if let stop = (session.stopReasons + holdReconciler.stopReasons).first(where: { $0.hasPrefix("helper") }) {
             return Self.helperStopText(stop)
         }
         if let app = helper.keepAwakeApps.first(where: \.resetsSleepSetting)?.name {
-            return "\(app) resets the sleep setting, so closed lid will be interrupted. Quit \(app) or remove its helper."
+            return trf("%@ resets the sleep setting, so closed lid will be interrupted. Quit %@ or remove its helper.", app, app)
         }
         let others = helper.keepAwakeApps.filter { !$0.resetsSleepSetting }.map(\.name)
         if !others.isEmpty {
-            return "Another keep-awake app is running (\(others.joined(separator: ", "))). It won’t stop closed lid, but your Mac may stay awake after CamLid finishes."
+            return trf("Another keep-awake app is running (%@). It won’t stop closed lid, but your Mac may stay awake after CamLid finishes.", others.joined(separator: ", "))
         }
-        if permit == .untestedAcknowledged { return "Untested configuration: \(identity)." }
+        if permit == .untestedAcknowledged { return trf("Untested configuration: %@.", identity) }
         switch holdReconciler.status {
         case .refused(let reason): return Self.helperReasonText(reason)
-        case .lost: return "Closed lid lost contact with the helper; sleep will be restored automatically."
-        case .releaseFailed: return "The sleep setting could not be restored yet. CamLid is retrying."
-        default: return holdReconciler.unavailableReason == nil ? nil : "Closed lid can’t reach the helper. Retrying."
+        case .lost: return tr("Closed lid lost contact with the helper; sleep will be restored automatically.")
+        case .releaseFailed: return tr("The sleep setting could not be restored yet. CamLid is retrying.")
+        default: return holdReconciler.unavailableReason == nil ? nil : tr("Closed lid can’t reach the helper. Retrying.")
         }
     }
 
     /// The closed-lid sentence for a helper stop: "helperLeaseLost", "helperReleaseFailed" or "helper:<refusal>".
     static func helperStopText(_ stop: String) -> String {
         switch stop {
-        case "helperLeaseLost": return "Closed lid lost contact with the helper; sleep was restored automatically."
-        case "helperReleaseFailed": return "The sleep setting could not be restored yet. CamLid is retrying."
+        case "helperLeaseLost": return tr("Closed lid lost contact with the helper; sleep was restored automatically.")
+        case "helperReleaseFailed": return tr("The sleep setting could not be restored yet. CamLid is retrying.")
         default: return helperReasonText(String(stop.dropFirst("helper:".count)))
         }
     }
@@ -702,53 +819,58 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     /// The reason line while music keeps an Auto session awake, naming each source as its Settings chip does.
     static func musicReasonText(_ sources: Set<MusicSource>) -> String {
         let names = MusicSource.allCases.filter { sources.contains($0) }.map(\.name)
-        return "Music is playing in \(names.joined(separator: " and "))."
+        return trf("Music is playing in %@.", names.joined(separator: tr(" and ")))
+    }
+
+    /// Spec 029: the reason line while another app's audio keeps an Auto session awake, naming the apps as Activity does.
+    static func audioReasonText(_ names: [String]) -> String {
+        trf("Audio is playing in %@.", names.joined(separator: ", "))
     }
 
     /// The reason line for a stop: one phrase per code. A helper stop uses the closed-lid wording without its final period.
     static func safetyReasonText(_ reasons: [String]) -> String {
-        let labels = ["thermalCritical": "Critical thermal pressure", "thermalSerious": "Sustained serious thermal pressure",
-            "thermalUnknown": "Thermal reading unavailable", "lidUnknown": "Lid reading unavailable",
-            "powerUnknown": "Power source unavailable", "notCharging": "AC power required",
-            "batteryFloor": "Battery below safety floor", "batteryUnknown": "Battery reading unavailable", "cpuStop": "Sustained CPU load exceeded limit"]
+        let labels = ["thermalCritical": tr("Critical thermal pressure"), "thermalSerious": tr("Sustained serious thermal pressure"),
+            "thermalUnknown": tr("Thermal reading unavailable"), "lidUnknown": tr("Lid reading unavailable"),
+            "powerUnknown": tr("Power source unavailable"), "notCharging": tr("AC power required"),
+            "batteryFloor": tr("Battery below safety floor"), "batteryUnknown": tr("Battery reading unavailable"), "cpuStop": tr("Sustained CPU load exceeded limit")]
         return reasons.map { reason -> String in
             if reason.hasPrefix("helper") {
                 return helperStopText(reason).trimmingCharacters(in: CharacterSet(charactersIn: "."))
             }
-            return labels[reason] ?? "Safety condition requires attention"
+            return labels[reason] ?? tr("Safety condition requires attention")
         }.joined(separator: "; ")
     }
 
     static func helperReasonText(_ reason: String) -> String {
         switch reason {
-        case "systemSleptWhileHeld": "The Mac slept during a Strict session (macOS can end Strict, for example when a display changes). Start a new session to continue."
-        case "mechanismUnavailable": "The installed helper doesn’t offer Strict yet. Reinstall it in Settings › Closed Lid."
-        case "safetyRefused": "Closed lid can only start with the lid open, normal temperature and no external display, on the charger (or on battery above the stop level when battery sessions are allowed)."
-        case "preexistingOverride", "foreignGlobalSleepDisabled": "Another app already disables sleep, so CamLid left it alone."
-        case "overrideChanged": "Another app changed the sleep setting (for example LidRun), so closed lid stopped."
+        case "systemSleptWhileHeld": tr("The Mac slept during a Strict session (macOS can end Strict, for example when a display changes). Start a new session to continue.")
+        case "mechanismUnavailable": tr("The installed helper doesn’t offer Strict yet. Reinstall it in Settings › Closed Lid.")
+        case "safetyRefused": tr("Closed lid can only start with the lid open, normal temperature and no external display, on the charger (or on battery above the stop level when battery sessions are allowed).")
+        case "preexistingOverride", "foreignGlobalSleepDisabled": tr("Another app already disables sleep, so CamLid left it alone.")
+        case "overrideChanged": tr("Another app changed the sleep setting (for example LidRun), so closed lid stopped.")
         case "recoveryRequired", "restorationFailed", "startupInspectionFailed":
-            "The helper needs recovery before it can hold the Mac awake. Restart the Mac or reinstall the helper in Settings › Closed Lid."
-        case "notReady": "The helper isn’t ready. Reinstall it in Settings › Closed Lid or restart the Mac."
-        case "safetyStop": "Stopped for safety: check power, battery, temperature and external displays."
-        case "sessionExpired": "The closed-lid time limit was reached."
+            tr("The helper needs recovery before it can hold the Mac awake. Restart the Mac or reinstall the helper in Settings › Closed Lid.")
+        case "notReady": tr("The helper isn’t ready. Reinstall it in Settings › Closed Lid or restart the Mac.")
+        case "safetyStop": tr("Stopped for safety: check power, battery, temperature and external displays.")
+        case "sessionExpired": tr("The closed-lid time limit was reached.")
         case "invalidLease", "renewalRefused", "renewalExpiredDuringCommit", "heartbeatExpired", "clientDisconnected",
              "monitorFailed", "helperStopping", "helperRestart", "operationFailed", "operationFailedCleanup":
-            "Closed lid lost its hold, and the sleep setting was restored. Start again to continue."
+            tr("Closed lid lost its hold, and the sleep setting was restored. Start again to continue.")
         // Unknown codes stay in the log and `camlid status`, never in the interface.
-        default: "Closed lid stopped."
+        default: tr("Closed lid stopped.")
         }
     }
 
     private var helperSummary: String {
         switch helper.state {
         case "installed": "helper installed"
-        case "notInstalled": "helper not installed"
-        case "unknown": "helper not checked"
-        default: "helper needs attention"
+        case "notInstalled": tr("helper not installed")
+        case "unknown": tr("helper not checked")
+        default: tr("helper needs attention")
         }
     }
 
-    private func refresh() {
+    func refresh() {
         guard !terminationConfirmed else { return }
         permissions.refresh()
         agents.configure(waitRetentionSeconds: Double(config.waitRetentionMinutes) * 60)
@@ -822,7 +944,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         latestReason = statusReason(signal: signal)
         let activeMode = session?.requestedMode
         let agentWorking = badgeStates().contains { $0.detectionEnabled && $0.workingCount > 0 }
-        let activityHolding = Self.isHoldingForActivity(mode: activeMode, agentWorking: agentWorking, musicHolding: musicHolding)
+        let activityHolding = Self.isHoldingForActivity(mode: activeMode, agentWorking: agentWorking, musicHolding: musicHolding,
+                                                        audioHolding: !anyAudioNames.isEmpty)
         let timerRemaining: Double? = if activeMode == .timed || activeMode == .manual {
             session?.capDeadlineMonotonic.map { max(0, $0 - now) }
         } else {
@@ -838,9 +961,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     }
 
     private func sensorDetails(_ health: HealthSnapshot, now: Double) -> String {
-        let lidAge = health.lid?.sampledAtMonotonic.map { String(format: "%.1f s old", max(0, now - $0)) } ?? "no fresh sample"
+        let lidAge = health.lid?.sampledAtMonotonic.map { String(format: tr("%.1f s old"), max(0, now - $0)) } ?? tr("no fresh sample")
         let lidSource = health.lid?.source ?? "IOPMrootDomain.AppleClamshellState"
-        return "Lid source: \(lidSource) · \(lidAge).\nTemperature: \(health.temperature.displayText).\nPressure is a macOS thermal state, not degrees."
+        return trf("Lid source: %@ · %@.\nTemperature: %@.\nPressure is a macOS thermal state, not degrees.", lidSource, lidAge, health.temperature.displayText)
     }
 
     private func recordSensorAvailability(_ health: HealthSnapshot) {
@@ -874,7 +997,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             requestedClosedLidIntent: config.closedLidOptIn))
     }
 
-    private func badgeStates() -> [AgentBadgeState] {
+    func badgeStates() -> [AgentBadgeState] {
         AgentBadgeState.providers.map { provider in
             AgentBadgeState(provider: provider, enabled: config.adapterEnrollment.contains(provider), tasks: observedTasks(provider: provider, now: uptime()), evidenceAgeSeconds: agents.lastReceipt(provider: provider).map { max(0, uptime() - $0) },
                 processCount: uptime() - lastProcessObservation <= 15 ? AppCoordinator.processCount(for: provider, candidateProviders: processCandidates.map(\.provider), orcaRunAgents: orcaRunAgentCount) : 0,
@@ -924,17 +1047,41 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     }
 
     /// Spec 025: while a watched music source plays, an Auto session stays working. Nothing is read when no source is watched.
+    /// Spec 029: with "Any audio" on, an Auto session also stays working while another process plays. Nothing is read when off.
     private func musicHoldReason(now: Double) -> String? {
         let watched = watchedMusicSources()
-        guard !watched.isEmpty else {
+        let anyAudioOn = preferences.bool(forKey: Self.anyAudioKey) && session?.requestedMode == .auto
+        guard !watched.isEmpty || anyAudioOn else {
             musicHold = MusicPlaybackHold()
             musicHolding = []
+            anyAudio = AudioOutputHold()
+            anyAudioNames = []
             return nil
         }
-        musicHolding = musicHold.observe(now: now) {
+        musicHolding = watched.isEmpty ? [] : musicHold.observe(now: now) {
             MusicOutput.reading(in: MusicOutput.processes(), watched: watched, holders: PlaybackAssertion.holders)
         }.intersection(watched)
-        return musicHolding.isEmpty ? nil : "musicPlayback"
+        // A process that a watched source counts is left to that source, so it is not counted twice.
+        let counted = anyAudioOn ? AudioOutputHold.countedNames(in: MusicOutput.processes(), watched: watched) : []
+        let wasHolding = anyAudio.holding
+        let audioHolding = anyAudioOn ? anyAudio.observe(now: now, outputting: !counted.isEmpty) : false
+        audioHoldingNow = audioHolding
+        if !anyAudioOn { anyAudio = AudioOutputHold() }
+        if audioHolding != wasHolding {
+            record(category: .stateTransition, newState: sessionStateForRecord(),
+                   reasons: audioHolding ? ["audioHoldStarted"] + counted : ["audioHoldEnded"])
+        }
+        anyAudioNames = audioHolding ? counted : []
+        if !musicHolding.isEmpty { return "musicPlayback" }
+        return audioHolding ? "audioPlayback" : nil
+    }
+
+    /// Spec 028: the language takes effect at once: the Localization state redraws the windows, and the menus are rebuilt.
+    func setLanguage(_ choice: AppLanguage) {
+        preferences.set(choice.rawValue, forKey: Self.languageKey)
+        Localization.isVietnamese = Localization.resolve(choice)
+        menuBar.installApplicationMenu()
+        refresh()
     }
 
     /// Spec 025: the music sources the user turned on, from the preferences.
@@ -953,35 +1100,36 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     private func statusReason(signal: SafetySignal) -> String? {
         if session == nil && config.mode == .off { return nil }
-        if agents.lastRejection == "enrollmentFull" { return "Agent capacity reached: 20 holding tasks are already tracked." }
-        if agents.lastRejection == "retirementHistoryFull" { return "Detection history full; new agent evidence is unavailable." }
+        if agents.lastRejection == "enrollmentFull" { return tr("Agent capacity reached: 20 holding tasks are already tracked.") }
+        if agents.lastRejection == "retirementHistoryFull" { return tr("Detection history full; new agent evidence is unavailable.") }
         if session == nil { return Self.noSessionReason }
         if !signal.reasons.isEmpty { return Self.safetyReasonText(signal.reasons) }
         if session?.requestedMode == .auto, !musicHolding.isEmpty { return Self.musicReasonText(musicHolding) }
+        if session?.requestedMode == .auto, !anyAudioNames.isEmpty { return Self.audioReasonText(anyAudioNames) }
         // Owner decision (2026-11-11): the countdown runs even when agent state is unclear. Say so while it runs.
         if session?.effectiveState == .completionGrace, graceUnclear {
-            return "Agent state is unclear, so the Mac sleeps after the countdown."
+            return tr("Agent state is unclear, so the Mac sleeps after the countdown.")
         }
         if session?.requestedMode == .auto {
             guard let lifetime = latestLifetimeState else {
-                if hasLifetimeRules { return "Watched program status is unavailable." }
+                if hasLifetimeRules { return tr("Watched program status is unavailable.") }
                 return nil
             }
             if lifetime.hasActiveRule, let label = lifetime.statuses.first(where: { $0.presence == .present })?.label {
-                return "Watched program is running: \(label)."
+                return trf("Watched program is running: %@.", label)
             }
             if lifetime.hasUnknownHold, let label = lifetime.statuses.first(where: { $0.presence == .unknown })?.label {
-                return "Watched program status is uncertain: \(label)."
+                return trf("Watched program status is uncertain: %@.", label)
             }
             if lifetime.suppressesAutoCompletion {
-                return "Watched program lifetime does not confirm AI task completion."
+                return tr("Watched program lifetime does not confirm AI task completion.")
             }
         }
         return nil
     }
 
     /// Shown with "Ready" while no session runs (the menu bar label reads "CamLid: Ready, No session · …").
-    nonisolated static let noSessionReason = "No session · choose Auto or Timed"
+    nonisolated static var noSessionReason: String { tr("No session · choose Auto or Timed") }
 
     func changeMode(_ mode: RequestedMode) {
         var patch = ConfigPatch(); patch.mode = mode
@@ -993,7 +1141,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     // MARK: - Dashboard panel
 
-    private func toggleDashboard(show: Bool? = nil) {
+    func toggleDashboard(show: Bool? = nil) {
         let shouldShow = show ?? !(utilityUI?.dashboardVisible ?? false)
         if shouldShow { showUtility(.dashboard) } else { utilityUI?.send(.closeDashboard); menuBar.restoreFocusToStatusItem() }
     }
@@ -1006,7 +1154,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             protection: protectionReadiness(), settingsSection: SettingsSection(rawValue: preferences.string(forKey: "CamLidSettingsSection") ?? "") ?? .agents,
             anchorFrame: frame, installationPending: hasPendingSettingsWork,
             observationReady: uptime() - lastProcessSuccess <= 15,
-            updates: updates.snapshot, canCheckUpdates: updates.canCheck,
+            updates: updates.snapshot, canCheckUpdates: updates.canCheck, canInstallUpdates: updates.canInstall,
+            updatesSessionActive: session != nil,
             loginState: loginItem.state, loginMessage: loginItem.message,
             notificationPermission: outcomeNotifications.permissionState,
             accessibilityPermission: permissions.accessibility, permissionSettingsError: permissions.settingsError,
@@ -1015,7 +1164,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             systemModel: systemIdentity().model ?? "unknown", systemBuild: systemIdentity().osBuild ?? "unknown",
             keepAwakeApps: helper.keepAwakeApps, capabilityText: closedLidCapabilityText,
             automaticUpdateChecks: updates.automaticChecks, agentSkillPath: agentSkill.installedPath,
-            watchedMusic: watchedMusicSources())
+            watchedMusic: watchedMusicSources(), anyAudioHold: preferences.bool(forKey: Self.anyAudioKey), language: language)
     }
     private func showUtility(_ surface: UtilitySurface) {
         if surface == .settings { loginItem.refresh(); Task { await outcomeNotifications.refresh() } }
@@ -1091,8 +1240,15 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         case .onboarding: showOnboarding()
         case .updates: menuBarOpenUpdates()
         case .checkUpdates: updates.check(); refresh()
+        case .installUpdate(let endingSession):
+            // The user agreed in the sheet to end this session. It is ended only when the restart starts.
+            agreedSessionStart = endingSession ? session?.startedAtMonotonic : nil
+            updates.installAvailable(endingSession: endingSession); refresh()
+        case .enableClosedLid(let revision): enableClosedLid(expectedRevision: revision)
         case .setAutomaticUpdateChecks(let on): updates.setAutomaticChecks(on); refresh()
-        case .setMusicSource(let source, let on): preferences.set(on, forKey: Self.musicKey(source)); refresh()
+        case .setMusicSource(let source, let on): setMusicSource(source, on)
+        case .setAnyAudioHold(let on): setAnyAudioHold(on)
+        case .setLanguage(let choice): setLanguage(choice)
         case .agentSkill(let request):
             utilityUI?.send(.agentSkillResult(agentSkill.perform(request)))
             refresh()
@@ -1122,24 +1278,24 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let graceRemaining = active?.graceDeadlineMonotonic.map { max(0, $0 - now) }
         let capRemaining = active?.capDeadlineMonotonic.map { max(0, $0 - now) }
         var notices: [String] = []
-        if let notice = refusalNotice { notices.append(notice) }
+        if let notice = refusalNotice { notices.append(Localization.display(notice)) }
         if let notice = closedLidMessage() { notices.append(notice) }
         if active != nil, !config.closedLidOptIn {
-            notices.append("Closing the lid sleeps this Mac. Turn on Keep awake with the lid closed in Settings › Closed Lid.")
+            notices.append(tr("Closing the lid sleeps this Mac. Turn on Keep awake with the lid closed in Settings › Closed Lid."))
         }
         if active?.effectiveState == .ready, latestHealth?.lidState == .closed,
            sleepRelevantTasks(now: now).contains(where: { PolicyEngine.holdsSession($0, now: now) }) {
-            notices.append("Agent work is waiting until the lid opens.")
+            notices.append(tr("Agent work is waiting until the lid opens."))
         }
         let health = latestHealth
         let summary = health.map(HealthSummary.from) ?? .unknown
-        if let failure = history.lastError { notices.append("History unavailable: " + failure + ".") }
-        if omittedHistoryRecords > 0 { notices.append("History omitted \(omittedHistoryRecords) transitions while storage was busy.") }
+        if let failure = history.lastError { notices.append(trf("History unavailable: %@.", failure)) }
+        if omittedHistoryRecords > 0 { notices.append(trf("History omitted %lld transitions while storage was busy.", omittedHistoryRecords)) }
         let badges = badgeStates()
         let working = AgentBadgeState.workingSummary(badges)
         let waiting = AgentBadgeState.waitingSummary(badges)
         let summaryParts = [working, waiting].filter { !$0.hasPrefix("No ") }
-        let taskSummary = summaryParts.isEmpty ? "No selected agents reporting work" : summaryParts.joined(separator: " · ")
+        let taskSummary = summaryParts.isEmpty ? tr("No selected agents reporting work") : summaryParts.joined(separator: " · ")
         let data = DashboardData(
             mode: active?.requestedMode ?? config.mode, state: state,
             reasonText: latestReason ?? "", sessionRunning: active != nil,
@@ -1147,22 +1303,23 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             powerActuationAvailable: holdReconciler.leaseVerified(now: now) || keepAwake.verified,
             lidDisplayText: summary.lidDisplay,
             capabilityText: closedLidCapabilityText, capabilityAction: closedLidCapabilityAction,
+            updateVersion: updates.snapshot.phase == .available ? updates.snapshot.version : nil,
             tasks: allObservedTasks(now: now).map {
                 DashboardTaskRow(id: $0.id, provider: agents.provider(for: $0.id) ?? activityProvider(for: $0.id) ?? "agent",
                     stateText: $0.state.rawValue, confidenceText: $0.confidence.rawValue)
             },
             taskSummaryText: taskSummary,
             batteryText: summary.battery, thermalText: summary.thermal,
-            temperatureText: health?.temperature.displayText,
+            temperatureText: health.map { tr($0.temperature.displayText) },
             sensorDetailsText: health.map { sensorDetails($0, now: now) },
             cpuText: health?.cpuPercent.map { String(format: "%.1f%%", $0) },
-            freshnessText: "Read-only telemetry · backend unverified · Closed lid: \(PowerMode.standard.title), \(helperSummary)",
+            freshnessText: trf("Read-only telemetry · backend unverified · Closed lid: %@, %@", tr(PowerMode.standard.title), helperSummary),
             isStale: health == nil,
             graceRemainingSeconds: graceRemaining,
             capRemainingSeconds: capRemaining,
-            completionDelayText: "Sleep when done: \(sessionSleepDelayMinutes ?? config.completionDelayMinutes) min",
+            completionDelayText: trf("Sleep when done: %lld min", sessionSleepDelayMinutes ?? config.completionDelayMinutes),
             banner: .unsupported, bannerMessage: notices.isEmpty ? nil : notices.joined(separator: " "),
-            lastSessionText: active.map { "Session \($0.id.prefix(8)) rev \($0.stateRevision)" },
+            lastSessionText: active.map { trf("Session %@ rev %@", String($0.id.prefix(8)), "\($0.stateRevision)") },
             stopEnabled: active != nil, startEnabled: menuBarCanStart && menuBarAutoAvailable, metrics: DashboardMetric.from(health), agents: badges,
             timerMinutes: active == nil ? nil : sessionTimerMinutes,
             timerMaximumMinutes: active == nil ? nil : timerMaximumMinutes(now: now),
@@ -1284,13 +1441,18 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         context.sessionActive = session != nil
         context.recoveryRequired = session?.effectiveState == .recoveryRequired
         context.unsavedSettings = hasPendingSettingsWork || utilityUI?.settingsDirty == true
-        context.agentWorkActive = allObservedTasks(now: uptime()).contains { [.working, .waiting, .unknown].contains($0.state) }
         return context
     }
 
-    private func showSettings() { showUtility(.settings) }
+    func showSettings() { showUtility(.settings) }
 
-    private func showActivityLog(show: Bool = true) {
+    /// Opens Settings on one pane, as the Settings menu item and the Dashboard's links do.
+    func showSettingsPane(_ section: SettingsSection) {
+        preferences.set(section.rawValue, forKey: "CamLidSettingsSection")
+        showSettings()
+    }
+
+    func showActivityLog(show: Bool = true) {
         if show { showUtility(.activity) }
         let recipient = utilityUI
         let requestID = UUID()
@@ -1314,7 +1476,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             guard !self.terminationFlowActive else { return }
             let receipt = await self.history.delete(sessionID: sessionID)
             if let receipt, self.history.lastError == nil {
-                self.activityOutcome = "Deleted \(receipt.removedCount) records."
+                self.activityOutcome = String(format: "Deleted %lld records.", receipt.removedCount)
             } else {
                 self.activityOutcome = "Deletion unconfirmed. Refresh history before retrying; a started operation may finish after its deadline."
             }
@@ -1335,7 +1497,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     func flushHistory(timeout: Double = 0.7) async -> Bool { await history.flush(timeout: timeout) }
 
-    private func showOnboarding() { showUtility(.onboarding) }
+    func showOnboarding() { showUtility(.onboarding) }
 
     @discardableResult func finishOnboarding() -> Bool {
         guard !authorityUnavailable, !terminationFlowActive else { return false }
@@ -1538,7 +1700,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         } catch {
             authorityUnavailable = true
             if case IPCError.policyDenied(let reason) = error {
-                refusalNotice = "Local control unavailable: " + reason
+                refusalNotice = String(format: "Local control unavailable: %@", reason)
             } else { refusalNotice = "Local control couldn’t start; another copy of CamLid may be running." }
         }
     }
@@ -1559,6 +1721,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 timeout: max(0, min(0.7, deadline - uptime()))) else { throw IPCError.unavailable }
             return data
         }
+        if command == .operate { return try JSONEncoder().encode(await operate(payload)) }
         if command == .start { return try JSONEncoder().encode(await startFromControl(payload)) }
         guard command == .configSet else { return try handleControl(command, payload: payload) }
         _ = try BoundedPayload(payload)
@@ -1569,22 +1732,27 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         context.files["remote-patch"] = raw
         var sanitized = options; sanitized.flags["file"] = "remote-patch"
         let result = Commands.dispatch("config set", options: sanitized, context: &context)
-        guard result.exitCode == 0, options.flags["dry-run"] == nil else { return try JSONEncoder().encode(result) }
+        // Only a patch that changes something is applied: an unchanged one answers at once, with the revision it stands at.
+        guard result.exitCode == 0, options.flags["dry-run"] == nil, Self.replyChanged(result) else {
+            return try JSONEncoder().encode(result)
+        }
         guard let dictionary = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any] else { throw IPCError.invalidInput("invalidPatch") }
         let patch = try ConfigPatch(jsonDictionary: dictionary)
         switch await applySettingsPatchAsync(patch, expectedRevision: revision, deadline: deadline) {
         case .saved: return try JSONEncoder().encode(result)
         case .conflict:
-            return try JSONEncoder().encode(CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"revisionConflict\"}", exitCode: 3))
+            return try JSONEncoder().encode(CLIReply.refused("configSet", reason: "revisionConflict", extra: ["currentRevision": revision]))
         case .failed: throw IPCError.unavailable
         case .unconfirmed:
-            return try JSONEncoder().encode(CLIResult(json: "{\"schemaVersion\":1,\"accepted\":false,\"reason\":\"commitUnconfirmed\",\"mayApplyLater\":true,\"readBackRequired\":true}", exitCode: 5))
+            return try JSONEncoder().encode(CLIReply.refused("configSet", reason: "commitUnconfirmed",
+                extra: ["mayApplyLater": true, "readBackRequired": true]))
         }
     }
 
     /// The menu-bar spinner runs while activity keeps an Auto session awake: a working agent, or music (spec 025).
-    static func isHoldingForActivity(mode: RequestedMode?, agentWorking: Bool, musicHolding: Set<MusicSource>) -> Bool {
-        mode == .auto && (agentWorking || !musicHolding.isEmpty)
+    static func isHoldingForActivity(mode: RequestedMode?, agentWorking: Bool, musicHolding: Set<MusicSource>,
+                                     audioHolding: Bool = false) -> Bool {
+        mode == .auto && (agentWorking || !musicHolding.isEmpty || audioHolding)
     }
 
     /// Whether a state change belongs in Activity history: a change that starts or ends work, waiting, completion or
@@ -1655,7 +1823,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         context.health = latestHealth; context.nowMonotonic = uptime()
         var result: CLIResult
         switch command {
-        case .status, .doctor, .agentsList:
+        case .agentsList:
+            result = agentsListReply()
+        case .status, .doctor:
             latestHealth = currentHealth()
             let readiness = protectionReadiness()
             var object: [String: Any] = ["schemaVersion": 1, "available": true,
@@ -1715,7 +1885,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             var protection = try JSONSerialization.jsonObject(with: JSONEncoder().encode(readiness)) as! [String: Any]
             protection["readinessState"] = protection.removeValue(forKey: "state")
             object["protection"] = protection
-            object["updates"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(updates.snapshot))
+            var updatesObject = try JSONSerialization.jsonObject(with: JSONEncoder().encode(updates.snapshot)) as! [String: Any]
+            updatesObject["installationAvailable"] = updates.canInstall
+            updatesObject["automaticChecks"] = updates.automaticChecks
+            object["updates"] = updatesObject
             if let latestHealth {
                 var health = try JSONSerialization.jsonObject(with: JSONEncoder().encode(latestHealth)) as! [String: Any]
                 var temperature = try JSONSerialization.jsonObject(with: JSONEncoder().encode(latestHealth.temperature)) as! [String: Any]
@@ -1729,6 +1902,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             }
             if let session { object["session"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(session)) }
             object["tasks"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(allObservedTasks(now: uptime())))
+            for (key, value) in controlStatusFields() { object[key] = value }
             result = CLIResult(json: String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self), exitCode: 0)
         case .admitCommand:
             throw IPCError.invalidInput("admitIsAsync")   // handled by `handleControlAsync` → `admitCommandRun`
@@ -1768,7 +1942,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             context.files["remote-patch"] = patch
             var sanitized = options; sanitized.flags["file"] = "remote-patch"
             result = Commands.dispatch("config set", options: sanitized, context: &context)
-            if result.exitCode == 0, options.flags["dry-run"] == nil {
+            if result.exitCode == 0, options.flags["dry-run"] == nil, Self.replyChanged(result) {
                 guard persistConfig(context.config) else { throw IPCError.unavailable }
                 record(category: .configuration, newState: sessionStateForRecord(), reasons: ["configApplied"])
                 refresh()
@@ -1795,55 +1969,102 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         return try JSONEncoder().encode(result)
     }
 
-    /// `camlid start [--mode auto|timed|manual] [--duration 30m]`: the same path as the Dashboard buttons, so every
-    /// refusal (mode, battery entry, closed-lid permit) applies. Power is held only later, once the helper confirms.
+    /// `camlid start [--mode auto|timed] [--duration 45m|2h|infinite]`, through the same checks as the Dashboard buttons, so
+    /// every refusal (mode, battery entry, closed-lid permit) applies. Asking for the session that already runs changes
+    /// nothing. A different session is refused unless `--replace` ends or retimes it. `--save-mode` saves the mode only after
+    /// the start has passed its checks, so a refused start saves nothing. Power is held only later, once the helper confirms.
     func startFromControl(_ payload: Data) async -> CLIResult {
-        func reply(_ code: Int, _ object: [String: Any]) -> CLIResult {
-            var merged = object; merged["schemaVersion"] = 1; merged["command"] = "start"
-            let data = (try? JSONSerialization.data(withJSONObject: merged, options: [.sortedKeys])) ?? Data()
-            return CLIResult(json: String(decoding: data, as: UTF8.self), exitCode: code)
-        }
         let options = payload.isEmpty ? CLIOptions() : ((try? JSONDecoder().decode(CLIOptions.self, from: payload)) ?? CLIOptions())
-        var mode: RequestedMode?
-        if let raw = options.flags["mode"] {
-            guard let parsed = RequestedMode(rawValue: raw), parsed != .off else {
-                return reply(2, ["accepted": false, "reason": "invalidMode"])
-            }
-            mode = parsed
+        let request: StartRequest
+        switch StartRequest.parse(options) {
+        case .refused(let refusal): return refusal
+        case .accepted(let accepted): request = accepted
         }
-        var minutes: Int?
-        if let raw = options.flags["duration"] {
-            // The Dashboard's timer offers Infinite (requested as "infinite") and the steps 5 to 480 minutes. Anything
-            // else is refused before a session starts, rather than accepted and left unapplied.
-            if raw == "infinite" {
-                minutes = 0
+        guard !authorityUnavailable else { return CLIReply.refused("start", reason: "appUnavailable") }
+        guard !terminationFlowActive else { return CLIReply.refused("start", reason: "applicationTerminating") }
+        guard !hasPendingSettingsWork else { return CLIReply.refused("start", reason: "settingsPending") }
+        if request.closedLid, !config.closedLidOptIn { return CLIReply.refused("start", reason: "closedLidOff") }
+
+        // What the call does to the running session, decided before anything changes.
+        let running = session
+        let outcome: String
+        if let running {
+            if runningSessionMatches(request) {
+                outcome = "alreadyRunning"
+            } else if !request.replace {
+                return CLIReply.refused("start", reason: "sessionAlreadyActive", detail: running.requestedMode.rawValue)
             } else {
-                let value = raw.hasSuffix("h") ? Double(raw.dropLast()).map { $0 * 60 }
-                    : raw.hasSuffix("m") ? Double(raw.dropLast()) : Double(raw)
-                guard let value, let whole = Int(exactly: value), whole > 0, ProtectionSession.isTimerMinutes(whole) else {
-                    return reply(2, ["accepted": false, "reason": "invalidDuration"])
-                }
-                minutes = whole
+                outcome = running.requestedMode == request.mode ? "timerChanged" : "replaced"
+            }
+        } else {
+            outcome = "started"
+        }
+        if outcome == "started" || outcome == "replaced" {
+            guard holdReconciler.restoration != .failed else { return CLIReply.refused("start", reason: "recoveryRequired") }
+            if let block = startBlock(for: request.mode, health: currentHealth(), endingCurrentSession: outcome == "replaced") {
+                return CLIReply.refused("start", reason: block.reason, detail: block.notice)
             }
         }
-        guard session == nil else { return reply(3, ["accepted": false, "reason": "sessionAlreadyActive"]) }
-        // The requested mode applies to this session only. The saved mode changes only through `config set`.
-        await startPreviewSession(mode: mode)
-        guard let active = session else {
-            let reason: String = if authorityUnavailable { "appUnavailable" }
-                else if terminationFlowActive { "applicationTerminating" }
-                else if (mode ?? config.mode) == .off { "modeOff" }
-                else if config.closedLidOptIn && !closedLidAllowed { "closedLidNotPermitted" }
-                else { config.batteryEntryRefusal(health: currentHealth()) ?? "notStarted" }
-            return reply(3, ["accepted": false, "reason": reason, "detail": refusalNotice ?? NSNull()])
+        var savedMode = false
+        if request.saveMode, config.mode != request.mode {
+            var patch = ConfigPatch(); patch.mode = request.mode
+            switch await applySettingsPatchAsync(patch, expectedRevision: revision) {
+            case .saved: savedMode = true
+            case .conflict: return CLIReply.refused("start", reason: "revisionConflict")
+            case .failed(let message): return CLIReply.refused("start", reason: "storageUnavailable", detail: message)
+            case .unconfirmed: return CLIReply.refused("start", reason: "commitUnconfirmed")
+            }
+            // The save suspends this call, so the session is checked again before it starts or changes.
+            guard session?.id == running?.id else {
+                return CLIReply.refused("start", reason: "sessionAlreadyActive",
+                    hint: "The session changed while the mode was saved. Read `camlid status`, then retry. The mode stays saved.")
+            }
         }
-        if let minutes, active.requestedMode == .timed { _ = changeTimerDuration(minutes, expectedRevision: revision) }
-        return reply(0, ["accepted": true, "mode": active.requestedMode.rawValue,
-            "effectiveState": (session ?? active).effectiveState.rawValue,
-            "closedLid": config.closedLidOptIn, "closedLidPermit": closedLidPermit().statusCode,
+        var changed = outcome == "started" || outcome == "replaced" || savedMode
+        var replacedPseudonym: String?
+        switch outcome {
+        case "started":
+            await startPreviewSession(mode: request.mode)
+        case "replaced":
+            replacedPseudonym = running.map { ActivityStore.pseudonym(sessionID: $0.id, salt: activitySalt) }
+            menuBarStopProtection()
+            await startPreviewSession(mode: request.mode)
+        default:
+            break
+        }
+        var capApplied = false
+        if request.mode == .timed, outcome != "alreadyRunning", session != nil, let minutes = request.minutes {
+            switch adjustTimer(minutes, expectedRevision: revision) {
+            case .success(let adjust):
+                capApplied = adjust.capApplied
+                changed = changed || adjust.changed
+            case .failure(let failure) where outcome == "timerChanged":
+                return CLIReply.refused("start", reason: failure.rawValue)
+            case .failure:
+                break   // The session started with its saved timer, and the reply reports the timer it runs.
+            }
+        }
+        guard let active = session else {
+            let block = startBlock(for: request.mode, health: currentHealth())
+            return CLIReply.refused("start", reason: block?.reason ?? "notStarted", detail: refusalNotice ?? block?.notice)
+        }
+        var durationSeconds: Any = NSNull()
+        if active.requestedMode != .auto, let timer = sessionTimerMinutes { durationSeconds = timer * 60 }
+        return CLIReply.done("start", changed: changed, [
+            "outcome": outcome,
+            "mode": active.requestedMode.rawValue,
+            "effectiveState": active.effectiveState.rawValue,
+            "durationSeconds": durationSeconds,
+            "capApplied": capApplied,
+            "replacedSessionPseudonym": jsonString(replacedPseudonym),
+            "savedMode": savedMode,
+            "revision": revision,
+            "closedLid": config.closedLidOptIn,
+            "closedLidPermit": closedLidPermit().statusCode,
             "powerMode": config.powerMode.rawValue,
             "powerActuation": holdReconciler.leaseVerified(now: uptime()),
-            "note": "Check camlid status: keepAwake.verified shows the lid-open hold, leaseVerified the closed-lid hold."])
+            "note": "Check camlid status: keepAwake.verified shows the lid-open hold, leaseVerified the closed-lid hold.",
+        ])
     }
 
     // MARK: - camlid run admissions (ADR 0006)
@@ -2063,6 +2284,67 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     }
 }
 
+/// Why a session cannot start now. The Dashboard shows `notice` (nil where it stays silent), and the CLI reports `reason`.
+enum StartBlock: Equatable {
+    case appUnavailable, applicationTerminating, modeOff, closedLidNotPermitted, alreadyRunning
+    /// The power reading refuses a start. The value is `Configuration.batteryEntryRefusal`'s reason.
+    case battery(String)
+
+    var reason: String {
+        switch self {
+        case .appUnavailable: return "appUnavailable"
+        case .applicationTerminating: return "applicationTerminating"
+        case .modeOff: return "modeOff"
+        case .closedLidNotPermitted: return "closedLidNotPermitted"
+        case .alreadyRunning: return "sessionAlreadyActive"
+        case .battery(let reason): return reason
+        }
+    }
+
+    var notice: String? {
+        switch self {
+        case .appUnavailable, .applicationTerminating, .alreadyRunning: return nil
+        case .modeOff: return "Choose a mode before starting."
+        case .closedLidNotPermitted: return "Closed lid isn’t available yet. Settings › Closed Lid shows what is missing."
+        case .battery(let reason):
+            switch reason {
+            case "batteryEntryLow": return "Battery is below the start level. Connect the charger or check the entry level in Safety settings."
+            case "batteryUnknown": return "Battery reading is unavailable. Connect the charger or retry after readings recover."
+            case "notCharging": return "Connect the charger, or turn off Require charger and enable Allow battery sessions in Safety settings."
+            default: return "Power source is unavailable. Retry after readings recover."
+            }
+        }
+    }
+
+    /// The reason Activity records for this refusal, or nil when the refusal is not recorded.
+    var recordedReason: String? {
+        switch self {
+        case .closedLidNotPermitted: return "backendUnverified"
+        case .battery(let reason): return reason
+        default: return nil
+        }
+    }
+}
+
+/// Why a running session's timer or sleep delay did not change. The raw value is the CLI's refusal reason.
+enum SessionAdjustFailure: String, Error, Equatable {
+    case appUnavailable, applicationTerminating, settingsPending, revisionConflict
+    case noTimedSession, noAutoSession, invalidDuration
+}
+
+/// A timer change. `minutes` is what the session now runs (0 is Infinite); `capApplied` says a safety limit shortened it.
+struct TimerAdjust: Equatable {
+    let minutes: Int
+    let changed: Bool
+    let capApplied: Bool
+    let notice: String?
+}
+
+struct SleepAdjust: Equatable {
+    let minutes: Int
+    let changed: Bool
+}
+
 private func uncheckedDefaultConfig() -> Configuration {
     // try? Configuration() cannot fail (defaults are valid); this is unreachable.
     // swiftlint:disable:next force_try
@@ -2088,14 +2370,11 @@ private final class ControlReplyBox: @unchecked Sendable {
 
 // Explicit session edits; routine policy evaluation never renews a deadline.
 extension ProtectionSession {
-    /// The timer's steps, the Dashboard's choices: Infinite (0) or 5 to 480 minutes.
-    static func isTimerMinutes(_ minutes: Int) -> Bool { minutes == 0 || (5...480).contains(minutes) }
-
     mutating func restartTimer(minutes: Int, maximumMinutes: Int, now: Double) -> Int? {
         guard requestedMode == .timed || requestedMode == .manual,
               !latchedSafetyStop, effectiveState != .expired,
               capDeadlineMonotonic.map({ now < $0 }) ?? true,
-              ProtectionSession.isTimerMinutes(minutes) else { return nil }
+              TimerRules.isTimer(minutes) else { return nil }
         let duration = minutes == 0 ? 0 : min(minutes, maximumMinutes)
         capDeadlineMonotonic = duration == 0 ? nil : now + Double(duration) * 60
         return duration
@@ -2103,7 +2382,7 @@ extension ProtectionSession {
 
     mutating func changeSleepDelay(minutes: Int, previousMinutes: Int) -> Bool {
         guard requestedMode == .auto, !latchedSafetyStop, effectiveState != .expired,
-              (0...30).contains(minutes) else { return false }
+              TimerRules.sleepDelay.contains(minutes) else { return false }
         if let deadline = graceDeadlineMonotonic {
             // Keep measuring from completion when editing during grace.
             graceDeadlineMonotonic = deadline - Double(previousMinutes) * 60 + Double(minutes) * 60

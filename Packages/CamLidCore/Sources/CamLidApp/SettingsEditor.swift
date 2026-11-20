@@ -6,7 +6,7 @@ public enum SettingsSection: String, Codable, CaseIterable, Sendable {
     // Three panes (owner-approved cleanup, 2026-11-01). A stored older pane name falls back to the default pane.
     case general, agents, safety
     public var title: String {
-        switch self { case .general: "General"; case .agents: "Agents"; case .safety: "Closed Lid" }
+        switch self { case .general: tr("General"); case .agents: tr("Agents"); case .safety: tr("Closed Lid") }
     }
     public var symbol: String {
         switch self { case .general: "gearshape"; case .agents: "terminal"; case .safety: "laptopcomputer" }
@@ -61,6 +61,8 @@ public final class SettingsEditor: ObservableObject {
     @Published public var closedLidPermit = "notPermitted"
     /// This Mac has a Strict row (ADR 0003); without one Strict cannot be chosen.
     @Published public var strictTested = false
+    /// Whether this Mac may use closed lid, decided the way the coordinator decides it. Strict has its own test.
+    public var closedLidAllowed: Bool { draft.powerMode == .strict ? strictTested : closedLidPermit != "notPermitted" }
     @Published public var systemModel = ""
     @Published public var systemBuild = ""
     @Published public var keepAwakeApps: [KeepAwakeApp] = []
@@ -89,6 +91,20 @@ public final class SettingsEditor: ObservableObject {
         if on { watchedMusic.insert(source) } else { watchedMusic.remove(source) }
         onSetMusicSource?(source, on)
     }
+    /// Spec 029: "Any audio" keeps an Auto session awake while any other app plays. Off by default.
+    @Published public var anyAudioHold = false
+    public var onSetAnyAudioHold: ((Bool) -> Void)?
+    public func setAnyAudioHold(_ on: Bool) {
+        anyAudioHold = on
+        onSetAnyAudioHold?(on)
+    }
+    /// Spec 028: the language, applied at once (System follows macOS).
+    @Published public var language: AppLanguage = .system
+    public var onSetLanguage: ((AppLanguage) -> Void)?
+    public func setLanguage(_ choice: AppLanguage) {
+        language = choice
+        onSetLanguage?(choice)
+    }
     public func setAutomaticUpdateChecks(_ on: Bool) {
         automaticUpdateChecks = on
         onSetAutomaticUpdateChecks?(on)
@@ -113,18 +129,27 @@ public final class SettingsEditor: ObservableObject {
         var candidate = draft
         for field in Self.numericFields {
             guard let value = NumericChoice.parse(numbers[field] ?? "") else {
-                errors.append(SettingsFieldError(field: field, message: "Enter a whole number.")); continue
+                errors.append(SettingsFieldError(field: field, message: tr("Enter a whole number."))); continue
             }
-            Self.assign(value, field: field, to: &candidate)
+            if !keepsImplicitDefault(field, value) { Self.assign(value, field: field, to: &candidate) }
         }
         return errors + candidate.validate().filter { error in !errors.contains { $0.field == error.field } }
+    }
+
+    /// An untouched default Timed stays unset, so it follows a changed session limit instead of freezing at the old value.
+    private func keepsImplicitDefault(_ field: SettingsFieldError.Field, _ value: Int) -> Bool {
+        field == .timer && original.timerMinutes == nil && !editingNumbers.contains(.timer)
+            && value == Self.numberValue(original, field: .timer)
     }
 
     @discardableResult
     public func save(using commit: (Configuration, Int) -> SettingsCommitResult) -> Bool {
         guard errors.isEmpty else { message = "Correct the highlighted fields before saving."; return false }
         var candidate = draft
-        for field in Self.numericFields { Self.assign(NumericChoice.parse(numbers[field] ?? "")!, field: field, to: &candidate) }
+        for field in Self.numericFields {
+            let value = NumericChoice.parse(numbers[field] ?? "")!
+            if !keepsImplicitDefault(field, value) { Self.assign(value, field: field, to: &candidate) }
+        }
         do {
             let configuration = try candidate.makeConfiguration()
             switch commit(configuration, revision) {

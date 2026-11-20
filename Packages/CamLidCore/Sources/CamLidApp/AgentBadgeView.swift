@@ -138,55 +138,55 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
     /// Settings disables unsupported or undetected agents. A supported but
     /// not-yet-detected agent says so; an unimplemented detector says "Soon".
     var settingsUnavailableReason: String? {
-        if !supportsDetection { return "Support soon" }
-        if !isDetected { return "Not detected" }
+        if !supportsDetection { return tr("Support soon") }
+        if !isDetected { return tr("Not detected") }
         return nil
     }
     var installationText: String {
-        if cliDetected == true { return "CLI detected" }
-        if appDetected == true { return "App detected" }
-        if cliDetected == false { return "Not detected" }
-        return "Checking…"
+        if cliDetected == true { return tr("CLI detected") }
+        if appDetected == true { return tr("App detected") }
+        if cliDetected == false { return tr("Not detected") }
+        return tr("Checking…")
     }
     /// Bundled raster mark, if this provider ships one. OpenCode renders as a vector
     /// below; unknown providers get the generic glyph.
     var markAssetName: String? { AgentProviderCatalog.info(for: provider)?.assetName }
     /// Providers whose mark is drawn in code rather than bundled raster art.
     var usesVectorMark: Bool { provider == "opencode" }
-    var detail: String { readiness == "disconnected" && (processCount ?? 0) > 0 ? "Process found · no task reported" : workingCount > 0 ? compactDetail + (unknownCount > 0 ? " · \(unknownCount) unknown" : "") : waitingCount > 0 ? compactDetail : observedState }
+    var detail: String { readiness == "disconnected" && (processCount ?? 0) > 0 ? tr("Process found · no task reported") : workingCount > 0 ? compactDetail + (unknownCount > 0 ? trf(" · %lld unknown", unknownCount) : "") : waitingCount > 0 ? compactDetail : tr(observedState) }
     var observationExplanation: String {
         let receipt: String
         if let age = evidenceAgeSeconds, age.isFinite, age >= 0 {
-            receipt = age >= 3_600 ? "Last update over an hour ago."
-                : "Last update \(age.formatted(.number.precision(.fractionLength(0)))) seconds ago."
+            receipt = age >= 3_600 ? tr("Last update over an hour ago.")
+                : trf("Last update %@ seconds ago.", age.formatted(.number.precision(.fractionLength(0)).locale(Localization.locale)))
         } else {
-            receipt = "No update yet."
+            receipt = tr("No update yet.")
         }
         let qualification = provider == "orca"
-            ? "Orca reports the state of its own panes only."
-            : "Estimated from the agent's activity; a running process alone proves nothing."
-        return "Confidence: \(confidence). \(receipt) \(qualification) Tasks waiting for you never keep the Mac awake."
+            ? tr("Orca reports the state of its own panes only.")
+            : tr("Estimated from the agent's activity; a running process alone proves nothing.")
+        return trf("Confidence: %@. %@ %@ Tasks waiting for you never keep the Mac awake.", tr(confidence), receipt, qualification)
     }
     static func workingSummary(_ agents: [Self]) -> String {
         let count = agents.filter { $0.detectionEnabled && $0.workingCount > 0 }.count
-        return count == 0 ? "No selected agents reporting work"
-            : count == 1 ? "1 selected agent reporting work" : "\(count) selected agents reporting work"
+        return count == 0 ? tr("No selected agents reporting work")
+            : count == 1 ? tr("1 selected agent reporting work") : trf("%lld selected agents reporting work", count)
     }
     static func waitingSummary(_ agents: [Self]) -> String {
         let count = agents.filter { $0.detectionEnabled && $0.workingCount == 0 && $0.waitingCount > 0 }.count
-        return count == 0 ? "No selected agents waiting for user"
-            : count == 1 ? "1 selected agent waiting for user" : "\(count) selected agents waiting for user"
+        return count == 0 ? tr("No selected agents waiting for user")
+            : count == 1 ? tr("1 selected agent waiting for user") : trf("%lld selected agents waiting for user", count)
     }
     var compactDetail: String {
         let text = baseCompactDetail
-        return estimated && readiness == "connected" ? text + " (estimated)" : text
+        return estimated && readiness == "connected" ? text + tr(" (estimated)") : text
     }
 
     private var baseCompactDetail: String {
-        if readiness == "disconnected" { return observedState == "Unknown" ? "No task reported" : "Not detected" }
-        if workingCount > 0 { return "Active · \(workingCount) " + (workingCount == 1 ? "task" : "tasks") + (waitingCount > 0 ? " · \(waitingCount) waiting" : "") }
-        if waitingCount > 0 { return "Waiting for user · \(waitingCount) " + (waitingCount == 1 ? "task" : "tasks") }
-        return observedState == "Unknown" ? "No task reported" : observedState
+        if readiness == "disconnected" { return observedState == "Unknown" ? tr("No task reported") : tr("Not detected") }
+        if workingCount > 0 { return trf("Active · %lld %@", workingCount, workingCount == 1 ? tr("task") : tr("tasks")) + (waitingCount > 0 ? trf(" · %lld waiting", waitingCount) : "") }
+        if waitingCount > 0 { return trf("Waiting for user · %lld %@", waitingCount, waitingCount == 1 ? tr("task") : tr("tasks")) }
+        return observedState == "Unknown" ? tr("No task reported") : tr(observedState)
     }
 
 }
@@ -215,7 +215,7 @@ struct SettingsAgentBadge: View {
         showsCLIInstallation ? state.installationText : state.compactDetail
     }
     private var accessibilityDescription: String {
-        let selection = !enabled ? "Ignored for sleep" : state.workingCount > 0 ? "May delay sleep" : "No working tasks holding power"
+        let selection = !enabled ? tr("Ignored for sleep") : state.workingCount > 0 ? tr("May delay sleep") : tr("No working tasks holding power")
         return selection + ". " + statusText + ". " + state.observationExplanation
     }
     private var mark: some View {
@@ -232,8 +232,8 @@ struct SettingsAgentBadge: View {
         .accessibilityIdentifier("camlid.agent." + state.provider)
         .accessibilityLabel(state.title)
         .accessibilityValue(accessibilityDescription)
-        .accessibilityHint(enabled ? "Click to ignore this agent for sleep decisions"
-            : "Click to include this agent in sleep decisions")
+        .accessibilityHint(enabled ? tr("Click to ignore this agent for sleep decisions")
+            : tr("Click to include this agent in sleep decisions"))
         .accessibilityAddTraits(enabled ? .isSelected : [])
     }
     var body: some View {
@@ -337,24 +337,24 @@ struct DashboardAgentBadge: View {
     private var status: String { isWorking ? "Working" : "Waiting" }
     private var count: Int { isWorking ? agent.workingCount : agent.waitingCount }
     private func countText(_ value: Int) -> String {
-        "\(value) " + (value == 1 ? "task" : "tasks")
+        "\(value) " + (value == 1 ? tr("task") : tr("tasks"))
     }
     private var hoverText: String {
-        guard isWorking else { return "Waiting: \(countText(count))" }
-        var text = "Working: \(countText(count))"
+        guard isWorking else { return trf("Waiting: %@", countText(count)) }
+        var text = trf("Working: %@", countText(count))
         if agent.waitingCount > 0 {
-            text += " · Waiting: \(countText(agent.waitingCount))"
+            text += trf(" · Waiting: %@", countText(agent.waitingCount))
         }
         return text
     }
 
     var body: some View {
         AgentBadge(provider: agent.provider, title: agent.title, tone: .activity) {
-            Text("\(count) " + status.lowercased()).font(.caption).monospacedDigit()
+            Text(trf("%lld %@", count, tr(status.lowercased()))).font(.caption).monospacedDigit()
                 .foregroundStyle(.secondary)
         }
         .help(hoverText)
-        .accessibilityLabel("\(agent.title), \(status), \(countText(count))")
+        .accessibilityLabel(trf("%@, %@, %@", agent.title, tr(status), countText(count)))
         .accessibilityValue(agent.observationExplanation)
         .accessibilityIdentifier("camlid.observed." + agent.provider)
     }
@@ -378,37 +378,41 @@ struct ModeBadges: View {
                         .padding(.horizontal, 9).padding(.vertical, 6)
                         .frame(maxWidth: .infinity)
                         .camLidPill(isSelected(mode) ? .selected : .neutral)
+                        // Explicit colours do not dim with .disabled, so an unavailable Auto needs this to look unavailable.
+                        .opacity(isUnavailable(mode) ? 0.4 : 1)
                 }
                     .buttonStyle(.borderless)
                     .accessibilityAddTraits(isSelected(mode) ? .isSelected : [])
-                    .accessibilityValue(isSelected(mode) ? "Selected" : (mode == .auto && !autoEnabled ? "Unavailable" : "Not selected"))
+                    .accessibilityValue(isSelected(mode) ? tr("Selected") : (isUnavailable(mode) ? tr("Unavailable") : tr("Not selected")))
                     .accessibilityLabel(accessibilityLabel(mode))
                     .accessibilityIdentifier("camlid.mode." + mode.rawValue)
-                    .help(modeHelp(mode) + (mode == .auto && !autoEnabled ? " Select an agent in Settings → Agents first." : ""))
-                    .disabled(mode == .auto && !autoEnabled)
+                    .help(modeHelp(mode) + (isUnavailable(mode) ? tr(" Select an agent in Settings → Agents first.") : ""))
+                    .disabled(isUnavailable(mode))
             }
         }.accessibilityElement(children: .contain)
-            .accessibilityLabel("Session mode")
+            .accessibilityLabel(tr("Session mode"))
     }
     private var displayedSelection: RequestedMode { selected == .manual ? .timed : selected }
+    /// Auto without a detection-enabled agent: dimmed and disabled, and the dashboard says why.
+    private func isUnavailable(_ mode: RequestedMode) -> Bool { mode == .auto && !autoEnabled }
     private func isSelected(_ mode: RequestedMode) -> Bool {
         selected != .off && mode == displayedSelection
     }
     private func buttonLabel(_ mode: RequestedMode) -> String {
-        mode.rawValue.capitalized
+        tr(mode.rawValue.capitalized)
     }
     private func accessibilityLabel(_ mode: RequestedMode) -> String {
-        guard activatesSession else { return mode.rawValue.capitalized + " mode" }
-        return (isSelected(mode) ? "Stop " : "Start ") + mode.rawValue.capitalized + " session"
+        guard activatesSession else { return trf("%@ mode", tr(mode.rawValue.capitalized)) }
+        return isSelected(mode) ? trf("Stop %@ session", tr(mode.rawValue.capitalized)) : trf("Start %@ session", tr(mode.rawValue.capitalized))
     }
     private func modeHelp(_ mode: RequestedMode) -> String {
         if activatesSession, isSelected(mode) {
-            return "Selected. Click again to stop the \(mode.rawValue.capitalized) session."
+            return trf("Selected. Click again to stop the %@ session.", mode.rawValue.capitalized)
         }
         switch mode {
-        case .off: return activatesSession ? "End the current session." : "No session can start."
-        case .auto: return activatesSession ? "Start an Auto session; finish after selected agents and the completion delay." : "Save Auto as the next session mode."
-        case .timed, .manual: return activatesSession ? "Start a Timed session with the timer choice; safety limits still apply." : "Save Timed as the next session mode."
+        case .off: return activatesSession ? tr("End the current session.") : tr("No session can start.")
+        case .auto: return activatesSession ? tr("Start an Auto session; finish after selected agents and the completion delay.") : tr("Save Auto as the next session mode.")
+        case .timed, .manual: return activatesSession ? tr("Start a Timed session with the timer choice; safety limits still apply.") : tr("Save Timed as the next session mode.")
         }
     }
 }

@@ -137,15 +137,14 @@ struct UIUXRefinementTests {
         let found = UpdatesView(snapshot: UpdateSnapshot(phase: .available, reason: "updateAvailable", version: "0.2.0"),
                                 canCheck: true, onCheck: {})
         #expect(found.title == "Update available" && found.detail.contains("Download it from the releases page"))
-        #expect(none.preferredHeight < 185)
+        #expect(none.showsButtons)
     }
 
     @Test func updateProjectionCannotEnableInstallation() throws {
         let payload = Data(#"{"phase":"available","reason":"updateAvailable","version":"2.0","installationAvailable":true}"#.utf8)
         let snapshot = try JSONDecoder().decode(UpdateSnapshot.self, from: payload)
         #expect(snapshot.phase == .available && snapshot.version == "2.0")
-        #expect(!snapshot.installationAvailable)
         let encoded = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as? [String: Any])
-        #expect(encoded["installationAvailable"] as? Bool == false)
+        #expect(encoded["installationAvailable"] == nil)
     }
 }

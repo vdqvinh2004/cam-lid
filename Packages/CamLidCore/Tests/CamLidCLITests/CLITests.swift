@@ -180,8 +180,8 @@ struct CLITests {
         let result = dispatch(["agents", "list"], context: &context)
         #expect(result.exitCode == 4)
         let dict = try jsonDict(result)
-        #expect(dict["available"] as? Bool == false)
-        #expect((dict["sessions"] as? [Any])?.isEmpty == true)
+        #expect(dict["reason"] as? String == "appUnavailable")
+        #expect(dict["agents"] == nil && dict["sessions"] == nil)
     }
 
     @Test("closed-lid start refused without capability, allowed with it")

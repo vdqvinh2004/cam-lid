@@ -21,11 +21,11 @@ public enum OrcaPollError: Error, Sendable {
     /// User-facing text. The raw case name must never reach the UI.
     public var userMessage: String {
         switch self {
-        case .unavailable: "Orca unavailable"
-        case .timeout: "Orca timed out"
-        case .tooLarge: "Orca output too large"
-        case .remote: "Orca remote target ignored"
-        case .invalid: "Orca reply invalid"
+        case .unavailable: tr("Orca unavailable")
+        case .timeout: tr("Orca timed out")
+        case .tooLarge: tr("Orca output too large")
+        case .remote: tr("Orca remote target ignored")
+        case .invalid: tr("Orca reply invalid")
         }
     }
 }

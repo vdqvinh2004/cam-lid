@@ -4,9 +4,9 @@ public enum OnboardingPage: Int, Sendable, CaseIterable {
     case welcome, detection, rollback
     public var title: String {
         switch self {
-        case .welcome: "Meet CamLid"
-        case .detection: "Your agents"
-        case .rollback: "Limits and controls"
+        case .welcome: tr("Meet CamLid")
+        case .detection: tr("Your agents")
+        case .rollback: tr("Limits and controls")
         }
     }
     var preferredHeight: CGFloat {
@@ -37,7 +37,7 @@ public struct OnboardingView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
-                Text("Step \(page.rawValue + 1) of \(OnboardingPage.allCases.count)")
+                Text(trf("Step %lld of %lld", page.rawValue + 1, OnboardingPage.allCases.count))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 HStack(spacing: 5) {
@@ -58,23 +58,23 @@ public struct OnboardingView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             if finishFailed {
                 CamLidStatusLabel(
-                    "Couldn’t complete Welcome. Keep CamLid open and try again. Your settings are unchanged.",
+                    tr("Couldn’t complete Welcome. Keep CamLid open and try again. Your settings are unchanged."),
                     systemImage: "exclamationmark.circle", tone: .danger,
-                    help: "Welcome could not finish; retry without changing settings"
+                    help: tr("Welcome could not finish; retry without changing settings")
                 )
                 .accessibilityIdentifier("camlid.onboarding.error")
             }
             Divider()
             HStack {
-                Button("Back") { page = OnboardingPage(rawValue: page.rawValue - 1)! }
+                Button(tr("Back")) { page = OnboardingPage(rawValue: page.rawValue - 1)! }
                     .disabled(page == .welcome || finishing)
                     .accessibilityIdentifier(CamLidAccessibility.IDs.onboardingBack)
                 Spacer()
-                Button(page == .rollback ? "Close" : "Skip", action: onCancel)
+                Button(page == .rollback ? tr("Close") : tr("Skip"), action: onCancel)
                     .disabled(finishing).keyboardShortcut(.cancelAction)
                 if page == .rollback {
-                    if finishing { ProgressView().controlSize(.small).accessibilityLabel("Completing Welcome") }
-                    Button(finishFailed ? "Retry" : "Finish") {
+                    if finishing { ProgressView().controlSize(.small).accessibilityLabel(tr("Completing Welcome")) }
+                    Button(finishFailed ? tr("Retry") : tr("Finish")) {
                         finishing = true; finishFailed = false
                         Task { @MainActor in
                             let completed = await onFinish()
@@ -85,7 +85,7 @@ public struct OnboardingView: View {
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier(CamLidAccessibility.IDs.onboardingFinish)
                 } else {
-                    Button("Continue") { page = OnboardingPage(rawValue: page.rawValue + 1)! }
+                    Button(tr("Continue")) { page = OnboardingPage(rawValue: page.rawValue + 1)! }
                         .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
                         .accessibilityIdentifier(CamLidAccessibility.IDs.onboardingNext)
                 }
@@ -122,26 +122,26 @@ private struct OnboardingContent: View {
         VStack(alignment: .leading, spacing: 12) {
             switch page {
             case .welcome:
-                Text("Follow your local coding agents from the menu bar.")
+                Text(tr("Follow your local coding agents from the menu bar."))
                 VStack(alignment: .leading, spacing: 10) {
-                    OnboardingModeRow(symbol: "arrow.triangle.2.circlepath", title: "Auto",
-                                      text: "Keeps the Mac awake while your agents work, then lets it sleep.")
-                    OnboardingModeRow(symbol: "timer", title: "Timed",
-                                      text: "Keeps it awake for a time you choose, or until you stop it.")
+                    OnboardingModeRow(symbol: "arrow.triangle.2.circlepath", title: tr("Auto"),
+                                      text: tr("Keeps the Mac awake while your agents work, then lets it sleep."))
+                    OnboardingModeRow(symbol: "timer", title: tr("Timed"),
+                                      text: tr("Keeps it awake for a time you choose, or until you stop it."))
                 }
                 CamLidNoticeCard(
-                    tone: .info, systemImage: "info.circle", title: "Closed lid",
-                    message: "Keeping the Mac awake with the lid closed needs the CamLid helper, and works on tested Macs or on this Mac after you allow it in Settings › Closed Lid. Until then you can explore sessions, agents and safety limits."
+                    tone: .info, systemImage: "info.circle", title: tr("Closed lid"),
+                    message: tr("Keeping the Mac awake with the lid closed needs the CamLid helper, and works on tested Macs or on this Mac after you allow it in Settings › Closed Lid. Until then you can explore sessions, agents and safety limits.")
                 )
-                Text("Click the menu-bar icon for the dashboard. Right-click or Control-click for options.")
+                Text(tr("Click the menu-bar icon for the dashboard. Right-click or Control-click for options."))
                     .font(.callout)
             case .detection:
-                Text("CamLid can keep your agents working while you step away.")
+                Text(tr("CamLid can keep your agents working while you step away."))
                 if detectedAgents.isEmpty {
                     if isObserving {
-                        ProgressView("Looking for local agents…").controlSize(.small)
+                        ProgressView(tr("Looking for local agents…")).controlSize(.small)
                     } else {
-                        Text("No supported agents detected on this Mac.")
+                        Text(tr("No supported agents detected on this Mac."))
                             .font(.callout).foregroundStyle(.secondary)
                     }
                 } else {
@@ -153,26 +153,26 @@ private struct OnboardingContent: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Text("CamLid finds these agents automatically on this Mac.")
+                Text(tr("CamLid finds these agents automatically on this Mac."))
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             case .rollback:
                 CamLidNoticeCard(
                     tone: .warning, systemImage: "exclamationmark.triangle.fill",
-                    title: "Use a ventilated desk, never a closed bag.",
-                    help: "Ventilation is required; keep the Mac out of closed bags"
+                    title: tr("Use a ventilated desk, never a closed bag."),
+                    help: tr("Ventilation is required; keep the Mac out of closed bags")
                 )
-                Text("Choose Auto or Timed in the dashboard. Click the active mode again to stop. Auto’s Sleep when done sets the delay after selected work ends.")
-                Text("Infinite has no time limit. Battery and thermal safety stops still apply. Activity records what happened and why.")
+                Text(tr("Choose Auto or Timed in the dashboard. Click the active mode again to stop. Auto’s Sleep when done sets the delay after selected work ends."))
+                Text(tr("Infinite has no time limit. Battery and thermal safety stops still apply. Activity records what happened and why."))
                     .foregroundStyle(.secondary)
-                Text("Readings can be delayed or unavailable.")
+                Text(tr("Readings can be delayed or unavailable."))
                     .font(.callout).foregroundStyle(.secondary)
             }
         }
     }
 }
 
-#Preview("Observed agents") {
+#Preview(tr("Observed agents")) {
     OnboardingView(agents: [AgentBadgeState(provider: "codex", enabled: false, tasks: [], processCount: 1)],
                    isObserving: false, onFinish: { true }, onCancel: {})
 }

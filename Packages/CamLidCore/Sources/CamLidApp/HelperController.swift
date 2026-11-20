@@ -39,7 +39,7 @@ import CamLidCore
         }
     }
 
-    public func install() { perform("install") }
+    public func install() { perform(tr("install")) }
     public func uninstall() { perform("uninstall") }
 
     private func perform(_ operation: String) {
@@ -133,7 +133,7 @@ import CamLidCore
         case "helperSignerMismatch": return "The helper is not signed by the same certificate as CamLid, so it was not installed."
         case "restoreUnresolved": return "The sleep setting could not be restored, so the helper was kept. Check `pmset -g`."
         case "qaCopy": return "A QA copy never installs or removes the closed-lid helper."
-        default: return "Helper \(result.reason) failed."
+        default: return String(format: "Helper %@ failed.", result.reason)
         }
     }
 

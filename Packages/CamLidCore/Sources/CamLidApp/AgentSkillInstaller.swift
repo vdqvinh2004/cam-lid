@@ -45,10 +45,10 @@ struct AgentSkillInstaller {
     }
 
     private func install(replacing: Bool) -> AgentSkillOutcome {
-        guard let content = bundled() else { return .failed("This build has no bundled skill file.") }
+        guard let content = bundled() else { return .failed(tr("This build has no bundled skill file.")) }
         // A link on the path would send the write somewhere else. CamLid writes plain files only.
         guard !Self.containsSymbolicLink(in: home) else {
-            return .failed("The skill path contains a symbolic link, so CamLid did not write through it.")
+            return .failed(tr("The skill path contains a symbolic link, so CamLid did not write through it."))
         }
         let exists = FileManager.default.fileExists(atPath: location.path)
         // CamLid's own file, unchanged since it wrote it, is updated without asking. Anything else needs consent.
@@ -76,7 +76,7 @@ struct AgentSkillInstaller {
             return .keptModified
         }
         guard let data = try? Data(contentsOf: location) else {
-            return .failed("CamLid could not read the skill file, so it left the file in place.")
+            return .failed(tr("CamLid could not read the skill file, so it left the file in place."))
         }
         guard Self.digest(data) == installed.sha256 else {
             record = nil

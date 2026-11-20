@@ -1,7 +1,8 @@
+import CamLidCore
 import Foundation
 
 /// A release tag such as "v0.1.0" read as numbers. Anything else (a pre-release suffix, a date) is not a version.
-struct ReleaseVersion: Comparable, Equatable {
+struct ReleaseVersion: Comparable, Equatable, Sendable {
     let parts: [Int]
 
     init?(_ text: String) {
@@ -71,9 +72,24 @@ struct ReleaseVersion: Comparable, Equatable {
               let releases = try? JSONSerialization.jsonObject(with: body) as? [[String: Any]] else { return .failed }
         for release in releases where release["draft"] as? Bool != true {
             guard let tag = release["tag_name"] as? String, let version = ReleaseVersion(tag) else { continue }
-            return version > current ? .available(String(tag.drop { $0 == "v" })) : .current
+            let number = String(tag.drop { $0 == "v" })
+            return version > current ? .available(number, assets(of: release, version: number)) : .current
         }
         return .noCompatibleUpdate
+    }
+
+    /// Spec 026 FR-002: the zip and its checksum of one release, and only when both are on github.com over HTTPS.
+    /// Otherwise nil, and the app offers the Releases page only.
+    nonisolated static func assets(of release: [String: Any], version: String) -> UpdateAssets? {
+        let zipName = "CamLid-\(version)-macos-arm64.zip"
+        let items = release["assets"] as? [[String: Any]] ?? []
+        func url(_ name: String) -> URL? {
+            guard let text = items.first(where: { $0["name"] as? String == name })?["browser_download_url"] as? String,
+                  let url = URL(string: text), url.scheme == "https", url.host == "github.com" else { return nil }
+            return url
+        }
+        guard let zip = url(zipName), let checksum = url(zipName + ".sha256") else { return nil }
+        return UpdateAssets(zipURL: zip, checksumURL: checksum)
     }
 
     nonisolated static func isOffline(_ error: URLError) -> Bool {

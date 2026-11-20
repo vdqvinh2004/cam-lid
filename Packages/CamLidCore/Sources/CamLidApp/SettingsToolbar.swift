@@ -21,6 +21,15 @@ final class SettingsToolbar: NSObject, NSToolbarDelegate {
     }
 
     /// Pane selection changes the selection and the title only. The window keeps the size the person chose.
+    /// Labels are set when an item is created, so a language change must set them again.
+    func refreshLabels() {
+        for item in toolbar.items {
+            guard let section = SettingsSection(rawValue: item.itemIdentifier.rawValue) else { continue }
+            item.label = section.title
+            item.toolTip = trf("%@ settings", section.title)
+        }
+    }
+
     func select(_ section: SettingsSection) {
         toolbar.selectedItemIdentifier = NSToolbarItem.Identifier(section.rawValue)
         window?.title = section.title   // macOS settings windows are titled with the pane name
@@ -40,7 +49,7 @@ final class SettingsToolbar: NSObject, NSToolbarDelegate {
         guard let section = SettingsSection(rawValue: identifier.rawValue) else { return nil }
         let item = NSToolbarItem(itemIdentifier: identifier)
         item.label = section.title
-        item.toolTip = section.title + " settings"
+        item.toolTip = trf("%@ settings", section.title)
         item.image = NSImage(systemSymbolName: section.symbol, accessibilityDescription: section.title)
         item.target = self; item.action = #selector(selectPane(_:))
         return item

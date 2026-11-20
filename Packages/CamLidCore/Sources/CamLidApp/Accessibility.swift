@@ -19,8 +19,8 @@ struct RowDisclosureStyle: DisclosureGroupStyle {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain)
-                    .accessibilityValue(configuration.isExpanded ? "Expanded" : "Collapsed")
-                    .help(configuration.isExpanded ? "Click row to collapse" : "Click row to expand")
+                    .accessibilityValue(configuration.isExpanded ? tr("Expanded") : tr("Collapsed"))
+                    .help(configuration.isExpanded ? tr("Click row to collapse") : tr("Click row to expand"))
                 trailing
             }
             if configuration.isExpanded { configuration.content.padding(.leading, 16) }
@@ -79,22 +79,22 @@ public enum CamLidAccessibility {
         public static func statusLabel(for state: EffectiveState, reason: String?) -> String {
             let base: String
             switch state {
-            case .off: base = "Off"
-            case .ready: base = "Ready"
-            case .protected: base = "Protected"
-            case .completionGrace: base = "Waiting after work"
-            case .safetyStopped: base = "Stopped by safety"
-            case .expired: base = "Session time limit reached"
-            case .unavailable: base = "Status unavailable"
-            case .recoveryRequired: base = "Recovery required"
+            case .off: base = tr("Off")
+            case .ready: base = tr("Ready")
+            case .protected: base = tr("Protected")
+            case .completionGrace: base = tr("Waiting after work")
+            case .safetyStopped: base = tr("Stopped by safety")
+            case .expired: base = tr("Session time limit reached")
+            case .unavailable: base = tr("Status unavailable")
+            case .recoveryRequired: base = tr("Recovery required")
             }
-            guard let reason, !reason.isEmpty else { return "CamLid: \(base)" }
-            return "CamLid: \(base), \(reason)"
+            guard let reason, !reason.isEmpty else { return trf("CamLid: %@", base) }
+            return trf("CamLid: %@, %@", base, reason)
         }
 
-        public static let stopAction = "Stop protection"
-        public static let optionsAction = "Options"
-        public static let unknownValue = "Unknown"
+        public static var stopAction: String { tr("Stop protection") }
+        public static var optionsAction: String { tr("Options") }
+        public static var unknownValue: String { tr("Unknown") }
     }
 
     /// Intended order of interactive dashboard controls. Native keyboard
@@ -127,24 +127,24 @@ public enum CamLidAccessibility {
 
         /// Keep-awake held with the lid open. Closed-lid protection is not verified here, so it never says "Protected".
         public static let keepingAwakeWithLidOpen = StatusStyle(
-            tone: .ok, symbolName: "laptopcomputer", text: "Keeping awake (lid open)")
+            tone: .ok, symbolName: "laptopcomputer", text: tr("Keeping awake (lid open)"))
 
         public static func style(for state: EffectiveState) -> StatusStyle {
             switch state {
             case .protected:
-                return StatusStyle(tone: .ok, symbolName: "laptopcomputer.badge.checkmark", text: "Protected")
+                return StatusStyle(tone: .ok, symbolName: "laptopcomputer.badge.checkmark", text: tr("Protected"))
             case .ready:
-                return StatusStyle(tone: .neutral, symbolName: "laptopcomputer", text: "Ready")
+                return StatusStyle(tone: .neutral, symbolName: "laptopcomputer", text: tr("Ready"))
             case .completionGrace:
-                return StatusStyle(tone: .attention, symbolName: "moon.zzz", text: "Waiting after work")
+                return StatusStyle(tone: .attention, symbolName: "moon.zzz", text: tr("Waiting after work"))
             case .safetyStopped, .expired:
-                return StatusStyle(tone: .stopped, symbolName: "laptopcomputer.trianglebadge.exclamationmark", text: state == .safetyStopped ? "Stopped — safety" : "Time limit reached")
+                return StatusStyle(tone: .stopped, symbolName: "laptopcomputer.trianglebadge.exclamationmark", text: state == .safetyStopped ? tr("Stopped — safety") : tr("Time limit reached"))
             case .off:
-                return StatusStyle(tone: .neutral, symbolName: "laptopcomputer.slash", text: "Off")
+                return StatusStyle(tone: .neutral, symbolName: "laptopcomputer.slash", text: tr("Off"))
             case .unavailable:
-                return StatusStyle(tone: .neutral, symbolName: "questionmark.circle", text: "Unknown")
+                return StatusStyle(tone: .neutral, symbolName: "questionmark.circle", text: tr("Unknown"))
             case .recoveryRequired:
-                return StatusStyle(tone: .stopped, symbolName: "laptopcomputer.trianglebadge.exclamationmark", text: "Recovery required")
+                return StatusStyle(tone: .stopped, symbolName: "laptopcomputer.trianglebadge.exclamationmark", text: tr("Recovery required"))
             }
         }
     }

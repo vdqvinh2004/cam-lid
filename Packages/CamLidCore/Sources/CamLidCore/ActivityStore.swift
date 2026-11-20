@@ -319,22 +319,25 @@ public struct ActivityStore: Sendable {
     /// info carries kind only. Same salt + same session ID always yields the
     /// same pseudonym within and across exports; different salts differ.
     public func exportRedacted(salt: String) -> [RedactedTransition] {
-        transitions().map { record in
-            RedactedTransition(
-                schemaVersion: record.schemaVersion,
-                id: record.id,
-                sessionPseudonym: record.sessionID.map { Self.pseudonym(sessionID: $0, salt: salt) },
-                timestamp: record.timestamp,
-                stateRevision: record.stateRevision,
-                category: record.category,
-                previousState: record.previousState,
-                newState: record.newState,
-                reasonCodes: record.reasonCodes,
-                providerKind: record.providerKind,
-                healthSummary: record.healthSummary,
-                cleanupOutcome: record.cleanupOutcome
-            )
-        }
+        transitions().map { Self.redacted($0, salt: salt) }
+    }
+
+    /// One record in redacted form: the session ID becomes its salted pseudonym, and the rest is kept as it is.
+    public static func redacted(_ record: StoredTransition, salt: String) -> RedactedTransition {
+        RedactedTransition(
+            schemaVersion: record.schemaVersion,
+            id: record.id,
+            sessionPseudonym: record.sessionID.map { pseudonym(sessionID: $0, salt: salt) },
+            timestamp: record.timestamp,
+            stateRevision: record.stateRevision,
+            category: record.category,
+            previousState: record.previousState,
+            newState: record.newState,
+            reasonCodes: record.reasonCodes,
+            providerKind: record.providerKind,
+            healthSummary: record.healthSummary,
+            cleanupOutcome: record.cleanupOutcome
+        )
     }
 
     /// JSON form of `exportRedacted(salt:)` for `camlid logs export --redacted`.
@@ -365,7 +368,7 @@ public struct ActivityStore: Sendable {
 
     /// Stable salted pseudonym (FNV-1a 64, hex). Pure-Swift so Core stays
     /// dependency-free; determinism is the requirement, not cryptographic strength.
-    static func pseudonym(sessionID: String, salt: String) -> String {
+    public static func pseudonym(sessionID: String, salt: String) -> String {
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in (salt + "\u{1F}" + sessionID).utf8 {
             hash ^= UInt64(byte)

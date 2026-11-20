@@ -21,6 +21,8 @@ public enum AllowlistedCommand: String, Sendable, Codable, CaseIterable {
     case diagnose
     case admitCommand, renewCommand, finishCommand
     case sleep
+    /// One app-side operation of the CLI catalog (`session duration`, `logs list`, …). The payload names the operation.
+    case operate
 }
 
 public enum IPCError: Error, Equatable, Sendable {

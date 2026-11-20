@@ -29,8 +29,7 @@ struct UISimplicityTests {
         #expect(ActivityLogView.preferredHeight(recordCount: 100_000, hasError: true) <= 480)
         let unavailable = UpdatesView(snapshot: UpdateSnapshot(phase: .unavailable, reason: "noCompatibleUpdate"), canCheck: false, onCheck: {})
         let checking = UpdatesView(snapshot: UpdateSnapshot(phase: .checking, reason: "checkingReleases"), canCheck: false, onCheck: {})
-        #expect(unavailable.preferredHeight < checking.preferredHeight)
-        #expect(unavailable.preferredHeight >= 110)
+        #expect(unavailable.showsButtons && !checking.showsButtons)
         #expect(Set(OnboardingPage.allCases.map(\.preferredHeight)).count == 1)
     }
     @Test @MainActor func infiniteChoiceSurvivesAutoAndMenusHideStopWhenIdle() async throws {
@@ -52,12 +51,15 @@ struct UISimplicityTests {
         #expect(infinite["capDeadlineMonotonic"] == nil)
         #expect(menu.buildMenu().items.first { $0.tag == 2 }?.isHidden == false)
         await app.activateDashboardMode(.auto, expectedRevision: 4)
+        // A switch replaces the running session with one of the new mode, which starts its own cap (spec 031 D4).
         let bounded = try #require(status()["session"] as? [String: Any])
-        #expect(bounded["id"] as? String == infinite["id"] as? String)
-        #expect((bounded["capDeadlineMonotonic"] as? Double ?? 0) == (infinite["startedAtMonotonic"] as? Double ?? 0) + 7200)
+        #expect(bounded["requestedMode"] as? String == "auto")
+        #expect(bounded["id"] as? String != infinite["id"] as? String)
+        #expect(bounded["capDeadlineMonotonic"] as? Double == (bounded["startedAtMonotonic"] as? Double ?? 0) + 7200)
         await app.activateDashboardMode(.timed, expectedRevision: 5)
         let unlimitedAgain = try #require(status()["session"] as? [String: Any])
-        #expect(unlimitedAgain["id"] as? String == infinite["id"] as? String)
+        // The saved Infinite choice survives the switch, so the new Timed session has no cap.
+        #expect(unlimitedAgain["requestedMode"] as? String == "timed")
         #expect(unlimitedAgain["capDeadlineMonotonic"] == nil)
         await app.activateDashboardMode(.timed, expectedRevision: 6)
         var finite = ConfigPatch(); finite.timerMinutes = 5
@@ -66,12 +68,13 @@ struct UISimplicityTests {
         let auto = try #require(status()["session"] as? [String: Any])
         await app.activateDashboardMode(.timed, expectedRevision: 8)
         let shortened = try #require(status()["session"] as? [String: Any])
-        #expect(shortened["id"] as? String == auto["id"] as? String)
-        #expect((shortened["capDeadlineMonotonic"] as? Double ?? 0) == (auto["startedAtMonotonic"] as? Double ?? 0) + 300)
+        #expect(shortened["requestedMode"] as? String == "timed")
+        #expect(shortened["id"] as? String != auto["id"] as? String)
+        #expect(shortened["capDeadlineMonotonic"] as? Double == (shortened["startedAtMonotonic"] as? Double ?? 0) + 300)
         // Owner-approved cleanup (2026-11-01): three panes.
         #expect(SettingsSection.allCases.map(\.title) == ["General", "Agents", "Closed Lid"])
     }
-    @Test @MainActor func dashboardModesStartSwitchAndToggleWithoutResettingCap() async throws {
+    @Test @MainActor func dashboardModesStartSwitchAndToggle() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
         func status() throws -> [String: Any] {
@@ -83,8 +86,9 @@ struct UISimplicityTests {
         await app.activateDashboardMode(.auto, expectedRevision: 2)
         let switched = try #require(status()["session"] as? [String: Any])
         #expect(switched["requestedMode"] as? String == "auto")
-        #expect(switched["id"] as? String == first["id"] as? String)
-        #expect(switched["capDeadlineMonotonic"] as? Double == first["capDeadlineMonotonic"] as? Double)
+        // The switch replaces the session: the new Auto session has its own id and its own cap (spec 031 D4).
+        #expect(switched["id"] as? String != first["id"] as? String)
+        #expect(switched["capDeadlineMonotonic"] as? Double == (switched["startedAtMonotonic"] as? Double ?? 0) + 7200)
         await app.activateDashboardMode(.auto, expectedRevision: 3)
         #expect(try status()["session"] == nil)
         await app.activateDashboardMode(.manual, expectedRevision: 3)

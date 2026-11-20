@@ -79,7 +79,11 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         }
     }
     func update(_ state: UtilityUIState) {
+        let languageChanged = self.state?.language != state.language
+        Localization.isVietnamese = Localization.resolve(state.language)
+        if languageChanged { refreshLanguage() }
         self.state = state
+        settingsEditor?.language = state.language
         settingsEditor?.receive(configuration: state.configuration, revision: state.revision)
         settingsEditor?.installationPending = state.installationPending
         settingsEditor?.badges = state.dashboard.agents
@@ -96,6 +100,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         settingsEditor?.automaticUpdateChecks = state.automaticUpdateChecks
         settingsEditor?.agentSkillPath = state.agentSkillPath
         settingsEditor?.watchedMusic = state.watchedMusic
+        settingsEditor?.anyAudioHold = state.anyAudioHold
         if popover?.isShown == true { dashboard(show: false) }
         if onboardingWindow?.isVisible == true { showOnboarding(show: false) }
         if updatesWindow?.isVisible == true { showUpdates(show: false) }
@@ -115,16 +120,27 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         case .installed, .removed, .nothingToRemove: return
         case .conflict(let path):
             let alert = NSAlert()
-            alert.messageText = "Replace the skill file that already exists?"
-            alert.informativeText = "\((path as NSString).abbreviatingWithTildeInPath) exists, and CamLid did not write it. Replacing it cannot be undone."
-            alert.addButton(withTitle: "Cancel"); alert.addButton(withTitle: "Replace")
+            alert.messageText = tr("Replace the skill file that already exists?")
+            alert.informativeText = trf("%@ exists, and CamLid did not write it. Replacing it cannot be undone.", (path as NSString).abbreviatingWithTildeInPath)
+            alert.addButton(withTitle: tr("Cancel")); alert.addButton(withTitle: tr("Replace"))
             if alert.runModal() == .alertSecondButtonReturn { send(.agentSkill(.install(replacing: true))) }
         case .keptModified:
-            showAgentSkillMessage("CamLid left the skill file in place",
-                "The file changed after CamLid wrote it, so CamLid did not remove it.")
+            showAgentSkillMessage(tr("CamLid left the skill file in place"),
+                tr("The file changed after CamLid wrote it, so CamLid did not remove it."))
         case .failed(let message):
-            showAgentSkillMessage("The agent skill was not changed", message)
+            showAgentSkillMessage(tr("The agent skill was not changed"), message)
         }
+    }
+
+    /// Spec 028: the menu bar and the window titles are AppKit, so they are set again when the language changes.
+    private func refreshLanguage() {
+        installMenu()
+        toolbar?.refreshLabels()
+        settingsWindow?.title = tr("Settings")
+        activityWindow?.title = tr("Activity")
+        onboardingWindow?.title = tr("Welcome to CamLid")
+        sleepDiagnosticsWindow?.title = tr("Why Is My Mac Awake?")
+        updatesWindow?.title = tr("Updates")
     }
 
     private func showAgentSkillMessage(_ title: String, _ detail: String) {
@@ -169,8 +185,10 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
                 switch action {
                 case .installHelper, .reinstallHelper: self?.send(.installHelper)
                 case .openClosedLidSettings: self?.send(.settings(.safety))
+                case .enableClosedLid: if let state = self?.state { self?.send(.enableClosedLid(state.revision)) }
                 }
-            })
+            },
+            onOpenUpdates: { [weak self] in self?.send(.updates) })
         if let host = dashboardHost { host.rootView = view }
         else { dashboardHost = NSHostingController(rootView: view) }
         dashboardHost?.sizingOptions = []
@@ -249,11 +267,15 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         editor.onSetAutomaticUpdateChecks = { [weak self] in self?.send(.setAutomaticUpdateChecks($0)) }
         editor.onSetAgentSkill = { [weak self] in self?.setAgentSkill($0) }
         editor.watchedMusic = state.watchedMusic
+        editor.anyAudioHold = state.anyAudioHold
         editor.onSetMusicSource = { [weak self] source, on in self?.send(.setMusicSource(source, on)) }
+        editor.onSetAnyAudioHold = { [weak self] on in self?.send(.setAnyAudioHold(on)) }
+        editor.onSetLanguage = { [weak self] choice in self?.send(.setLanguage(choice)) }
+        editor.language = state.language
         editor.configureAsyncAutosave { [weak self] patch, revision in
             await self?.commit(patch, revision: revision) ?? .failed("App unavailable. Input preserved.")
         }
-        let view = SettingsView(editor: editor, statusSummary: "Power protection unavailable",
+        let view = SettingsView(editor: editor, statusSummary: tr("Power protection unavailable"),
             onCommit: { _, _ in .failed("App unavailable. Draft preserved.") },
             onClose: { [weak self] in self?.settingsWindow?.performClose(nil) },
             onOpenActivityLog: { [weak self] in self?.send(.activity) },
@@ -261,7 +283,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         let host = NSHostingController(rootView: view)
         host.sizingOptions = []
         let window = NSWindow(contentViewController: host)
-        window.isReleasedWhenClosed = false; window.title = "Settings"
+        window.isReleasedWhenClosed = false; window.title = tr("Settings")
         window.contentMinSize = NSSize(width: 500, height: 360)   // SettingsView lays out from 500 pt; the picker and some content stay visible
         window.setContentSize(NSSize(width: 580, height: SettingsSection.windowHeight)); window.center()
         window.setFrameAutosaveName("CamLid.Settings")   // restores the size and position the person left, when one is saved
@@ -296,7 +318,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
             onDeleteAll: { [weak self] in self?.send(.deleteHistory(nil)) }, onDeleteResult: { _ in })
         let height = ActivityLogView.preferredHeight(recordCount: activity.records.count, hasError: activity.error != nil)
         let needsInitialSize = activityWindow == nil || !historyInitiallySized
-        present(view, title: "Activity", window: &activityWindow, width: 640, height: height, minWidth: 560, show: show)
+        present(view, title: tr("Activity"), window: &activityWindow, width: 640, height: height, minWidth: 560, show: show)
         if needsInitialSize, !activity.isLoading, let activityWindow {
             activityWindow.setContentSize(NSSize(width: 640, height: height))
             historyInitiallySized = true
@@ -311,7 +333,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
                 let written = await Task.detached(priority: .utility) {
                     do { try data.write(to: url, options: .atomic); return true } catch { return false }
                 }.value
-                self.send(.activityOutcome(written ? "Redacted export saved to \(url.lastPathComponent)." : "Export failed. Choose a writable location and retry."))
+                self.send(.activityOutcome(written ? String(format: "Redacted export saved to %@.", url.lastPathComponent) : "Export failed. Choose a writable location and retry."))
             }
         }
     }
@@ -324,7 +346,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
             if completed { self.onboardingWindow?.close() }
             return completed
         }, onCancel: { [weak self] in self?.send(.cancelOnboarding); self?.onboardingWindow?.close() })
-        present(view, title: "Welcome to CamLid", window: &onboardingWindow, width: 520, height: OnboardingPage.welcome.preferredHeight, minWidth: 440, show: show)
+        present(view, title: tr("Welcome to CamLid"), window: &onboardingWindow, width: 520, height: OnboardingPage.welcome.preferredHeight, minWidth: 440, show: show)
     }
     private func completeOnboarding() async -> Bool {
         guard onboardingRequest == nil else { return false }
@@ -354,13 +376,16 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         }
     }
     private func showSleepDiagnostics() {
-        present(SleepDiagnosticsView(read: { [weak self] in await self?.readDiagnostics() ?? DiagnosticSnapshot(errors: ["appUnavailable"]) }), title: "Why Is My Mac Awake?", window: &sleepDiagnosticsWindow, width: 600, height: 420, minWidth: 520)
+        present(SleepDiagnosticsView(read: { [weak self] in await self?.readDiagnostics() ?? DiagnosticSnapshot(errors: ["appUnavailable"]) }), title: tr("Why Is My Mac Awake?"), window: &sleepDiagnosticsWindow, width: 600, height: 420, minWidth: 520)
     }
     private func showUpdates(show: Bool = true) {
         guard let state else { return }
-        let view = UpdatesView(snapshot: state.updates, canCheck: state.canCheckUpdates,
-                              onCheck: { [weak self] in self?.send(.checkUpdates) })
-        present(view, title: "Updates", window: &updatesWindow, width: 460, height: view.preferredHeight, minWidth: 360, show: show)
+        let view = UpdatesView(snapshot: state.updates, canCheck: state.canCheckUpdates, canInstall: state.canInstallUpdates,
+                              sessionActive: state.updatesSessionActive,
+                              onCheck: { [weak self] in self?.send(.checkUpdates) },
+                              onInstall: { [weak self] endingSession in self?.send(.installUpdate(endingSession: endingSession)) })
+        present(view, title: tr("Updates"), window: &updatesWindow, width: 460, height: 200, minWidth: 360, minHeight: 120,
+                sizesToContent: true, show: show)
     }
     /// Opens a window in front of every other app's windows, also when it was already open behind them.
     static func bringToFront(_ window: NSWindow) {
@@ -371,17 +396,19 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
     /// `minWidth` is the narrowest the content lays out in; a window must not be dragged (or scripted) below it, or the
     /// content clips at the left edge.
     private func present<Content: View>(_ view: Content, title: String, window: inout NSWindow?, width: CGFloat, height: CGFloat,
-                                        minWidth: CGFloat, show: Bool = true) {
+                                        minWidth: CGFloat, minHeight: CGFloat = 200, sizesToContent: Bool = false,
+                                        show: Bool = true) {
         if let existing = window {
             if let host = existing.contentViewController as? NSHostingController<Content> { host.rootView = view }
             if show { Self.bringToFront(existing) }; return
         }
         guard show else { return }
         let host = NSHostingController(rootView: view)
-        host.sizingOptions = []
+        // A window that sizes to its content follows the view's ideal size as its state changes.
+        host.sizingOptions = sizesToContent ? [.preferredContentSize] : []
         let created = NSWindow(contentViewController: host)
         created.isReleasedWhenClosed = false; created.title = title; created.delegate = self
-        created.contentMinSize = NSSize(width: minWidth, height: 200)
+        created.contentMinSize = NSSize(width: minWidth, height: minHeight)
         created.setContentSize(NSSize(width: width, height: height)); created.center(); window = created
         Self.bringToFront(created)
     }
@@ -416,30 +443,31 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
     func installMenu() {
         let main = NSMenu(); let root = NSMenuItem(); main.addItem(root)
         let app = NSMenu(); root.submenu = app
-        let dashboard = NSMenuItem(title: "Show Dashboard", action: #selector(openDashboard), keyEquivalent: "d"); dashboard.target = self; app.addItem(dashboard)
-        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ","); settings.target = self; app.addItem(settings)
-        let start = NSMenuItem(title: "Auto", action: #selector(startPreview), keyEquivalent: ""); start.tag = 1; start.target = self; app.addItem(start)
-        let stop = NSMenuItem(title: "Stop", action: #selector(stopPreview), keyEquivalent: "."); stop.tag = 2; stop.target = self; stop.isHidden = true; app.addItem(stop)
-        let activity = NSMenuItem(title: "Activity Log…", action: #selector(openActivity), keyEquivalent: "l"); activity.target = self; app.addItem(activity)
-        let diagnostics = NSMenuItem(title: "Why is my Mac awake?…", action: #selector(openSleepDiagnostics), keyEquivalent: ""); diagnostics.target = self; app.addItem(diagnostics)
-        let welcome = NSMenuItem(title: "Welcome & Safety…", action: #selector(openWelcome), keyEquivalent: ""); welcome.target = self; app.addItem(welcome)
-        let updates = NSMenuItem(title: "Check for Updates…", action: #selector(openUpdates), keyEquivalent: ""); updates.target = self; app.addItem(updates)
-        let quit = NSMenuItem(title: "Quit CamLid", action: #selector(quitMain), keyEquivalent: "q"); quit.target = self; app.addItem(quit)
-        let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
-        let edit = NSMenu(title: "Edit"); editItem.submenu = edit; main.addItem(editItem)
-        edit.addItem(withTitle: "Undo", action: Selector("undo:"), keyEquivalent: "z")
-        let redo = edit.addItem(withTitle: "Redo", action: Selector("redo:"), keyEquivalent: "z")
+        let dashboard = NSMenuItem(title: tr("Show Dashboard"), action: #selector(openDashboard), keyEquivalent: "d"); dashboard.target = self; app.addItem(dashboard)
+        let settings = NSMenuItem(title: tr("Settings…"), action: #selector(openSettings), keyEquivalent: ","); settings.target = self; app.addItem(settings)
+        let start = NSMenuItem(title: tr("Auto"), action: #selector(startPreview), keyEquivalent: ""); start.tag = 1; start.target = self; app.addItem(start)
+        let stop = NSMenuItem(title: tr("Stop"), action: #selector(stopPreview), keyEquivalent: "."); stop.tag = 2; stop.target = self; stop.isHidden = true; app.addItem(stop)
+        let activity = NSMenuItem(title: tr("Activity Log…"), action: #selector(openActivity), keyEquivalent: "l"); activity.target = self; app.addItem(activity)
+        let diagnostics = NSMenuItem(title: tr("Why is my Mac awake?…"), action: #selector(openSleepDiagnostics), keyEquivalent: ""); diagnostics.target = self; app.addItem(diagnostics)
+        let welcome = NSMenuItem(title: tr("Welcome & Safety…"), action: #selector(openWelcome), keyEquivalent: ""); welcome.target = self; app.addItem(welcome)
+        let updates = NSMenuItem(title: tr("Check for Updates…"), action: #selector(openUpdates), keyEquivalent: ""); updates.target = self; app.addItem(updates)
+        let about = NSMenuItem(title: tr("About CamLid"), action: #selector(openAbout), keyEquivalent: ""); about.target = self; app.addItem(about)
+        let quit = NSMenuItem(title: tr("Quit CamLid"), action: #selector(quitMain), keyEquivalent: "q"); quit.target = self; app.addItem(quit)
+        let editItem = NSMenuItem(title: tr("Edit"), action: nil, keyEquivalent: "")
+        let edit = NSMenu(title: tr("Edit")); editItem.submenu = edit; main.addItem(editItem)
+        edit.addItem(withTitle: tr("Undo"), action: Selector("undo:"), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: tr("Redo"), action: Selector("redo:"), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         edit.addItem(.separator())
         // Nil targets let the focused native editor handle and validate commands.
-        for (title, action, key) in [("Cut", #selector(NSText.cut(_:)), "x"),
-                                   ("Copy", #selector(NSText.copy(_:)), "c"),
-                                   ("Paste", #selector(NSText.paste(_:)), "v"),
-                                   ("Select All", #selector(NSText.selectAll(_:)), "a")] {
+        for (title, action, key) in [(tr("Cut"), #selector(NSText.cut(_:)), "x"),
+                                   (tr("Copy"), #selector(NSText.copy(_:)), "c"),
+                                   (tr("Paste"), #selector(NSText.paste(_:)), "v"),
+                                   (tr("Select All"), #selector(NSText.selectAll(_:)), "a")] {
             edit.addItem(withTitle: title, action: action, keyEquivalent: key)
         }
-        let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: ""); let windows = NSMenu(title: "Window"); windowItem.submenu = windows; main.addItem(windowItem)
-        windows.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let windowItem = NSMenuItem(title: tr("Window"), action: nil, keyEquivalent: ""); let windows = NSMenu(title: tr("Window")); windowItem.submenu = windows; main.addItem(windowItem)
+        windows.addItem(withTitle: tr("Close Window"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         NSApp.mainMenu = main; NSApp.windowsMenu = windows
     }
     public func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
@@ -450,6 +478,7 @@ public final class UtilityUICoordinator: NSObject, NSApplicationDelegate, NSWind
         }
     }
     @objc private func openSettings() { showSettings() }
+    @objc private func openAbout() { AboutPanel.show() }
     @objc private func openDashboard() { dashboard(show: true) }
     @objc private func startPreview() { activateMode(.auto) }
     @objc private func stopPreview() { send(.stop) }

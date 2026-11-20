@@ -8,7 +8,8 @@ struct QARefinementSupport {
     /// One in-memory store per fixture, shared by every coordinator it makes, so a "relaunch" sees the same settings.
     let preferences = MemoryPreferences()
     func makeCoordinator(failingWrites: Bool = false, outcomeNotifications: OutcomeNotifications? = nil, permissions: AppPermissions? = nil,
-        healthReader: (() -> HealthSnapshot)? = { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) }) -> AppCoordinator {
+        healthReader: (() -> HealthSnapshot)? = { try! HealthSnapshot(batteryPercent: 80, powerSource: .ac, thermalPressure: .nominal, lidState: .open) },
+        systemIdentity: (() -> (model: String?, osBuild: String?))? = nil) -> AppCoordinator {
         let failure: @Sendable (Data, URL) throws -> Void = { _, _ in throw CocoaError(.fileWriteNoPermission) }
         let writer: (@Sendable (Data, URL) throws -> Void)? = failingWrites ? failure : nil
         let app = AppCoordinator(locations: .test(root: root),
@@ -16,7 +17,7 @@ struct QARefinementSupport {
             settingsWriter: writer, outcomeNotifications: outcomeNotifications, permissions: permissions, healthReader: healthReader,
             // Never the real Mac identity or the real installed helper: a qualified row now matches the owner's Mac.
             helperController: HelperController(status: { .notInstalled }, keepAwakeApps: { [] }),
-            holdTransportFactory: { NeverTransport() }, closedLidSupportRow: { nil }, systemIdentity: { (nil, nil) },
+            holdTransportFactory: { NeverTransport() }, closedLidSupportRow: { nil }, systemIdentity: systemIdentity ?? { (nil, nil) },
             // Never the agents actually running on this Mac (this suite itself runs under one).
             activitySampler: { _ in ([], ContinuousTime.now) })
         // Settings writes get a wide budget: the app's 0.7 s fails under CPU load (see `settingsWriteBudget`).

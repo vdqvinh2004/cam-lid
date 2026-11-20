@@ -46,14 +46,14 @@ public struct SleepDiagnosticsView: View {
             Spacer(minLength: 12)
             if isLoading, snapshot != nil {
                 ProgressView().controlSize(.small)
-                    .accessibilityLabel("Refreshing sleep information")
+                    .accessibilityLabel(tr("Refreshing sleep information"))
             }
-            Button("Copy diagnostics", systemImage: "doc.on.doc") { copyReport() }
+            Button(tr("Copy diagnostics"), systemImage: "doc.on.doc") { copyReport() }
                 .disabled(snapshot == nil)
-                .help("Copy a plain-text report of this sleep information to the clipboard")
+                .help(tr("Copy a plain-text report of this sleep information to the clipboard"))
                 .accessibilityIdentifier("camlid.sleepDiagnostics.copy")
-            Button("Refresh", systemImage: "arrow.clockwise") { Task { await refresh() } }
-                .disabled(isLoading).help("Refresh the sleep report (⌘R)")
+            Button(tr("Refresh"), systemImage: "arrow.clockwise") { Task { await refresh() } }
+                .disabled(isLoading).help(tr("Refresh the sleep report (⌘R)"))
                 .keyboardShortcut("r", modifiers: .command)
                 .accessibilityIdentifier("camlid.sleepDiagnostics.refresh")
         }
@@ -61,9 +61,9 @@ public struct SleepDiagnosticsView: View {
         .padding(.vertical, 12)
     }
     private var headerStatus: String {
-        guard let snapshot else { return "Checking…" }
-        if isLoading { return "Refreshing…" }
-        return "Checked at \(snapshot.observedAt.formatted(date: .omitted, time: .shortened))"
+        guard let snapshot else { return tr("Checking…") }
+        if isLoading { return tr("Refreshing…") }
+        return trf("Checked at %@", snapshot.observedAt.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(Localization.locale)))
     }
     @MainActor private func refresh() async {
         guard !isLoading else { return }; isLoading = true
@@ -78,14 +78,14 @@ private struct LoadingState: View {
         VStack(spacing: 10) {
             ProgressView().controlSize(.regular)
                 .accessibilityHidden(true)
-            Text("Checking what's keeping your Mac awake…")
+            Text(tr("Checking what's keeping your Mac awake…"))
                 .font(.callout)
-            Text("This usually takes a moment.")
+            Text(tr("This usually takes a moment."))
                 .font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityRepresentation {
-            Text("Checking what's keeping your Mac awake. This usually takes a moment.")
+            Text(tr("Checking what's keeping your Mac awake. This usually takes a moment."))
         }
     }
 }
@@ -104,7 +104,7 @@ private struct DiagnosticContent: View {
             } else {
                 causeList(causes)
             }
-            Text("CamLid only reads these details. Other apps, devices, and macOS activity can also affect sleep and may not appear here.")
+            Text(tr("CamLid only reads these details. Other apps, devices, and macOS activity can also affect sleep and may not appear here."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             technicalDetails
         }
@@ -127,7 +127,7 @@ private struct DiagnosticContent: View {
                 Text(emptyMessageText(appsCoverage: appsCoverage))
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Check again") { Task { await refresh() } }
+                Button(tr("Check again")) { Task { await refresh() } }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -142,14 +142,14 @@ private struct DiagnosticContent: View {
     private func emptyMessageText(appsCoverage: DiagnosticCoverage?) -> String {
         switch appsCoverage ?? .unavailable {
         case .complete:
-            return "If the screen is off and your Mac still seems busy, it may be finishing a short background task."
+            return tr("If the screen is off and your Mac still seems busy, it may be finishing a short background task.")
         case .partial:
-            return "Some app activity wasn't returned, so another app may still be involved."
+            return tr("Some app activity wasn't returned, so another app may still be involved.")
         case .unavailable:
             if snapshot.preventedBy.isEmpty {
-                return "macOS didn't return the list of apps asking to stay awake."
+                return tr("macOS didn't return the list of apps asking to stay awake.")
             }
-            return "macOS says \(snapshot.preventedBy.joined(separator: ", ")) may be preventing sleep, but the detailed list couldn't be read."
+            return trf("macOS says %@ may be preventing sleep, but the detailed list couldn't be read.", snapshot.preventedBy.joined(separator: ", "))
         }
     }
     private func causeList(_ causes: [FriendlySleepCause]) -> some View {
@@ -162,16 +162,16 @@ private struct DiagnosticContent: View {
         .accessibilityIdentifier("camlid.sleepDiagnostics.requests")
     }
     private var technicalDetails: some View {
-        DisclosureGroup("Technical details") {
+        DisclosureGroup(tr("Technical details")) {
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
-                detailRow("App requests", coverageText(snapshot.coverage["userAssertions"]))
-                detailRow("Global setting", coverageText(snapshot.coverage["global"]))
-                detailRow("Devices", coverageText(snapshot.coverage["kernel"]))
-                detailRow("Preventing sleep", preventingText)
-                detailRow("CamLid", snapshot.activeSessionMode.map { $0.rawValue.capitalized }
-                    ?? "Stopped")
+                detailRow(tr("App requests"), coverageText(snapshot.coverage["userAssertions"]))
+                detailRow(tr("Global setting"), coverageText(snapshot.coverage["global"]))
+                detailRow(tr("Devices"), coverageText(snapshot.coverage["kernel"]))
+                detailRow(tr("Preventing sleep"), preventingText)
+                detailRow(tr("CamLid"), snapshot.activeSessionMode.map { $0.rawValue.capitalized }
+                    ?? tr("Stopped"))
                 if !snapshot.errors.isEmpty {
-                    detailRow("Errors", snapshot.errors.joined(separator: ", "))
+                    detailRow(tr("Errors"), snapshot.errors.joined(separator: ", "))
                 }
             }
             .font(.caption)
@@ -187,14 +187,14 @@ private struct DiagnosticContent: View {
         }
     }
     private var preventingText: String {
-        guard snapshot.coverage["preventing"] == .complete else { return "Not reported" }
-        return snapshot.preventedBy.isEmpty ? "None reported" : snapshot.preventedBy.joined(separator: ", ")
+        guard snapshot.coverage["preventing"] == .complete else { return tr("Not reported") }
+        return snapshot.preventedBy.isEmpty ? tr("None reported") : snapshot.preventedBy.joined(separator: ", ")
     }
     private func coverageText(_ coverage: DiagnosticCoverage?) -> String {
         switch coverage {
-        case .complete: "Available"
-        case .partial: "Partial"
-        case .unavailable, .none: "Unavailable"
+        case .complete: tr("Available")
+        case .partial: tr("Partial")
+        case .unavailable, .none: tr("Unavailable")
         }
     }
 }
@@ -230,7 +230,7 @@ private struct CauseRow: View {
                         if cause.activeNow { ActiveNowLabel() }
                     }
                     // The page already answers "what keeps it awake", so the plain systemIdle line is not repeated per row.
-                    if cause.subtitle != "Keeps your Mac awake" {
+                    if cause.subtitle != tr("Keeps your Mac awake") {
                         Text(cause.subtitle).font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -251,7 +251,7 @@ private struct ActiveNowLabel: View {
         HStack(spacing: 4) {
             Circle().fill(.green).frame(width: 5, height: 5)
                 .accessibilityHidden(true)
-            Text("Active now").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            Text(tr("Active now")).font(.caption.weight(.medium)).foregroundStyle(.secondary)
         }
         .fixedSize()
     }

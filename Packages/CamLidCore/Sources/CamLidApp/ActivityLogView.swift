@@ -39,12 +39,19 @@ public struct ActivityFilter: Sendable, Equatable {
 
 }
 
-private let activityDateFormatter: DateFormatter = {
+/// Spec 028 FR-005: dates follow the chosen language. Each language keeps one formatter, so a row does not build one.
+private func activityDateString(_ date: Date) -> String {
+    (Localization.isVietnamese ? activityDateFormatterVietnamese : activityDateFormatterSystem).string(from: date)
+}
+private let activityDateFormatterSystem = makeActivityDateFormatter(Locale.current)
+private let activityDateFormatterVietnamese = makeActivityDateFormatter(Locale(identifier: "vi_VN"))
+private func makeActivityDateFormatter(_ locale: Locale) -> DateFormatter {
     let formatter = DateFormatter()
+    formatter.locale = locale
     formatter.dateStyle = .short
     formatter.timeStyle = .medium
     return formatter
-}()
+}
 
 /// Retains the last readable snapshot while a newer request is pending.
 /// Request identity prevents late replies from replacing a newer read.
@@ -121,7 +128,7 @@ public struct ActivityLogView: View {
                 errorBanner
             }
             if isLoading && transitions.isEmpty {
-                ProgressView("Loading activity…")
+                ProgressView(tr("Loading activity…"))
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityIdentifier("camlid.activity.loading")
@@ -137,21 +144,21 @@ public struct ActivityLogView: View {
                 .frame(minHeight: 120, maxHeight: .infinity)
                 .accessibilityIdentifier(CamLidAccessibility.IDs.activityList)
             }
-            if let receipt = outcome ?? lastReceiptText {
+            if let receipt = outcome.map(Localization.display) ?? lastReceiptText {
                 Text(receipt).font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(16)
         .frame(minWidth: 560, minHeight: 200, maxHeight: .infinity, alignment: .topLeading)
         .alert(
-            "Delete this session's history?",
+            tr("Delete this session's history?"),
             isPresented: Binding(
                 get: { pendingSessionDelete != nil },
                 set: { if !$0 { pendingSessionDelete = nil } }
             )
         ) {
-            Button("Cancel", role: .cancel) { pendingSessionDelete = nil }
-            Button("Delete", role: .destructive) {
+            Button(tr("Cancel"), role: .cancel) { pendingSessionDelete = nil }
+            Button(tr("Delete"), role: .destructive) {
                 if let session = pendingSessionDelete {
                     onDeleteSession(session)
                     pendingSessionDelete = nil
@@ -159,14 +166,14 @@ public struct ActivityLogView: View {
             }
             .disabled(isLoading || storageError != nil)
         } message: {
-            Text("This permanently removes the session’s activity. You cannot undo this action.")
+            Text(tr("This permanently removes the session’s activity. You cannot undo this action."))
         }
-        .alert("Delete all history?", isPresented: $confirmingDeleteAll) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete everything", role: .destructive) { onDeleteAll() }
+        .alert(tr("Delete all history?"), isPresented: $confirmingDeleteAll) {
+            Button(tr("Cancel"), role: .cancel) {}
+            Button(tr("Delete everything"), role: .destructive) { onDeleteAll() }
                 .disabled(isLoading || storageError != nil)
         } message: {
-            Text("This permanently removes all local activity. Export a redacted copy first if you want to keep it.")
+            Text(tr("This permanently removes all local activity. Export a redacted copy first if you want to keep it."))
         }
     }
 
@@ -175,15 +182,15 @@ public struct ActivityLogView: View {
             Text(countText).font(.caption).foregroundStyle(.secondary)
             if isLoading {
                 ProgressView().controlSize(.mini)
-                Text("Refreshing…").font(.caption).foregroundStyle(.secondary)
+                Text(tr("Refreshing…")).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             if hiddenSensorCount > 0 {
-                Button("Show \(hiddenSensorCount) routine updates") { showsSensorUpdates = true }
+                Button(trf("Show %lld routine updates", hiddenSensorCount)) { showsSensorUpdates = true }
                     .buttonStyle(.link).font(.caption)
-                    .help("Sensor availability changes and repeated agent checks are routine and hidden by default")
+                    .help(tr("Sensor availability changes and repeated agent checks are routine and hidden by default"))
             } else if showsSensorUpdates && sensorCount > 0 && !filter.isActive {
-                Button("Hide routine updates") { showsSensorUpdates = false }
+                Button(tr("Hide routine updates")) { showsSensorUpdates = false }
                     .buttonStyle(.link).font(.caption)
             }
         }
@@ -193,26 +200,26 @@ public struct ActivityLogView: View {
     private var errorBanner: some View {
         CamLidNoticeCard(
             tone: .warning, systemImage: "exclamationmark.triangle.fill",
-            title: transitions.isEmpty ? "History could not be read." : "History could not be refreshed. Showing previously loaded activity.",
-            message: "Your saved activity hasn’t changed. Check available storage and try again.",
-            actionTitle: "Retry", onAction: onRefresh
+            title: transitions.isEmpty ? tr("History could not be read.") : tr("History could not be refreshed. Showing previously loaded activity."),
+            message: tr("Your saved activity hasn’t changed. Check available storage and try again."),
+            actionTitle: tr("Retry"), onAction: onRefresh
         )
         .accessibilityIdentifier("camlid.activity.error")
     }
 
     private var emptyState: some View {
         CamLidEmptyState(
-            systemImage: "clock.arrow.circlepath", title: "No activity yet",
-            message: "Session, safety and agent changes will appear here.",
-            actionTitle: "Refresh", onAction: onRefresh
+            systemImage: "clock.arrow.circlepath", title: tr("No activity yet"),
+            message: tr("Session, safety and agent changes will appear here."),
+            actionTitle: tr("Refresh"), onAction: onRefresh
         )
     }
 
     private var filteredEmptyState: some View {
         CamLidEmptyState(
             systemImage: "line.3.horizontal.decrease.circle",
-            title: hiddenSensorCount > 0 ? "Only routine updates are available." : "No events match these filters.",
-            actionTitle: hiddenSensorCount > 0 ? "Show Sensor Updates" : (filter.isActive ? "Clear Filters" : nil),
+            title: hiddenSensorCount > 0 ? tr("Only routine updates are available.") : tr("No events match these filters."),
+            actionTitle: hiddenSensorCount > 0 ? tr("Show Sensor Updates") : (filter.isActive ? tr("Clear Filters") : nil),
             onAction: {
                 if hiddenSensorCount > 0 { showsSensorUpdates = true }
                 else if filter.isActive { filter = ActivityFilter() }
@@ -225,43 +232,43 @@ public struct ActivityLogView: View {
     private var filterBar: some View {
         VStack(spacing: 8) {
             HStack {
-                TextField("Search activity", text: $filter.query)
+                TextField(tr("Search activity"), text: $filter.query)
                     .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Search activity")
+                    .accessibilityLabel(tr("Search activity"))
                     .accessibilityIdentifier(CamLidAccessibility.IDs.activitySearch)
-                if filter.isActive { Button("Clear") { filter = ActivityFilter() } }
+                if filter.isActive { Button(tr("Clear")) { filter = ActivityFilter() } }
             }
             HStack {
-                Picker("Type", selection: $filter.category) {
-                    Text("All activity").tag(nil as ActivityCategory?)
+                Picker(tr("Type"), selection: $filter.category) {
+                    Text(tr("All activity")).tag(nil as ActivityCategory?)
                     ForEach(ActivityCategory.allCases, id: \.self) { category in
                         Text(ActivityPresentation.categoryName(category)).tag(category as ActivityCategory?)
                       }
                   }.frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("camlid.activity.category")
-                    .help("Filter activity by event type")
-                Picker("Reason", selection: $filter.reasonCode) {
-                    Text("All reasons").tag(nil as String?)
+                    .help(tr("Filter activity by event type"))
+                Picker(tr("Reason"), selection: $filter.reasonCode) {
+                    Text(tr("All reasons")).tag(nil as String?)
                     ForEach(allReasonCodes, id: \.self) { code in
                         Text(ActivityPresentation.readableReason(code)).tag(code as String?)
                       }
                   }
-                .frame(maxWidth: .infinity, alignment: .leading).help("Filter activity by reason")
-                Button("Export…", action: onExportRedacted)
+                .frame(maxWidth: .infinity, alignment: .leading).help(tr("Filter activity by reason"))
+                Button(tr("Export…"), action: onExportRedacted)
                     .disabled(isLoading || storageError != nil || transitions.isEmpty)
-                    .help("Export a copy with pseudonymized identifiers and no prompts, code or transcripts")
+                    .help(tr("Export a copy with pseudonymized identifiers and no prompts, code or transcripts"))
                     .accessibilityIdentifier(CamLidAccessibility.IDs.activityExport)
                 Menu {
-                    Button("Refresh", action: onRefresh).disabled(isLoading)
+                    Button(tr("Refresh"), action: onRefresh).disabled(isLoading)
                     Divider()
-                    Toggle("Include routine updates", isOn: $showsSensorUpdates)
+                    Toggle(tr("Include routine updates"), isOn: $showsSensorUpdates)
                     Divider()
-                    Button("Delete all history…", role: .destructive) { confirmingDeleteAll = true }
+                    Button(tr("Delete all history…"), role: .destructive) { confirmingDeleteAll = true }
                         .disabled(isLoading || storageError != nil || transitions.isEmpty)
                         .accessibilityIdentifier(CamLidAccessibility.IDs.activityDelete)
                   } label: { Image(systemName: "ellipsis.circle") }
                     .menuStyle(.borderlessButton).fixedSize()
-                    .accessibilityLabel("Activity actions")
-                    .help("Refresh or delete local activity")
+                    .accessibilityLabel(tr("Activity actions"))
+                    .help(tr("Refresh or delete local activity"))
             }
         }
     }
@@ -269,17 +276,17 @@ public struct ActivityLogView: View {
 
     private var countText: String {
         if filter.isActive || hiddenSensorCount > 0 {
-            return "\(filtered.count) of \(transitions.count) events"
+            return trf("%lld of %lld events", filtered.count, transitions.count)
         }
-        return transitions.count == 1 ? "1 event" : "\(transitions.count) events"
+        return transitions.count == 1 ? tr("1 event") : trf("%lld events", transitions.count)
     }
 
     private func relativeTimestamp(_ date: Date) -> String {
         let seconds = max(0, Int(Date().timeIntervalSince(date)))
-        if seconds < 60 { return "Just now" }
-        if seconds < 3_600 { return "\(seconds / 60)m ago" }
-        if seconds < 86_400 { return "\(seconds / 3_600)h ago" }
-        return "\(seconds / 86_400)d ago"
+        if seconds < 60 { return tr("Just now") }
+        if seconds < 3_600 { return trf("%lldm ago", seconds / 60) }
+        if seconds < 86_400 { return trf("%lldh ago", seconds / 3_600) }
+        return trf("%lldd ago", seconds / 86_400)
     }
 
     private var allReasonCodes: [String] {
@@ -312,20 +319,20 @@ public struct ActivityLogView: View {
                 if [ActivityCategory.configuration, .enrollment].contains(record.category), !record.reasonCodes.isEmpty {
                     Text(record.reasonCodes.map(ActivityPresentation.readableReason).joined(separator: ", "))
                 }
-                Text("State: " + CamLidAccessibility.StatusStyle.style(for: record.newState).text)
-                if let provider = record.providerKind { Text("Agent: " + provider.capitalized) }
-                if let cleanup = record.cleanupOutcome { Text("Cleanup: " + cleanup.rawValue) }
+                Text(tr("State: ") + CamLidAccessibility.StatusStyle.style(for: record.newState).text)
+                if let provider = record.providerKind { Text(tr("Agent: ") + provider.capitalized) }
+                if let cleanup = record.cleanupOutcome { Text(tr("Cleanup: ") + cleanup.rawValue) }
                 if let session = record.sessionID {
                     HStack {
-                        Text("Session: " + session).textSelection(.enabled)
+                        Text(tr("Session: ") + session).textSelection(.enabled)
                         Spacer()
-                        Button("Delete session…", role: .destructive) { pendingSessionDelete = session }
+                        Button(tr("Delete session…"), role: .destructive) { pendingSessionDelete = session }
                             .buttonStyle(.link)
                             .disabled(isLoading || storageError != nil)
                     }
                 }
                 if !record.reasonCodes.isEmpty {
-                    Text("Reason codes: " + record.reasonCodes.joined(separator: ", ")).textSelection(.enabled)
+                    Text(tr("Reason codes: ") + record.reasonCodes.joined(separator: ", ")).textSelection(.enabled)
                 }
             }.font(.caption).foregroundStyle(.secondary).padding(.vertical, 4)
         } label: {
@@ -339,13 +346,13 @@ public struct ActivityLogView: View {
                         Text(ActivityPresentation.title(record)).font(.body)
                         if repeats > 1 {
                             Text("×\(repeats)").font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                                .help("\(repeats) identical events in a row; the newest is shown")
-                                .accessibilityLabel("\(repeats) times")
+                                .help(trf("%lld identical events in a row; the newest is shown", repeats))
+                                .accessibilityLabel(trf("%lld times", repeats))
                         }
                         Spacer()
                         Text(relativeTimestamp(record.timestamp))
                             .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                            .help(activityDateFormatter.string(from: record.timestamp))
+                            .help(activityDateString(record.timestamp))
                     }
                     // A second line only when it says something the title doesn't.
                     let detail = record.reasonCodes.map(ActivityPresentation.readableReason).joined(separator: ", ")
@@ -360,7 +367,7 @@ public struct ActivityLogView: View {
 
     /// Hosts feed the returned receipt back here to surface the count.
     public func receiptText(_ receipt: DeletionReceipt) -> String {
-        "Deleted \(receipt.removedCount) record(s) (\(receipt.scope.rawValue)) at \(activityDateFormatter.string(from: receipt.deletedAt))."
+        trf("Deleted %lld record(s) (%@) at %@.", receipt.removedCount, receipt.scope.rawValue, activityDateString(receipt.deletedAt))
     }
 }
 
@@ -381,13 +388,13 @@ enum ActivityPresentation {
     }
     static func categoryName(_ category: ActivityCategory) -> String {
         switch category {
-        case .stateTransition: "Session state"
-        case .safetyStop: "Safety stops"
-        case .grace: "Sleep when done"
-        case .capExpiry: "Session limit"
-        case .recovery: "Recovery"
-        case .enrollment: "Agent activity"
-        case .configuration: "Settings & sensors"
+        case .stateTransition: tr("Session state")
+        case .safetyStop: tr("Safety stops")
+        case .grace: tr("Sleep when done")
+        case .capExpiry: tr("Session limit")
+        case .recovery: tr("Recovery")
+        case .enrollment: tr("Agent activity")
+        case .configuration: tr("Settings & sensors")
         }
     }
     /// Hidden by default: sensor availability flips, and the per-poll agent checks older builds recorded.
@@ -440,58 +447,58 @@ enum ActivityPresentation {
     }
 
     static func readableReason(_ code: String) -> String {
-        if code.hasPrefix("exitStatus:") { return "Command exited with status \(code.dropFirst("exitStatus:".count))" }
-        if code.hasPrefix("durationSeconds:") { return "Command ran for \(code.dropFirst("durationSeconds:".count)) s" }
+        if code.hasPrefix("exitStatus:") { return trf("Command exited with status %@", String(code.dropFirst("exitStatus:".count))) }
+        if code.hasPrefix("durationSeconds:") { return trf("Command ran for %@ s", String(code.dropFirst("durationSeconds:".count))) }
         switch code {
-        case "agentToolFailed": return "Agent tool failed; turn outcome is separate"
-        case "backendUnverified": return "Closed-lid backend unavailable"
-        case "agentEvent": return "Agent activity updated"
-        case "sleepBlocked": return "Sleep request blocked"
-        case "configApplied": return "Settings updated"
-        case "modeChanged": return "Mode changed"
-        case "appLaunched": return "CamLid opened"
-        case "appQuitNoOwnedPower": return "CamLid quit without a session"
-        case "onboardingComplete": return "Welcome completed"
-        case "sessionStarted": return "Session started"
-        case "sessionStopped": return "Session stopped"
-        case "modeOff": return "Mode turned off"
-        case "agentStateChanged": return "Agent state changed"
-        case "agentObservation": return "Agent checked"
-        case "sessionTimerChanged": return "Timer changed"
-        case "sessionSleepDelayChanged": return "Sleep when done changed"
-        case "lidAvailabilityChanged": return "Lid reading availability changed"
-        case "temperatureAvailabilityChanged": return "Temperature availability changed"
-        case "batteryFloor": return "Battery below minimum"
-        case "notCharging": return "AC power required"
-        case "thermalCritical": return "Critical thermal pressure"
-        case "cliQuit": return "Quit from the command line"
-        case "appQuit": return "CamLid quit"
-        case "releaseComplete": return "Sleep setting restored"
-        case "graceExpired": return "Sleep when done finished"
-        case "sleepRequested": return "Sleep requested"
-        case "capReached": return "Time limit reached"
-        case "cpuSustained", "cpuStop": return "CPU stayed busy"
-        case "configWriteFailed": return "Settings could not be saved"
-        case "configConflict": return "Settings changed elsewhere"
-        case "configCommitUnconfirmed": return "Settings write unconfirmed"
-        case "untestedConfigurationAccepted": return "Untested Mac allowed"
-        case "untestedConfigurationWithdrawn": return "Untested Mac no longer allowed"
-        case "safetyLatched": return "Stopped by safety"
-        case "lastTaskStopped": return "Last agent task stopped"
-        case "gracePending": return "Waiting to sleep"
-        case "commandStarted": return "Command started"
-        case "commandFinished": return "Command finished"
+        case "agentToolFailed": return tr("Agent tool failed; turn outcome is separate")
+        case "backendUnverified": return tr("Closed-lid backend unavailable")
+        case "agentEvent": return tr("Agent activity updated")
+        case "sleepBlocked": return tr("Sleep request blocked")
+        case "configApplied": return tr("Settings updated")
+        case "modeChanged": return tr("Mode changed")
+        case "appLaunched": return tr("CamLid opened")
+        case "appQuitNoOwnedPower": return tr("CamLid quit without a session")
+        case "onboardingComplete": return tr("Welcome completed")
+        case "sessionStarted": return tr("Session started")
+        case "sessionStopped": return tr("Session stopped")
+        case "modeOff": return tr("Mode turned off")
+        case "agentStateChanged": return tr("Agent state changed")
+        case "agentObservation": return tr("Agent checked")
+        case "sessionTimerChanged": return tr("Timer changed")
+        case "sessionSleepDelayChanged": return tr("Sleep when done changed")
+        case "lidAvailabilityChanged": return tr("Lid reading availability changed")
+        case "temperatureAvailabilityChanged": return tr("Temperature availability changed")
+        case "batteryFloor": return tr("Battery below minimum")
+        case "notCharging": return tr("AC power required")
+        case "thermalCritical": return tr("Critical thermal pressure")
+        case "cliQuit": return tr("Quit from the command line")
+        case "appQuit": return tr("CamLid quit")
+        case "releaseComplete": return tr("Sleep setting restored")
+        case "graceExpired": return tr("Sleep when done finished")
+        case "sleepRequested": return tr("Sleep requested")
+        case "capReached": return tr("Time limit reached")
+        case "cpuSustained", "cpuStop": return tr("CPU stayed busy")
+        case "configWriteFailed": return tr("Settings could not be saved")
+        case "configConflict": return tr("Settings changed elsewhere")
+        case "configCommitUnconfirmed": return tr("Settings write unconfirmed")
+        case "untestedConfigurationAccepted": return tr("Untested Mac allowed")
+        case "untestedConfigurationWithdrawn": return tr("Untested Mac no longer allowed")
+        case "safetyLatched": return tr("Stopped by safety")
+        case "lastTaskStopped": return tr("Last agent task stopped")
+        case "gracePending": return tr("Waiting to sleep")
+        case "commandStarted": return tr("Command started")
+        case "commandFinished": return tr("Command finished")
         default: return code.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression).capitalized
         }
     }
 }
 
-#Preview("Loading activity") {
+#Preview(tr("Loading activity")) {
     ActivityLogView(transitions: [], isLoading: true,
                     onExportRedacted: {}, onDeleteSession: { _ in }, onDeleteAll: {})
 }
 
-#Preview("Unavailable history") {
-    ActivityLogView(transitions: [], storageError: "Read unavailable",
+#Preview(tr("Unavailable history")) {
+    ActivityLogView(transitions: [], storageError: tr("Read unavailable"),
                     onExportRedacted: {}, onDeleteSession: { _ in }, onDeleteAll: {})
 }

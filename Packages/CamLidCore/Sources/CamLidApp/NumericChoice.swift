@@ -12,6 +12,10 @@ public enum NumericChoice {
         case .adapters: []
         }
     }
+    /// Default Timed choices that fit the session time limit. Infinite (0) always stays: it passes the limit only on charger power.
+    public static func timerChoices(upTo limit: Int) -> [Int] {
+        presets(.timer).filter { $0 == 0 || $0 <= limit }
+    }
     public static func parse(_ text: String) -> Int? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -26,13 +30,13 @@ public enum NumericChoice {
     }
     public static func label(_ value: Int, field: SettingsFieldError.Field) -> String {
         switch field {
-        case .timer where value == 0: "∞ Infinite"
-        case .completionDelay where value == 0: "Immediately"
-        case .waitRetention where value == 0: "Do not retain"
+        case .timer where value == 0: tr("∞ Infinite")
+        case .completionDelay where value == 0: tr("Immediately")
+        case .waitRetention where value == 0: tr("Do not retain")
         case .batteryFloor, .batteryEntry: "\(value)%"
         case .runCap where value >= 60 && value % 60 == 0,
-             .timer where value >= 60 && value % 60 == 0: "\(value / 60) hr"
-        default: "\(value) min"
+             .timer where value >= 60 && value % 60 == 0: trf("%lld hr", value / 60)
+        default: trf("%lld min", value)
         }
     }
 }

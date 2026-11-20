@@ -30,7 +30,7 @@ public enum CamLidStatusIcon {
     public static var autoSpinnerFrames: [NSImage] { spinnerFrames }
 
     private static func symbolImage(_ name: String) -> NSImage? {
-        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: "CamLid")?
+        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: tr("CamLid"))?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 16, weight: .medium)) else { return nil }
         image.size = statusSize
         image.isTemplate = true
@@ -39,7 +39,7 @@ public enum CamLidStatusIcon {
 
     /// The laptop with a badge in its lower right corner, cut out of the laptop so both stay legible.
     private static func badged(symbol: String? = nil, arcPhase: CGFloat? = nil) -> NSImage? {
-        guard let laptop = NSImage(systemSymbolName: "laptopcomputer", accessibilityDescription: "CamLid")?
+        guard let laptop = NSImage(systemSymbolName: "laptopcomputer", accessibilityDescription: tr("CamLid"))?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)) else { return nil }
         let badgeSymbol = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil)?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 7, weight: .bold)) }
@@ -65,7 +65,7 @@ public enum CamLidStatusIcon {
             }
             return true
         }
-        image.accessibilityDescription = "CamLid"
+        image.accessibilityDescription = tr("CamLid")
         image.isTemplate = true
         return image
     }

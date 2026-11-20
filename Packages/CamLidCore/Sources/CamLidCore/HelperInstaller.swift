@@ -329,11 +329,7 @@ public struct HelperInstaller: Sendable {
     private func signerLeaf(of url: URL) -> String? {
         guard runner.run("/usr/bin/codesign", ["--verify", "--strict", url.path]).status == 0 else { return nil }
         let out = runner.run("/usr/bin/codesign", ["-d", "-r-", url.path])
-        guard out.status == 0, let range = out.output.range(of: "certificate leaf = H\"") else { return nil }
-        let rest = out.output[range.upperBound...]
-        guard let end = rest.firstIndex(of: "\"") else { return nil }
-        let hash = String(rest[..<end])
-        return hash.count == 40 && hash.allSatisfy({ $0.isHexDigit && !$0.isUppercase }) ? hash : nil
+        return out.status == 0 ? CodeSignature.leaf(inDesignatedRequirement: out.output) : nil
     }
 
     /// One certificate for both app and helper pins that certificate; anything else pins the exact builds.

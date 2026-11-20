@@ -55,20 +55,20 @@ public struct DashboardMetric: Codable, Sendable, Equatable, Identifiable {
         var rows: [Self] = [
             Self(id: "battery", symbol: Self.batterySymbol(percent: h?.batteryPercent, onCharger: h?.powerSource == .ac),
                 value: h?.batteryPercent.map { String(format: "%.0f%%", $0) } ?? "Unknown",
-                detail: "Battery: " + (h?.batteryPercent.map { String(format: "%.0f%%", $0) } ?? "Unknown") + ", "
-                    + (h?.powerSource == .ac ? "on charger" : h?.powerSource == .battery ? "on battery" : "power source unknown"),
+                detail: tr("Battery: ") + (h?.batteryPercent.map { String(format: "%.0f%%", $0) } ?? tr("Unknown")) + ", "
+                    + (h?.powerSource == .ac ? tr("on charger") : h?.powerSource == .battery ? tr("on battery") : tr("power source unknown")),
                 attention: h?.batteryPercent == nil),
             Self(id: "cpu", symbol: "cpu", value: h?.cpuPercent.map { String(format: "%.0f%%", $0) } ?? "Unknown",
-                detail: "CPU: " + (h?.cpuPercent.map { String(format: "%.1f%%", $0) } ?? "Unknown"), attention: h?.cpuPercent == nil),
+                detail: tr("CPU: ") + (h?.cpuPercent.map { String(format: "%.1f%%", $0) } ?? tr("Unknown")), attention: h?.cpuPercent == nil),
             Self(id: "thermal", symbol: "flame", value: pressure,
-                detail: "Thermal pressure: " + pressure,
+                detail: tr("Thermal pressure: ") + tr(pressure),
                 attention: pressure == "Serious" || pressure == "Critical" || pressure == "Unknown"),
             Self(id: "lid", symbol: "laptopcomputer", value: lid,
-                detail: "Lid: " + lid, attention: lid == "Unknown")
+                detail: tr("Lid: ") + tr(lid), attention: lid == "Unknown")
         ]
         if let t = h?.temperature, t.availability == "available", let value = t.valueCelsius {
             rows.append(Self(id: "temperature", symbol: "thermometer", value: String(format: "%.1f°C", value),
-                detail: (t.displayName ?? "Temperature") + ": " + String(format: "%.1f°C", value), attention: false))
+                detail: tr(t.displayName ?? "Temperature") + ": " + String(format: "%.1f°C", value), attention: false))
         }
         return rows
     }
@@ -76,18 +76,20 @@ public struct DashboardMetric: Codable, Sendable, Equatable, Identifiable {
 
 /// The fix offered beside the closed-lid readiness line when something can be done about it.
 public enum CapabilityAction: String, Codable, Sendable, Equatable {
-    case installHelper, reinstallHelper, openClosedLidSettings
+    case installHelper, reinstallHelper, openClosedLidSettings, enableClosedLid
     public var title: String {
         switch self {
-        case .installHelper: "Install Helper…"
-        case .reinstallHelper: "Reinstall Helper…"
-        case .openClosedLidSettings: "Open Closed Lid Settings…"
+        case .installHelper: tr("Install Helper…")
+        case .reinstallHelper: tr("Reinstall Helper…")
+        case .openClosedLidSettings: tr("Open Closed Lid Settings…")
+        case .enableClosedLid: tr("Turn On")
         }
     }
     var help: String {
         switch self {
-        case .installHelper, .reinstallHelper: "Asks for an administrator password to install the closed-lid helper"
-        case .openClosedLidSettings: "Opens Settings › Closed Lid"
+        case .installHelper, .reinstallHelper: tr("Asks for an administrator password to install the closed-lid helper")
+        case .openClosedLidSettings: tr("Opens Settings › Closed Lid")
+        case .enableClosedLid: tr("Turns on keeping the Mac awake with the lid closed")
         }
     }
 }
@@ -130,6 +132,8 @@ public struct DashboardData: Codable, Sendable, Equatable {
     public let sessionRunning: Bool
     /// False (or unverified display sleep) downgrades Protected presentation.
     public let powerActuationAvailable: Bool
+    /// Spec 027: the version of a newer release that the last check found. Nil when there is none.
+    public let updateVersion: String?
     public let leaseVerified: Bool
     public let lidDisplayText: String?
     /// Replaces the fixed preview notice when set (closed-lid readiness on this Mac).
@@ -173,9 +177,9 @@ public struct DashboardData: Codable, Sendable, Equatable {
         leaseVerified: Bool = false,
         powerActuationAvailable: Bool = false,
         lidDisplayText: String? = nil,
-        capabilityText: String? = nil, capabilityAction: CapabilityAction? = nil,
+        capabilityText: String? = nil, capabilityAction: CapabilityAction? = nil, updateVersion: String? = nil,
         tasks: [DashboardTaskRow] = [],
-        taskSummaryText: String = "No selected agents reporting work",
+        taskSummaryText: String? = nil,
         batteryText: String? = nil,
         thermalText: String? = nil,
         temperatureText: String? = nil, sensorDetailsText: String? = nil,
@@ -201,9 +205,9 @@ public struct DashboardData: Codable, Sendable, Equatable {
         self.leaseVerified = leaseVerified
         self.powerActuationAvailable = powerActuationAvailable
         self.lidDisplayText = lidDisplayText
-        self.capabilityText = capabilityText; self.capabilityAction = capabilityAction
+        self.capabilityText = capabilityText; self.capabilityAction = capabilityAction; self.updateVersion = updateVersion
         self.tasks = tasks
-        self.taskSummaryText = taskSummaryText
+        self.taskSummaryText = taskSummaryText ?? tr("No selected agents reporting work")
         self.batteryText = batteryText
         self.thermalText = thermalText
         self.temperatureText = temperatureText; self.sensorDetailsText = sensorDetailsText
@@ -238,7 +242,7 @@ func formatCountdown(_ seconds: Double) -> String {
     let hours = total / 3_600
     let minutes = (total % 3_600) / 60
     let secs = total % 60
-    if hours > 0 { return "\(hours)h \(minutes)m" }
+    if hours > 0 { return trf("%lldh %lldm", hours, minutes) }
     return String(format: "%d:%02d", minutes, secs)
 }
 
@@ -261,6 +265,8 @@ public struct DashboardView: View {
     public let onSleepDelayChange: (@MainActor @Sendable (Int) -> Void)?
     public let onOpenAgents: (() -> Void)?
     public let onCapabilityAction: ((CapabilityAction) -> Void)?
+    /// Spec 027: opens the Updates window, where the install button is.
+    public let onOpenUpdates: (() -> Void)?
 
     public init(data: DashboardData,
         onOpenLog: @escaping () -> Void, onClose: @escaping () -> Void,
@@ -268,13 +274,15 @@ public struct DashboardView: View {
         durationMinutes: Int = 120, onDurationChange: (@MainActor @Sendable (Int) -> Void)? = nil,
         maximumDurationMinutes: Int = 480, sleepDelayMinutes: Int = 2,
         onSleepDelayChange: (@MainActor @Sendable (Int) -> Void)? = nil,
-        onOpenAgents: (() -> Void)? = nil, onCapabilityAction: ((CapabilityAction) -> Void)? = nil) {
+        onOpenAgents: (() -> Void)? = nil, onCapabilityAction: ((CapabilityAction) -> Void)? = nil,
+        onOpenUpdates: (() -> Void)? = nil) {
         self.data = data
         self.onOpenLog = onOpenLog; self.onClose = onClose; self.onModeChange = onModeChange
         self.durationMinutes = durationMinutes; self.onDurationChange = onDurationChange
         self.maximumDurationMinutes = maximumDurationMinutes; self.sleepDelayMinutes = sleepDelayMinutes
         self.onSleepDelayChange = onSleepDelayChange; self.onOpenAgents = onOpenAgents
         self.onCapabilityAction = onCapabilityAction
+        self.onOpenUpdates = onOpenUpdates
     }
     public var body: some View {
         ViewThatFits(in: .vertical) {
@@ -285,11 +293,12 @@ public struct DashboardView: View {
     private var timerSelection: Int {
         durationMinutes == 0 ? 0 : max(0, min(durationMinutes, maximumDurationMinutes))
     }
-    /// Top to bottom: header, reason, closed-lid notice, mode, its picker, status chips, agents (or the no-agent hint),
-    /// then banner. Hidden when empty: reason, notice (ready Mac), picker (no session), agents (none working), banner.
+    /// Top to bottom: header, reason, closed-lid notice, mode (with its hint while Auto needs an agent), its picker, status chips,
+    /// agents, then banner. Hidden when empty: reason, notice (ready Mac), hint (agents selected), picker (no session), agents (none working), banner.
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
+            updateNotice
             if !data.displayedReasonText.isEmpty {
                 Text(data.displayedReasonText).font(.callout).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.tail).help(data.displayedReasonText)
@@ -302,8 +311,9 @@ public struct DashboardView: View {
                     ModeBadges(selected: data.stopEnabled ? data.mode : .off, onSelect: onModeChange, activatesSession: true,
                         autoEnabled: data.hasEnabledAgents)
                         .accessibilityIdentifier(CamLidAccessibility.IDs.dashboardMode)
-                } else { Text("Mode: \(data.mode == .manual ? "Timed" : data.mode.rawValue.capitalized)") }
+                } else { Text(trf("Mode: %@", data.mode == .manual ? tr("Timed") : tr(data.mode.rawValue.capitalized))) }
             }
+            if !data.hasEnabledAgents { autoNeedsAgentHint }
             durationRow
             sleepDelayRow
             DashboardMetrics(metrics: data.metrics)
@@ -315,20 +325,22 @@ public struct DashboardView: View {
         }.padding(10).frame(minWidth: 232, maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// Dashboard badges in one A–Z row: working or waiting agents and playing music. With no agent selected, a hint says so.
-    @ViewBuilder private var agentsSection: some View {
-        if !data.hasEnabledAgents {
-            HStack(spacing: 4) {
-                Text("No agent selected.").foregroundStyle(.secondary)
-                if let onOpenAgents {
-                    Button("Choose Agents…", action: onOpenAgents)
-                        .buttonStyle(.link)
-                        .help("Open Settings → Agents to choose which agents may delay sleep")
-                        .accessibilityIdentifier("camlid.dashboard.chooseAgents")
-                }
+    /// Under the mode buttons, beside the dimmed Auto: Auto has nothing to watch without a selected agent, so say so there.
+    private var autoNeedsAgentHint: some View {
+        HStack(spacing: 4) {
+            Text(tr("Auto needs an agent selected.")).foregroundStyle(.secondary)
+            if let onOpenAgents {
+                Button(tr("Choose Agents…"), action: onOpenAgents)
+                    .buttonStyle(.link)
+                    .help(tr("Open Settings → Agents to choose which agents may delay sleep"))
+                    .accessibilityIdentifier("camlid.dashboard.chooseAgents")
             }
-            .font(.caption)
         }
+        .font(.caption)
+    }
+
+    /// Dashboard badges in one A–Z row: working or waiting agents and playing music.
+    @ViewBuilder private var agentsSection: some View {
         if !data.dashboardBadges.isEmpty {
             BadgeFlowLayout(spacing: 6, lineSpacing: 6) {
                 ForEach(data.dashboardBadges) { badge in
@@ -367,8 +379,8 @@ public struct DashboardView: View {
                     .help(data.statusTitle + (data.displayedReasonText.isEmpty ? "" : ": " + data.displayedReasonText))
             }
             Spacer(minLength: 4)
-            Button(action: onOpenLog) { Label("Activity", systemImage: "clock.arrow.circlepath") }
-                .labelStyle(.iconOnly).buttonStyle(.borderless).help("Open Activity Log")
+            Button(action: onOpenLog) { Label(tr("Activity"), systemImage: "clock.arrow.circlepath") }
+                .labelStyle(.iconOnly).buttonStyle(.borderless).help(tr("Open Activity Log"))
                 .accessibilityIdentifier(CamLidAccessibility.IDs.viewLogButton)
         }
     }
@@ -377,20 +389,19 @@ public struct DashboardView: View {
         if let onDurationChange, data.stopEnabled, data.mode == .timed || data.mode == .manual {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Image(systemName: "timer").foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                        .help("Timed duration; Infinite runs until stopped or a safety limit, including the battery time limit")
-                    Picker("Duration", selection: Binding(get: { timerSelection }, set: onDurationChange)) {
-                        Text("∞ Infinite").tag(0)
+                    Label(tr("Duration"), systemImage: "timer").foregroundStyle(.secondary)
+                        .help(tr("Timed duration; Infinite runs until stopped or a safety limit, including the battery time limit"))
+                    Picker(tr("Duration"), selection: Binding(get: { timerSelection }, set: onDurationChange)) {
+                        Text(tr("∞ Infinite")).tag(0)
                         ForEach(NumericChoice.presets(.timer).filter { $0 > 0 && $0 <= maximumDurationMinutes }, id: \.self) { value in
                             Text(NumericChoice.label(value, field: .runCap)).tag(value)
                         }
                         if timerSelection != 0, !NumericChoice.presets(.timer).contains(timerSelection) {
                             Text(NumericChoice.label(timerSelection, field: .runCap)).tag(timerSelection)
                         }
-                    }.labelsHidden().accessibilityLabel("Session duration")
+                    }.labelsHidden().accessibilityLabel(tr("Session duration"))
                         .frame(maxWidth: .infinity, alignment: .trailing)
-                        .help("Changing the duration restarts the timer now; battery exposure keeps its original deadline")
+                        .help(tr("Changing the duration restarts the timer now; battery exposure keeps its original deadline"))
                         .disabled(data.state == .safetyStopped || data.state == .expired)
                         .accessibilityIdentifier("camlid.dashboard.timer")
                 }
@@ -406,27 +417,39 @@ public struct DashboardView: View {
     @ViewBuilder private var sleepDelayRow: some View {
         if let onSleepDelayChange, data.stopEnabled, data.mode == .auto {
             HStack(spacing: 8) {
-                Label("Sleep when done", systemImage: "moon.zzz").foregroundStyle(.secondary)
-                    .help("Auto waits after selected work ends; macOS sleep rules apply")
-                Picker("Sleep when done", selection: Binding(get: { sleepDelayMinutes }, set: onSleepDelayChange)) {
+                Label(tr("Sleep when done"), systemImage: "moon.zzz").foregroundStyle(.secondary)
+                    .help(tr("Auto waits after selected work ends; macOS sleep rules apply"))
+                Picker(tr("Sleep when done"), selection: Binding(get: { sleepDelayMinutes }, set: onSleepDelayChange)) {
                     ForEach(NumericChoice.presets(.completionDelay), id: \.self) { minutes in
-                        Text(minutes == 0 ? "Immediately" : "After \(minutes) min").tag(minutes)
+                        Text(minutes == 0 ? tr("Immediately") : trf("After %lld min", minutes)).tag(minutes)
                     }
                     if !NumericChoice.presets(.completionDelay).contains(sleepDelayMinutes) {
-                        Text("After \(sleepDelayMinutes) min").tag(sleepDelayMinutes)
+                        Text(trf("After %lld min", sleepDelayMinutes)).tag(sleepDelayMinutes)
                     }
-                }.labelsHidden().accessibilityLabel("Auto sleep delay")
+                }.labelsHidden().accessibilityLabel(tr("Auto sleep delay"))
                     .frame(maxWidth: .infinity, alignment: .trailing)
-                    .help("Wait this long after selected agents finish, then let the Mac sleep")
+                    .help(tr("Wait this long after selected agents finish, then let the Mac sleep"))
                     .disabled(data.state == .safetyStopped || data.state == .expired)
                     .accessibilityIdentifier("camlid.dashboard.sleepDelay")
             }
         }
     }
 
+    /// Spec 027: a newer release the last check found. The link opens the Updates window, where the install button is.
+    @ViewBuilder private var updateNotice: some View {
+        if let version = data.updateVersion, let onOpenUpdates {
+            Button { onOpenUpdates() } label: {
+                Label(trf("CamLid %@ is available", version), systemImage: "arrow.down.circle.fill").font(.caption)
+            }
+            .buttonStyle(.link)
+            .help(tr("Opens the Updates window, where you can install it"))
+            .accessibilityIdentifier("camlid.dashboard.updateNotice")
+        }
+    }
+
     /// Readiness is shown only when something is missing; a ready Mac is already said by the status icon.
     @ViewBuilder private var capabilityNotice: some View {
-        if !data.powerActuationAvailable && data.capabilityText?.hasPrefix("Closed lid ready") != true {
+        if !data.powerActuationAvailable && data.capabilityText?.hasPrefix(tr("Closed lid ready")) != true {
             VStack(alignment: .leading, spacing: 4) {
                 PreviewBuildNotice(text: data.capabilityText, font: .caption)
                 if let action = data.capabilityAction, let onCapabilityAction {
@@ -452,7 +475,7 @@ private struct DashboardMetrics: View {
     }
 
     private func metricChip(_ metric: DashboardMetric) -> some View {
-        CamLidMetricChip(value: metric.value, systemImage: metric.symbol, detail: metric.detail,
+        CamLidMetricChip(value: tr(metric.value), systemImage: metric.symbol, detail: metric.detail,
                          attention: metric.attention && metric.value != "Unknown")
     }
 }
@@ -498,15 +521,15 @@ public extension DashboardData {
     var showsLidOpenAwake: Bool { keepingAwakeWithLidOpen && state == .protected && !leaseVerified }
     var statusTitle: String {
         if showsLidOpenAwake { return CamLidAccessibility.StatusStyle.keepingAwakeWithLidOpen.text }
-        if presentedState == .ready, mode == .auto, sessionRunning { return "Waiting for agents" }
-        if presentedState == .completionGrace && !powerActuationAvailable { return "Waiting after work" }
+        if presentedState == .ready, mode == .auto, sessionRunning { return tr("Waiting for agents") }
+        if presentedState == .completionGrace && !powerActuationAvailable { return tr("Waiting after work") }
         return CamLidAccessibility.StatusStyle.style(for: presentedState).text
     }
     var statusSymbol: String {
         showsLidOpenAwake ? CamLidAccessibility.StatusStyle.keepingAwakeWithLidOpen.symbolName
             : CamLidAccessibility.StatusStyle.style(for: presentedState).symbolName
     }
-    var graceLabel: String { powerActuationAvailable ? "Sleep requested in" : "Delay remaining" }
+    var graceLabel: String { powerActuationAvailable ? tr("Sleep requested in") : tr("Delay remaining") }
 }
 
 extension NSHostingController where Content == DashboardView {
@@ -517,14 +540,14 @@ extension NSHostingController where Content == DashboardView {
     }
 }
 
-#Preview("Unknown telemetry") {
-    DashboardView(data: .unknown(reason: "Readings unavailable"), onOpenLog: {}, onClose: {})
+#Preview(tr("Unknown telemetry")) {
+    DashboardView(data: .unknown(reason: tr("Readings unavailable")), onOpenLog: {}, onClose: {})
         .frame(width: 390, height: 300)
 }
 
-#Preview("Sleep when done") {
+#Preview(tr("Sleep when done")) {
     DashboardView(data: DashboardData(mode: .auto, state: .completionGrace,
-        reasonText: "Preview session", graceRemainingSeconds: 90, stopEnabled: true),
+        reasonText: tr("Preview session"), graceRemainingSeconds: 90, stopEnabled: true),
         onOpenLog: {}, onClose: {})
         .frame(width: 390, height: 360)
 }

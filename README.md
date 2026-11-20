@@ -20,7 +20,7 @@ version and the code hashes of the app, its root helper and its command-line too
 3. Continue with [Install and use](#install-and-use).
 
 Updating: *Check for Updates…* asks GitHub for the newest release when you click it and opens the Releases page. Settings
-› General can also check once a day (off by default). Either way CamLid never downloads or installs anything. A release is signed with CamLid's own certificate, so the installed helper keeps
+› General can also check once a day (off by default). The check itself downloads nothing, and nothing is downloaded or installed unless you click *Update to <version>*. If a session is running, CamLid asks before it stops the session for the restart, and stops it only after the download and checks have passed. A release is signed with CamLid's own certificate, so the installed helper keeps
 working with the new app; CamLid asks you to reinstall the helper only when the helper itself changed, and the release
 notes say so. An app you sign ad hoc yourself needs **Reinstall helper…** after every rebuild.
 
@@ -37,6 +37,10 @@ notes say so. An app you sign ad hoc yourself needs **Reinstall helper…** afte
     ([spec 015](specs/015-agent-activity-observer/spec.md)). CPU in an agent's first 25 seconds after launch is not
     counted as work.
   - Watched programs: optional rules that keep the Mac awake while a given program runs.
+- **Music and audio.** Music sources you turn on in Settings › Agents keep Auto awake while they play. **Any audio** (off by
+  default) does the same for any other app that plays sound: the hold starts after three seconds of output and ends a minute
+  after the sound stops. Activity names the app.
+- **Language.** English or Tiếng Việt in Settings › General › Language, following macOS by default. The About window is in the menu.
 - **Safety stops** on low battery, high thermal pressure, unplugged charger (unless "Allow on battery" is on),
   sustained CPU load (optional) and session time limits. Missing readings never count as healthy.
 - **When a session ends with the lid closed, the Mac sleeps** (unless an external display is connected).
@@ -114,11 +118,15 @@ PATH with `sudo ln -s /Applications/CamLid.app/Contents/Helpers/camlid /usr/loca
 be cleared first, see Download).
 
 ```sh
+camlid commands                 # every command, its flags, reply fields and refusal reasons (start here)
 camlid status --json            # state, agents, health, helper lease
 camlid start --mode auto        # same path as the Dashboard; refuses with a reason code
+camlid start --mode timed --duration 45m --replace   # switch a running session; durations need a unit
+camlid session duration 2h      # change a running Timed session's timer
 camlid run -- make build        # keeps the Mac awake while this command runs; needs CamLid running
 camlid stop
 camlid config get --json
+camlid config set runCapMinutes 120   # one setting; an unchanged value writes nothing
 camlid helper status            # install | uninstall | trust need administrator rights
 camlid diagnose --json          # "Why is my Mac awake?"
 camlid logs export --redacted --output events.json
@@ -141,10 +149,10 @@ CamLid has no third-party code dependencies.
 ## Privacy
 
 History stays on the Mac (14 days or 20 MiB). It records mode changes, safety stops and agent states, never prompts,
-code or transcripts. Exports replace session IDs with salted pseudonyms and keep only the provider kind. The only
-network use is the update check: one request to GitHub's public releases API, with no account, cookies or system
-profile, when you click *Check for Updates…* or, if you turn on the daily check (off by default), once a day. The agent
-skill writes a file on your Mac and sends nothing.
+code or transcripts. Exports replace session IDs with salted pseudonyms and keep only the provider kind. The network use is the update check: one request to GitHub's public releases API, with no account, cookies or system
+profile, when you click *Check for Updates…* or, if you turn on the daily check (off by default), once a day. From 0.3 on, the download of a release from GitHub happens only when you click *Update to <version>*. The agent
+skill writes a file on your Mac and sends nothing. The music and audio holds read only whether an app is producing
+sound, never its content, and need no new permission.
 
 ## Project documents
 
@@ -160,7 +168,7 @@ skill writes a file on your Mac and sends nothing.
 
 - Qualified on one Mac model and macOS build; other combinations are untested.
 - Agent activity for terminal agents is an estimate: a model thinking silently for a long time can look idle.
-- Not notarized: macOS asks you to approve the first launch, and the app cannot update itself.
+- Not notarized: macOS asks you to approve the first launch. From 0.3 on, an in-app update is checked against CamLid's own release certificate, not against Apple.
 - Apple silicon only.
 - No fan or charging control.
 - The lid-open hold and `camlid run` were checked on one Mac only.

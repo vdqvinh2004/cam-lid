@@ -24,7 +24,8 @@ struct NotificationBudget {
     private var budget = NotificationBudget()
     private var requesting = false
     private(set) var permission = "notDetermined"
-    var permissionState: String { requesting ? "requesting" : permission }
+    /// What the Notifications setting shows. Where macOS cannot ask (outside an app bundle), it is always unavailable.
+    var permissionState: String { !supported ? "unavailable" : requesting ? "requesting" : permission }
     var onPermissionChanged: (() -> Void)?
     private var enabled: [NotificationCategory] = []
     private let supported: Bool
@@ -78,13 +79,13 @@ struct NotificationBudget {
     }
     static func content(category: NotificationCategory) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
-        content.title = "CamLid: " + category.title
+        content.title = tr("CamLid: ") + category.title
         // Fixed templates only: no raw reason, argv, process or history payload.
         switch category {
-        case .completion: content.body = "Tracked work settled. Check Activity for the sleep outcome."
-        case .failure: content.body = "Tracked work reported a failure. Check Activity for details."
-        case .safety: content.body = "A safety condition stopped protection. Check Activity for details."
-        case .restoration: content.body = "Recovery needs attention. Check Activity before starting another session."
+        case .completion: content.body = tr("Tracked work settled. Check Activity for the sleep outcome.")
+        case .failure: content.body = tr("Tracked work reported a failure. Check Activity for details.")
+        case .safety: content.body = tr("A safety condition stopped protection. Check Activity for details.")
+        case .restoration: content.body = tr("Recovery needs attention. Check Activity before starting another session.")
         }
         content.sound = .default
         return content

@@ -25,7 +25,7 @@ public enum MusicSource: String, CaseIterable, Codable, Sendable {
     /// The source's name in the reason line: the same words as its Settings chip.
     public var name: String {
         switch self {
-        case .browser: "Chromium browsers"
+        case .browser: tr("Chromium")
         case .spotify: "Spotify"
         case .appleMusic: "Apple Music"
         case .safari: "Safari"
@@ -35,10 +35,10 @@ public enum MusicSource: String, CaseIterable, Codable, Sendable {
     /// The Settings chip's help.
     public var help: String {
         switch self {
-        case .browser: "Chromium browsers: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Firefox is not detected."
-        case .spotify: "Detected from Spotify's audio output. When the music stops, Sleep when done applies, as after agent work."
-        case .appleMusic: "Detected from Music's audio output. When the music stops, Sleep when done applies, as after agent work."
-        case .safari: "Detected from Safari's audio output and its media-playback assertion. When the music stops, Sleep when done applies, as after agent work."
+        case .browser: tr("Chromium: Chrome, Brave, Edge, Vivaldi, Opera, Arc and Chromium. Firefox is not detected.")
+        case .spotify: tr("Detected from Spotify's audio output. When the music stops, Sleep when done applies, as after agent work.")
+        case .appleMusic: tr("Detected from Music's audio output. When the music stops, Sleep when done applies, as after agent work.")
+        case .safari: tr("Detected from Safari's audio output and its media-playback assertion. When the music stops, Sleep when done applies, as after agent work.")
         }
     }
 
@@ -59,13 +59,16 @@ enum MusicOutput {
     struct Process: Equatable {
         let bundleID: String?
         let isOutputting: Bool
+        /// Spec 029: the process ID, for the display name in Activity. Defaults to 0 for readings that do not need it.
+        var pid: Int32 = 0
     }
 
     /// Live: reads CoreAudio's process list.
     static func processes() -> [Process] {
         guard #available(macOS 14.2, *) else { return [] }
         return processObjects().map { object in
-            Process(bundleID: bundleID(of: object), isOutputting: flag(kAudioProcessPropertyIsRunningOutput, of: object))
+            Process(bundleID: bundleID(of: object), isOutputting: flag(kAudioProcessPropertyIsRunningOutput, of: object),
+                    pid: processID(of: object))
         }
     }
 
@@ -104,6 +107,15 @@ enum MusicOutput {
         var value: UInt32 = 0
         var size = UInt32(MemoryLayout<UInt32>.size)
         return AudioObjectGetPropertyData(object, &addr, 0, nil, &size, &value) == noErr && value == 1
+    }
+
+    @available(macOS 14.2, *)
+    private static func processID(of object: AudioObjectID) -> Int32 {
+        var addr = address(kAudioProcessPropertyPID)
+        var value: pid_t = 0
+        var size = UInt32(MemoryLayout<pid_t>.size)
+        _ = AudioObjectGetPropertyData(object, &addr, 0, nil, &size, &value)
+        return value
     }
 
     @available(macOS 14.2, *)
@@ -190,7 +202,7 @@ enum PlaybackAssertion {
         process == name || process.hasPrefix(name + " ")
     }
 
-    private static func processName(_ pid: Int) -> String? {
+    static func processName(_ pid: Int) -> String? {
         var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
         guard proc_pidpath(pid_t(pid), &buffer, UInt32(buffer.count)) > 0 else { return nil }
         return URL(fileURLWithPath: String(cString: buffer)).lastPathComponent

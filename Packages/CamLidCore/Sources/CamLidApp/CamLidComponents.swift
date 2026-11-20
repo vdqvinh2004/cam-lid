@@ -232,17 +232,17 @@ struct PreviewBuildNotice: View {
     var text: String? = nil
     var font: Font = .callout
 
-    private var ready: Bool { text?.hasPrefix("Closed lid ready") == true }
+    private var ready: Bool { text?.hasPrefix(tr("Closed lid ready")) == true }
 
     var body: some View {
         CamLidStatusLabel(
-            text ?? "Can’t keep your Mac awake",
+            text ?? tr("Can’t keep your Mac awake"),
             systemImage: ready ? "checkmark.circle" : "info.circle",
             tone: ready ? .success : .info,
             font: font,
             help: ready
-                ? "Sessions can keep this Mac awake with the lid closed, within the safety limits."
-                : "Closed lid isn’t available yet. Settings › Closed Lid shows what is missing."
+                ? tr("Sessions can keep this Mac awake with the lid closed, within the safety limits.")
+                : tr("Closed lid isn’t available yet. Settings › Closed Lid shows what is missing.")
         )
     }
 }

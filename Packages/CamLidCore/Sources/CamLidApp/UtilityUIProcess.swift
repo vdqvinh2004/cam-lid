@@ -16,6 +16,10 @@ struct UtilityUIState: Codable, Sendable {
     var observationReady: Bool = false
     var updates = UpdateSnapshot(phase: .ready, reason: "manualCheckReady")
     var canCheckUpdates = true
+    /// Spec 026: the Update button is offered only when this build can install the offered release.
+    var canInstallUpdates = false
+    /// Spec 026: a session is running. Installing asks first, and ends the session only if the user agrees.
+    var updatesSessionActive = false
     var loginState = "notRegistered"
     var loginMessage = "Login registration has not been checked."
     var notificationPermission = "notDetermined"
@@ -33,6 +37,8 @@ struct UtilityUIState: Codable, Sendable {
     var automaticUpdateChecks = false
     var agentSkillPath: String?
     var watchedMusic: Set<MusicSource> = []
+    var anyAudioHold = false
+    var language: AppLanguage = .system
 }
 enum UtilityUICommand: Codable, Sendable {
     case show(UtilitySurface, UtilityUIState)
@@ -67,6 +73,8 @@ case settings(SettingsSection)
     case readDiagnostics(UUID)
     case reloadHistory
     case checkUpdates
+    case installUpdate(endingSession: Bool)
+    case enableClosedLid(Int)
     case authorizeNotifications, applyLoginPreference
     case installHelper, uninstallHelper
     case setUntestedAcknowledgement(Bool)
@@ -74,6 +82,8 @@ case settings(SettingsSection)
     case openPermissionSettings(AppPermission)
     case setAutomaticUpdateChecks(Bool)
     case setMusicSource(MusicSource, Bool)
+    case setAnyAudioHold(Bool)
+    case setLanguage(AppLanguage)
     case agentSkill(AgentSkillRequest)
 }
 
@@ -96,6 +106,8 @@ final class UtilityUIPipe {
         _ = fcntl(output.fileDescriptor, F_SETNOSIGPIPE, 1)
         input.readabilityHandler = { [weak self] handle in
             let chunk = handle.availableData
+            // At end of file the handler would keep firing until the main queue ran end(), flooding it and blocking quit.
+            if chunk.isEmpty { handle.readabilityHandler = nil }
             DispatchQueue.main.async { self?.consume(chunk) }
         }
     }
@@ -189,4 +201,9 @@ final class UtilityUIProcess {
         exited(process.processIdentifier)
     }
     func close() { pipe?.end(); if process.isRunning { process.terminate() } }
+    /// An install ends the Updates window process at once: it keeps no state, and the app that owns it is about to exit.
+    func killForInstall() {
+        pipe?.end(); pipe = nil
+        if process.isRunning { _ = kill(process.processIdentifier, SIGKILL) }
+    }
 }

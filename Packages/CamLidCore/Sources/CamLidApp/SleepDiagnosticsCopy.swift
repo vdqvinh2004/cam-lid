@@ -39,50 +39,50 @@ enum SleepDiagnosticsCopy {
     }
 
     private static let rules: [Rule] = [
-        Rule(names: ["facetime"], key: "facetime", title: "FaceTime is on a call", symbol: "phone.fill"),
+        Rule(names: ["facetime"], key: "facetime", title: tr("FaceTime is on a call"), symbol: "phone.fill"),
         Rule(names: ["avconferenced", "vtdecoderxpcservice"], key: "call",
-             title: "A call is in progress", symbol: "phone.fill"),
+             title: tr("A call is in progress"), symbol: "phone.fill"),
         Rule(names: ["cameracaptured", "vdcassistant"], key: "camera",
-             title: "The camera is in use", symbol: "video.fill"),
+             title: tr("The camera is in use"), symbol: "video.fill"),
         Rule(names: ["coreaudiod", "audioaccessoryd"], key: "audio",
-             title: "Audio is playing", symbol: "speaker.wave.2.fill"),
+             title: tr("Audio is playing"), symbol: "speaker.wave.2.fill"),
         Rule(names: ["mds", "mds_stores", "mdworker", "mdworker_shared", "spotlightknowledged", "corespotlightd"],
-             key: "spotlight", title: "Spotlight is organizing files", symbol: "magnifyingglass"),
+             key: "spotlight", title: tr("Spotlight is organizing files"), symbol: "magnifyingglass"),
         Rule(names: ["dasd"], key: "background",
-             title: "macOS is doing background work", symbol: "gearshape.2"),
+             title: tr("macOS is doing background work"), symbol: "gearshape.2"),
         Rule(names: ["nsurlsessiond", "cloudd", "bird", "fileproviderd"], key: "network",
-             title: "Your Mac is downloading data in the background", symbol: "arrow.down.circle"),
-        Rule(names: ["apsd"], key: "push", title: "Push notifications are active", symbol: "bell"),
+             title: tr("Your Mac is downloading data in the background"), symbol: "arrow.down.circle"),
+        Rule(names: ["apsd"], key: "push", title: tr("Push notifications are active"), symbol: "bell"),
         Rule(names: ["sharingd", "rapportd"], key: "handoff",
-             title: "Handoff or AirDrop is active", symbol: "square.and.arrow.up"),
+             title: tr("Handoff or AirDrop is active"), symbol: "square.and.arrow.up"),
         Rule(names: ["bluetoothd"], key: "bluetooth",
-             title: "Bluetooth is active", symbol: "antenna.radiowaves.left.and.right"),
-        Rule(names: ["powerd"], key: "screen", title: "The screen is on", symbol: "display"),
+             title: tr("Bluetooth is active"), symbol: "antenna.radiowaves.left.and.right"),
+        Rule(names: ["powerd"], key: "screen", title: tr("The screen is on"), symbol: "display"),
         Rule(names: ["windowserver", "loginwindow"], key: "input",
-             title: "You recently used your Mac", symbol: "keyboard"),
+             title: tr("You recently used your Mac"), symbol: "keyboard"),
         Rule(names: ["kernel_task"], key: "kernel",
-             title: "A connected device is asking your Mac to stay awake", symbol: "cable.connector"),
+             title: tr("A connected device is asking your Mac to stay awake"), symbol: "cable.connector"),
         Rule(names: ["backupd", "timemachine", "tmutil"], key: "backup",
-             title: "Time Machine is backing up", symbol: "externaldrive"),
+             title: tr("Time Machine is backing up"), symbol: "externaldrive"),
         Rule(names: ["softwareupdated", "softwareupdate", "osinstaller", "installd"], key: "update",
-             title: "macOS is installing an update", symbol: "arrow.triangle.2.circlepath"),
+             title: tr("macOS is installing an update"), symbol: "arrow.triangle.2.circlepath"),
         Rule(names: ["photoanalysisd", "photolibraryd", "photos"], key: "photos",
-             title: "Photos is analyzing your library", symbol: "photo"),
+             title: tr("Photos is analyzing your library"), symbol: "photo"),
         Rule(names: ["caffeinate"], key: "awake",
-             title: "An app asked your Mac to stay awake", symbol: "cup.and.saucer"),
-        Rule(names: ["orca"], key: "orca", title: "Orca is running a task", symbol: "terminal"),
-        Rule(names: ["lidrun"], key: "lidrun", title: "LidRun is active", symbol: "laptopcomputer"),
+             title: tr("An app asked your Mac to stay awake"), symbol: "cup.and.saucer"),
+        Rule(names: ["orca"], key: "orca", title: tr("Orca is running a task"), symbol: "terminal"),
+        Rule(names: ["lidrun"], key: "lidrun", title: tr("LidRun is active"), symbol: "laptopcomputer"),
         Rule(names: ["brave", "brave browser", "brave browser helper"], key: "brave",
-             title: "Brave Browser is active", symbol: "globe"),
+             title: tr("Brave Browser is active"), symbol: "globe"),
         Rule(names: ["camlid", "com.camlid.power-helper"], key: "camlid",
-             title: "CamLid is active", symbol: "moon.fill"),
-        Rule(names: ["zoom.us", "zoom"], key: "zoom", title: "Zoom is on a call", symbol: "video.fill"),
+             title: tr("CamLid is active"), symbol: "moon.fill"),
+        Rule(names: ["zoom.us", "zoom"], key: "zoom", title: tr("Zoom is on a call"), symbol: "video.fill"),
         Rule(names: ["microsoft teams", "msteams"], key: "teams",
-             title: "Microsoft Teams is on a call", symbol: "video.fill"),
+             title: tr("Microsoft Teams is on a call"), symbol: "video.fill"),
         Rule(names: ["webex", "webexmeetings"], key: "webex",
-             title: "Webex is on a call", symbol: "video.fill"),
+             title: tr("Webex is on a call"), symbol: "video.fill"),
         Rule(names: ["docker", "com.docker.backend", "docker desktop"], key: "docker",
-             title: "Docker is running tasks", symbol: "shippingbox"),
+             title: tr("Docker is running tasks"), symbol: "shippingbox"),
     ]
 
     static func causes(for snapshot: DiagnosticSnapshot) -> [FriendlySleepCause] {
@@ -109,7 +109,7 @@ enum SleepDiagnosticsCopy {
                 activeNow: active,
                 priority: priority(of: group.effect),
                 details: group.blockers.map { blocker in
-                    FriendlySleepDetail(id: blocker.id, owner: blocker.owner ?? "Unknown process",
+                    FriendlySleepDetail(id: blocker.id, owner: blocker.owner ?? tr("Unknown process"),
                         pid: blocker.pid, type: blocker.type, source: blocker.source)
                 }.sorted {
                     if $0.owner != $1.owner { return $0.owner.localizedStandardCompare($1.owner) == .orderedAscending }
@@ -128,12 +128,12 @@ enum SleepDiagnosticsCopy {
                     causes.append(FriendlySleepCause(
                         id: descriptor.key,
                         title: descriptor.title,
-                        subtitle: "macOS says this is preventing sleep right now",
+                        subtitle: tr("macOS says this is preventing sleep right now"),
                         symbol: descriptor.symbol,
                         activeNow: true,
                         priority: 0,
                         details: [FriendlySleepDetail(id: "pmset-\(name.lowercased())", owner: name,
-                            pid: nil, type: "Sleep prevented by", source: "pmset")]))
+                            pid: nil, type: tr("Sleep prevented by"), source: "pmset")]))
                 }
             }
         }
@@ -150,29 +150,29 @@ enum SleepDiagnosticsCopy {
         if causes.isEmpty {
             switch appsCoverage ?? .unavailable {
             case .complete:
-                return "Nothing is keeping your Mac awake right now."
+                return tr("Nothing is keeping your Mac awake right now.")
             case .partial:
-                return "We couldn't check everything keeping your Mac awake."
+                return tr("We couldn't check everything keeping your Mac awake.")
             case .unavailable:
-                return "We couldn't check what's keeping your Mac awake."
+                return tr("We couldn't check what's keeping your Mac awake.")
             }
         }
         return headline(causes)
     }
 
     static func headline(_ causes: [FriendlySleepCause]) -> String {
-        guard let first = causes.first else { return "Nothing is keeping your Mac awake right now." }
-        if causes.count == 1 { return "\(first.title). That's keeping your Mac awake." }
-        if causes.count == 2 { return "\(first.title). One other thing is also keeping your Mac awake." }
+        guard let first = causes.first else { return tr("Nothing is keeping your Mac awake right now.") }
+        if causes.count == 1 { return trf("%@. That's keeping your Mac awake.", first.title) }
+        if causes.count == 2 { return trf("%@. One other thing is also keeping your Mac awake.", first.title) }
         let others = causes.count - 1
-        return "\(first.title). \(word(others)) other things are also keeping your Mac awake."
+        return trf("%@. %@ other things are also keeping your Mac awake.", first.title, word(others))
     }
 
     /// Spells out small counts so the headline reads like a sentence.
     private static func word(_ value: Int) -> String {
         let words = ["Zero", "One", "Two", "Three", "Four", "Five",
                      "Six", "Seven", "Eight", "Nine", "Ten"]
-        return words.indices.contains(value) ? words[value] : String(value)
+        return words.indices.contains(value) ? tr(words[value]) : String(value)
     }
 
     private static func descriptor(for blocker: DiagnosticBlocker) -> Descriptor {
@@ -182,11 +182,11 @@ enum SleepDiagnosticsCopy {
     private static func descriptor(forOwner ownerName: String?, effect: SleepEffect) -> Descriptor {
         switch effect {
         case .global:
-            return Descriptor(key: "global", title: "Sleep is turned off in macOS settings",
-                              symbol: "gearshape", subtitle: "This applies to the whole Mac")
+            return Descriptor(key: "global", title: tr("Sleep is turned off in macOS settings"),
+                              symbol: "gearshape", subtitle: tr("This applies to the whole Mac"))
         case .kernel:
-            return Descriptor(key: "kernel", title: "A connected device is asking your Mac to stay awake",
-                              symbol: "cable.connector", subtitle: "This applies to connected hardware")
+            return Descriptor(key: "kernel", title: tr("A connected device is asking your Mac to stay awake"),
+                              symbol: "cable.connector", subtitle: tr("This applies to connected hardware"))
         default:
             break
         }
@@ -195,24 +195,24 @@ enum SleepDiagnosticsCopy {
             return Descriptor(key: rule.key, title: rule.title, symbol: rule.symbol)
         }
         if owner.contains("spotlight") {
-            return Descriptor(key: "spotlight", title: "Spotlight is organizing files", symbol: "magnifyingglass")
+            return Descriptor(key: "spotlight", title: tr("Spotlight is organizing files"), symbol: "magnifyingglass")
         }
         if owner.contains("backup") || owner.contains("time machine") {
-            return Descriptor(key: "backup", title: "Time Machine is backing up", symbol: "externaldrive")
+            return Descriptor(key: "backup", title: tr("Time Machine is backing up"), symbol: "externaldrive")
         }
         if let name = appDisplayName(ownerName) {
-            return Descriptor(key: "app-" + name.lowercased(), title: "\(name) is active", symbol: "macwindow")
+            return Descriptor(key: "app-" + name.lowercased(), title: trf("%@ is active", name), symbol: "macwindow")
         }
         switch effect {
         case .displayIdle:
-            return Descriptor(key: "display", title: "Something is keeping your screen on", symbol: "display")
+            return Descriptor(key: "display", title: tr("Something is keeping your screen on"), symbol: "display")
         case .systemIdle:
-            return Descriptor(key: "system", title: "Something is keeping your Mac awake",
-                              symbol: "moon.zzz", subtitle: "A background process is holding a sleep request")
+            return Descriptor(key: "system", title: tr("Something is keeping your Mac awake"),
+                              symbol: "moon.zzz", subtitle: tr("A background process is holding a sleep request"))
         case .userActivity:
-            return Descriptor(key: "input", title: "You recently used your Mac", symbol: "keyboard")
+            return Descriptor(key: "input", title: tr("You recently used your Mac"), symbol: "keyboard")
         case .unknown, .global, .kernel:
-            return Descriptor(key: "unknown", title: "Something is using your Mac", symbol: "questionmark.circle")
+            return Descriptor(key: "unknown", title: tr("Something is using your Mac"), symbol: "questionmark.circle")
         }
     }
 
@@ -240,12 +240,12 @@ enum SleepDiagnosticsCopy {
 
     private static func subtitle(for effect: SleepEffect) -> String {
         switch effect {
-        case .displayIdle: "Keeps your Mac and screen awake"
-        case .systemIdle: "Keeps your Mac awake"
-        case .userActivity: "Recent activity. Sleep resumes after a short pause"
-        case .global: "Sleep is turned off for the whole Mac"
-        case .kernel: "A connected device is asking macOS to stay awake"
-        case .unknown: "macOS reports activity"
+        case .displayIdle: tr("Keeps your Mac and screen awake")
+        case .systemIdle: tr("Keeps your Mac awake")
+        case .userActivity: tr("Recent activity. Sleep resumes after a short pause")
+        case .global: tr("Sleep is turned off for the whole Mac")
+        case .kernel: tr("A connected device is asking macOS to stay awake")
+        case .unknown: tr("macOS reports activity")
         }
     }
 }
