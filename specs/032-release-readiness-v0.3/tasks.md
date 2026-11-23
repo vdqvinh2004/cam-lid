@@ -15,8 +15,8 @@
 
 ## Checks for the owner
 
-- [ ] O1 Status menu on the installed build: no Show Dashboard in the icon menu; Timed starts with the Settings duration; Auto and Stop still work.
-- [ ] O2 One short closed-lid session with this build, then restore (as in spec 024, G15).
+- [x] O1 Status menu on the installed build: no Show Dashboard in the icon menu; Timed starts with the Settings duration; Auto and Stop still work. Owner check passed (2026-11-23).
+- [x] O2 One short closed-lid session with this build, then restore (as in spec 024, G15). Owner check passed (2026-11-23).
 - [x] O3 Done 2026-11-23: the zip, its checksum and the notes are on the pre-release https://github.com/vdqvinh2004/cam-lid/releases/tag/v0.3.0, and the annotated tag `v0.3.0` points to `e6f3d4c`, the build commit (ADR 0004).
 - [x] O4 Done 2026-11-23, in the commit after the release: specs 026 to 031 are "released" in their status lines and in the index (as in spec 024, S3).
 - [ ] O5 Read the release notes wording.
