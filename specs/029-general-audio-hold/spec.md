@@ -1,6 +1,6 @@
 # Feature Specification: General audio hold (v0.3)
 
-**Status:** Built on v0.3 behind the "Any audio" chip, which is off by default. It extends spec 025 from four sources to any app, and replaces spec 019 FR-007 and User Story 7 for that general case. The research gate (T001–T003) is partly done on this Mac; the owner's app matrix (T021) and the go/no-go (T003) are open, and D1–D6 are for the owner to confirm.
+**Status:** Released in 0.3.0 beta on 2026-11-23, behind the "Any audio" chip, which is off by default. It extends spec 025 from four sources to any app, and replaces spec 019 FR-007 and User Story 7 for that general case. The research gate (T001–T003) is partly done on this Mac; the owner's app matrix (T021) and the go/no-go (T003) are open, and D1–D6 are for the owner to confirm.
 
 ## Goal
 

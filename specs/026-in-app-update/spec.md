@@ -1,6 +1,6 @@
 # Feature Specification: in-app update (v0.3)
 
-**Status:** Implemented on branch `v0.3`, not released. The owner chose D1, D3–D5 as recommended, and D2 was tested (see "Decided"). It changes ADR 0004 decision 4 and spec 021 decision 3 ("install mode: deferred"), so both are amended only if the owner approves. Builds 0.1 and 0.2 have no installer: their users update by hand once, and in-app updates start with 0.3.
+**Status:** Released in 0.3.0 beta on 2026-11-23. The owner chose D1, D3–D5 as recommended, and D2 was tested (see "Decided"). It changes ADR 0004 decision 4 and spec 021 decision 3 ("install mode: deferred"), so both are amended only if the owner approves. Builds 0.1 and 0.2 have no installer: their users update by hand once, and in-app updates start with 0.3.
 
 ## Goal
 

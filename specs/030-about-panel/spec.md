@@ -1,6 +1,6 @@
 # Feature Specification: About panel (v0.3)
 
-**Status:** Implemented on v0.3, not released. Added on the owner's request ("Thêm của about panel cho v 0.3 đi", 2026-11-19). The live check is open (tasks T025–T026).
+**Status:** Released in 0.3.0 beta on 2026-11-23. Added on the owner's request ("Thêm của about panel cho v 0.3 đi", 2026-11-19). The live check is open (tasks T025–T026).
 
 ## Goal
 

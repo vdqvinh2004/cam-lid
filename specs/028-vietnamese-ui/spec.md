@@ -1,6 +1,6 @@
 # Feature Specification: Vietnamese interface (v0.3)
 
-**Status:** Implemented on v0.3, not released. Replaces spec 019 FR-001, User Story 1 and tasks T011–T014. D1–D3 are applied as recommended; the owner confirms them. A native-speaker review of the Vietnamese text and the VoiceOver check are open (tasks T033).
+**Status:** Released in 0.3.0 beta on 2026-11-23. Replaces spec 019 FR-001, User Story 1 and tasks T011–T014. D1–D3 are applied as recommended; the owner confirms them. A native-speaker review of the Vietnamese text and the VoiceOver check are open (tasks T033).
 
 ## Goal
 

@@ -1,6 +1,6 @@
 # Feature Specification: CLI parity for every interface function (v0.3)
 
-**Status:** Proposed on 2026-11-20 after an audit of the v0.3 interface against the `camlid` CLI. Owner request: "Kiểm tra xem tất cả các chức năng ở giao diện đều có thể làm được với CLI chưa. Nếu chưa, thêm spec vào cho v0.3 hoàn thiện toàn bộ chức năng cho CLI". Nothing is implemented. Decisions D1–D7 are for the owner to confirm.
+**Status:** Released in 0.3.0 beta on 2026-11-23. Proposed on 2026-11-20 after an audit of the v0.3 interface against the `camlid` CLI. Owner request: "Kiểm tra xem tất cả các chức năng ở giao diện đều có thể làm được với CLI chưa. Nếu chưa, thêm spec vào cho v0.3 hoàn thiện toàn bộ chức năng cho CLI". Nothing is implemented. Decisions D1–D7 are for the owner to confirm.
 
 ## Goal
 

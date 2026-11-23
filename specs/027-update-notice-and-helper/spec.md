@@ -1,6 +1,6 @@
 # Feature Specification: update notice and closed-lid helper onboarding (v0.3)
 
-**Status:** Implemented on branch `v0.3`, not released. Open: whether the daily update check is on by default for new installs (see D4).
+**Status:** Released in 0.3.0 beta on 2026-11-23. Open: whether the daily update check is on by default for new installs (see D4).
 
 ## Goal
 

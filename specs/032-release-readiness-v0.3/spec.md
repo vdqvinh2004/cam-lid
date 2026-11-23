@@ -1,6 +1,6 @@
 # Release readiness: CamLid 0.3.0
 
-**Status:** In progress · **Date:** 2026-11-23 · **Gate for:** the v0.3 release, as [spec 024](../024-release-readiness-v0.2/spec.md) was for 0.2.0.
+**Status:** Released as 0.3.0 beta on 2026-11-23 · **Date:** 2026-11-23 · **Gate for:** the v0.3 release, as [spec 024](../024-release-readiness-v0.2/spec.md) was for 0.2.0.
 
 ## Scope
 
