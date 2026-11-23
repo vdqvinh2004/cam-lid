@@ -7,6 +7,7 @@ import CamLidCore
 @MainActor
 public protocol MenuBarActions: AnyObject {
     func menuBarStartProtection()
+    func menuBarStartTimedProtection()
     func menuBarStopProtection()
     func menuBarOpenSettings()
     func menuBarOpenSleepDiagnostics()
@@ -31,6 +32,7 @@ public extension MenuBarActions {
     func menuBarOpenSleepDiagnostics() {}
     func menuBarOpenUpdates() {}
     func menuBarShowWelcome() {}
+    func menuBarStartTimedProtection() {}
 }
 
 public struct MenuBarStatus: Sendable, Equatable {
@@ -183,6 +185,8 @@ public final class MenuBarController: NSObject {
             menu.item(withTag: 1)?.state = actions?.menuBarActiveMode == .auto ? .on : .off
             menu.item(withTag: 2)?.isEnabled = actions?.menuBarCanStop ?? false
             menu.item(withTag: 2)?.isHidden = actions?.menuBarCanStop != true
+            menu.item(withTag: 3)?.isEnabled = actions?.menuBarCanStart ?? false
+            menu.item(withTag: 3)?.state = Self.isTimedActive(actions?.menuBarActiveMode) ? .on : .off
         }
         let activeMode = actions?.menuBarActiveMode
         let isTimedSession = activeMode == .timed || activeMode == .manual
@@ -297,6 +301,9 @@ public final class MenuBarController: NSObject {
             onToggleDashboard?()
         }
     }
+    /// Timed and Manual sessions both run a timer, so both show the Timed item as on.
+    static func isTimedActive(_ mode: RequestedMode?) -> Bool { mode == .timed || mode == .manual }
+
     /// Right-click and Control-click open the menu; any other click toggles the dashboard.
     static func opensContextMenu(eventType: NSEvent.EventType?, control: Bool) -> Bool {
         eventType == .rightMouseUp || control
@@ -314,7 +321,13 @@ public final class MenuBarController: NSObject {
     func installApplicationMenu() {
         let root = NSMenu()
         let application = NSMenuItem(title: tr("CamLid"), action: nil, keyEquivalent: "")
-        application.submenu = buildMenu()
+        let appMenu = buildMenu()
+        // The icon's menu has no Dashboard item. The app's own menu keeps it, with its ⌘D shortcut.
+        let dashboard = NSMenuItem(title: tr("Show Dashboard"), action: #selector(didSelectDashboard), keyEquivalent: "d")
+        dashboard.target = self
+        appMenu.insertItem(dashboard, at: 0)
+        appMenu.insertItem(.separator(), at: 1)
+        application.submenu = appMenu
         root.addItem(application)
         let window = NSMenuItem(title: tr("Window"), action: nil, keyEquivalent: "")
         let windowMenu = NSMenu(title: tr("Window"))
@@ -329,9 +342,6 @@ public final class MenuBarController: NSObject {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        let dashboard = NSMenuItem(title: tr("Show Dashboard"), action: #selector(didSelectDashboard), keyEquivalent: "d")
-        dashboard.target = self
-        menu.addItem(dashboard)
         let start = NSMenuItem(
             title: tr("Auto"), action: #selector(didSelectStart),
             keyEquivalent: ""
@@ -342,6 +352,14 @@ public final class MenuBarController: NSObject {
         start.state = actions?.menuBarActiveMode == .auto ? .on : .off
         start.setAccessibilityIdentifier(CamLidAccessibility.IDs.startMenuItem)
         menu.addItem(start)
+
+        // Timed runs for the Default Timed duration in Settings, as the Dashboard's Timed button does.
+        let timed = NSMenuItem(title: tr("Timed"), action: #selector(didSelectStartTimed), keyEquivalent: "")
+        timed.tag = 3
+        timed.target = self
+        timed.isEnabled = actions?.menuBarCanStart ?? false
+        timed.state = Self.isTimedActive(actions?.menuBarActiveMode) ? .on : .off
+        menu.addItem(timed)
 
         let stop = NSMenuItem(
             title: tr("Stop"), action: #selector(didSelectStop),
@@ -403,6 +421,7 @@ public final class MenuBarController: NSObject {
     @objc private func didSelectAbout() { AboutPanel.show() }
     @objc private func didSelectWelcome() { actions?.menuBarShowWelcome() }
     @objc private func didSelectStart() { actions?.menuBarStartProtection() }
+    @objc private func didSelectStartTimed() { actions?.menuBarStartTimedProtection() }
     @objc private func didSelectStop() { actions?.menuBarStopProtection() }
     @objc private func didSelectSettings() { actions?.menuBarOpenSettings() }
     @objc private func didSelectActivityLog() { actions?.menuBarOpenActivityLog() }

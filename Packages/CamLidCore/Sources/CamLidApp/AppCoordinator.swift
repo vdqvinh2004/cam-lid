@@ -356,6 +356,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     // MARK: - MenuBarActions (preview sessions; never power actuation)
 
     public func menuBarStartProtection() { Task { await activateDashboardMode(.auto, expectedRevision: revision) } }
+    /// The Timed item: the same path as the Dashboard's Timed button, so the timer is the Settings default duration.
+    public func menuBarStartTimedProtection() { Task { await activateDashboardMode(.timed, expectedRevision: revision) } }
 
     func activateDashboardMode(_ mode: RequestedMode, expectedRevision: Int) async {
         guard !authorityUnavailable, !terminationFlowActive, !hasPendingSettingsWork else { return }

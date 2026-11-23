@@ -74,6 +74,28 @@ struct UISimplicityTests {
         // Owner-approved cleanup (2026-11-01): three panes.
         #expect(SettingsSection.allCases.map(\.title) == ["General", "Agents", "Closed Lid"])
     }
+    @Test @MainActor func statusMenuHasNoDashboardItemAndTimedUsesTheSettingsDuration() async throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        let app = fixture.makeCoordinator()
+        let menu = MenuBarController(); menu.actions = app
+        let items = menu.buildMenu().items
+        #expect(items.contains { $0.title == "Show Dashboard" } == false)
+        #expect(items.first { $0.tag == 3 }?.title == "Timed")
+        #expect(items.first { $0.tag == 3 }?.isEnabled == true)
+        var patch = ConfigPatch(); patch.timerMinutes = 45
+        guard case .saved = await app.applySettingsPatchAsync(patch, expectedRevision: app.revision) else {
+            Issue.record("Could not save the Timed duration"); return
+        }
+        app.menuBarStartTimedProtection()
+        for _ in 0..<100 where app.session == nil { try await Task.sleep(nanoseconds: 10_000_000) }
+        let reply = try JSONDecoder().decode(CLIResult.self, from: app.handleControl(.status, payload: Data()))
+        let status = try #require(JSONSerialization.jsonObject(with: Data(reply.json.utf8)) as? [String: Any])
+        let session = try #require(status["session"] as? [String: Any])
+        #expect(session["requestedMode"] as? String == "timed")
+        // The Settings default (45 minutes) is the Timed duration, counted from the start.
+        #expect((session["capDeadlineMonotonic"] as? Double ?? 0) - (session["startedAtMonotonic"] as? Double ?? 0) == 2_700)
+    }
+
     @Test @MainActor func dashboardModesStartSwitchAndToggle() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let app = fixture.makeCoordinator()
