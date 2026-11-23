@@ -151,7 +151,8 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - **Update to a new release (new in 0.3).** When *Check for Updates…* finds a newer release, *Update to <version>* downloads it from GitHub, checks its checksum and signature, replaces CamLid and restarts. Nothing downloads without your click, and a running session asks first. Builds 0.1 and 0.2 have no installer: update those by hand once.
 - **Update notice (new in 0.3).** The Dashboard shows "CamLid <version> is available" when the last check found a newer release.
 - **About CamLid (new in 0.3).** The menu offers the standard About window: version, copyright and the repository link.
-- **Command line (changed in 0.3).** \`camlid start --mode\` no longer saves the mode; \`camlid config set mode\` does. \`camlid simulate --use-current-config\` uses your saved settings.
+- **Status menu (new in 0.3).** Right-click the icon for Auto, Timed (it runs for the Default Timed duration in Settings) and Stop. Show Dashboard is in the CamLid menu.
+- **Command line (new and changed in 0.3).** \`camlid commands\` lists every command, its flags, reply fields and refusal reasons. \`camlid start\` saves nothing unless you pass \`--save-mode\`; \`--replace\` switches a running session. Durations need a unit: \`45m\`, \`2h\` or \`infinite\`. \`camlid session duration\` and \`camlid session sleep-delay\` change the running session. \`camlid config set <key> <value>\` sets one setting. \`camlid simulate --use-current-config\` uses your saved settings.
 
 ### Known limits
 - **Tested on one Mac:** Mac17,3, macOS 27.0.1 (build 26A434), Apple silicon. On any other Mac or macOS build, closed-lid operation
