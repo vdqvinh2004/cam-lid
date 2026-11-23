@@ -9,7 +9,7 @@ The shared roadmap (kept outside this repository) defines cross-feature gates an
 > agents, one persistent helper, GitHub releases). Their task lists now mark tasks `[x]` when evidence exists, `[~]`
 > when [ADR 0002](../docs/adr/0002-observer-only-agent-activity.md), [0003](../docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md)
 > or [0004](../docs/adr/0004-distribution-through-github-releases.md) replaced them (the reason is on the line), and
-> leave `[ ]` only for work that is still valid. Current work is spec 016 (remaining trials). v0.2.0 was released as a pre-release on 2026-11-18 (specs 021 to 025; the release gate is spec 024). Spec 020 plans later work; specs 019 and 026 to 031 are v0.3 work, implemented on branch `v0.3` and not yet released.
+> leave `[ ]` only for work that is still valid. Current work is spec 016 (remaining trials). v0.2.0 was released as a pre-release on 2026-11-18 (specs 021 to 025; the release gate is spec 024). Spec 020 plans later work; specs 019 and 026 to 031 are v0.3 work, released as 0.3.0 beta on 2026-11-23 (tag `v0.3.0`). The branch `v0.3` was deleted after the release; its commits are in `main`.
 
 - [M0: Project Planning](001-project-planning/spec.md) — Complete: documentation only.
 - [M1: Power and Detection Feasibility](002-power-feasibility/spec.md) — **Closed for this design:** the backend question was answered by the persistent helper (014) and Strict (016), qualified on one Mac by attended trials.
