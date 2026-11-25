@@ -109,9 +109,11 @@ public struct AgentBadgeState: Codable, Equatable, Identifiable, Sendable {
         unknownCount = rows.filter { $0.state == .unknown }.count
         confidence = rows.isEmpty || rows.contains(where: { $0.confidence == .unknown }) ? "unknown" : rows.contains(where: { $0.confidence == .inferred }) ? "inferred" : "exact"
         readiness = rows.isEmpty ? "disconnected" : "connected"
+        // Orca's receipts come once per poll, so its evidence stays fresh for the whole stale window, not for one poll.
+        let unknownAfter = provider == OrcaHostResolver.providerID ? OrcaHostResolver.staleSeconds : 15
         observedState = rows.isEmpty ? ((!observationKnown || processCount > 0) ? "Unknown" : "Not detected")
             : workingCount > 0 ? "Active" : unknownCount > 0 ? "Unknown"
-            : waitingCount > 0 ? "Waiting" : (evidenceAgeSeconds.map { $0 > 15 } == true ? "Unknown" : "Inactive")
+            : waitingCount > 0 ? "Waiting" : (evidenceAgeSeconds.map { $0 > unknownAfter } == true ? "Unknown" : "Inactive")
     }
     private enum CodingKeys: String, CodingKey {
         case provider, detectionEnabled, readiness, observedState, workingCount, waitingCount, unknownCount, evidenceAgeSeconds, confidence, processCount, cliDetected, appDetected, estimated

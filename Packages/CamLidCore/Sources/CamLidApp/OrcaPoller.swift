@@ -43,6 +43,11 @@ public struct OrcaPoller: Sendable {
         guard consent else { throw IPCError.policyDenied("orcaMetadataConsentRequired") }
         // No version pin: a missing or reshaped CLI fails below as unavailable/invalid.
         let status = try Self.run(executable: executable, arguments: ["status", "--json"])
+        // A closed Orca lists no worktrees and its reply is rejected as unavailable: skip the second process.
+        if let state = try? JSONDecoder().decode(StatusEnvelope.self, from: status), state.ok,
+           state.result.target.kind == "local", !state.result.runtime.reachable {
+            throw OrcaPollError.unavailable
+        }
         let worktrees = try Self.run(executable: executable, arguments: ["worktree", "ps", "--limit", "20", "--json"])
         return (status, worktrees)
     }

@@ -228,9 +228,12 @@ public struct OrcaHostResolver: Sendable {
     public static let providerID = "orca"
     /// Minimum supported CLI version. Local-ready probe: 1.4.219.
     public static let minSupportedVersion = SemanticVersion(1, 4, 0)
+    /// Orca is read every `pollSeconds`; its state is stale after three polls without a good reply.
+    public static let pollSeconds: Double = 15
+    public static let staleSeconds: Double = 3 * pollSeconds
     public let maxSnapshotAgeSeconds: Double
 
-    public init(maxSnapshotAgeSeconds: Double = 15) {
+    public init(maxSnapshotAgeSeconds: Double = OrcaHostResolver.staleSeconds) {
         self.maxSnapshotAgeSeconds = maxSnapshotAgeSeconds
     }
 

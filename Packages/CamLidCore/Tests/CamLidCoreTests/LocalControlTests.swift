@@ -37,6 +37,21 @@ struct RuntimeAgentTests {
         try JSONEncoder().encode(NormalizedEvent(provider: "codex", sessionID: "session", runID: "run",
             state: state, evidenceKind: .lifecycle, confidence: .exact, sequence: sequence, receivedMonotonic: 99_999))
     }
+    /// Orca is read once per poll, so its working row must outlast the 15 s heartbeat other providers use.
+    @Test func orcaWorkingRowHoldsAcrossItsPollWindow() throws {
+        func orca(_ sequence: Int) throws -> Data {
+            try JSONEncoder().encode(NormalizedEvent(provider: "orca", sessionID: "pane", runID: "pane",
+                state: .working, evidenceKind: .lifecycle, confidence: .inferred, sequence: sequence, receivedMonotonic: 99_999))
+        }
+        var store = RuntimeAgentStore()
+        #expect(try store.ingest(orca(0), now: 10) == "applied")
+        #expect(store.tasks(now: 25.7).first?.state == .working)
+        #expect(try store.ingest(orca(1), now: 25) == "applied")
+        #expect(store.tasks(now: 40.7).first?.state == .working)
+        #expect(store.tasks(now: 70).first?.state == .working)
+        #expect(store.tasks(now: 71).first?.state == .unknown)
+        #expect(store.tasks(now: 71).first?.unknownUntilMonotonic == 190)
+    }
     @Test func staleActivityAnchorsToServerReceipt() throws {
         var store = RuntimeAgentStore()
         #expect(try store.ingest(event(0), now: 10) == "applied")

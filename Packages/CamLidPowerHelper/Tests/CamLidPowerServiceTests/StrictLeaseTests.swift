@@ -40,7 +40,7 @@ import Testing
 
     @Test func strictRunsOnBatteryWhenTheClientAllowsIt() {
         let (f, fake) = fixture()
-        f.safety = HelperSafety(onAC: false, batteryPercent: 70, thermalNominal: true, consoleUID: 501, lidClosed: false, externalDisplays: 0)
+        f.safety = HelperSafety(onAC: false, batteryPercent: 70, thermal: .nominal, consoleUID: 501, lidClosed: false, externalDisplays: 0)
         f.service.start()
         let held = f.service.handle(PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 300, mechanism: .strict,
                                                  batteryFloorPercent: 20), owner: f.owner, uid: 501)
@@ -89,7 +89,7 @@ import Testing
         var requests = 0
         f.service.sleepSystem = { requests += 1 }
         let held = acquireStrict(f)
-        f.safety = HelperSafety(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501,
+        f.safety = HelperSafety(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 501,
                                 lidClosed: true, externalDisplays: 0)
         _ = f.service.handle(PowerRequest(operation: .release, token: held.token), owner: f.owner, uid: 501)
         #expect(requests == 0)

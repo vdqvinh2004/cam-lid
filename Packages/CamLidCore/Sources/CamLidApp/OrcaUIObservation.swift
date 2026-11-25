@@ -194,8 +194,19 @@ struct OrcaUICollector {
 
 /// Bounded stable tab observations. Missing or failed reads invalidate idle too.
 struct OrcaUITracker {
+    /// Sequences start over in a new epoch. The store never closes a gap it rejected, so after a rejection the tracker
+    /// restarts in a new epoch, which the store takes as a fresh run (its epoch reset).
+    private(set) var epoch: Int
     private var sequences: [String: Int] = [:]
     private var lastStates: [String: OrcaUIState] = [:]
+
+    init(epoch: Int = 0) { self.epoch = epoch }
+
+    /// The known runs stay, so the next snapshot reports each one again in the new epoch (unknown when it is missing).
+    mutating func restart() {
+        epoch += 1
+        sequences = [:]
+    }
     mutating func consume(_ snapshot: OrcaUISnapshot, now: Double) throws -> [NormalizedEvent] {
         let age = now - snapshot.observedAt
         guard now.isFinite, age.isFinite, age >= 0, age <= 1,
@@ -205,7 +216,7 @@ struct OrcaUITracker {
             try validateID(row.id)
             guard current.updateValue(row.state, forKey: row.id) == nil else { throw OrcaUIReadError.incomplete }
         }
-        let ids = Set(sequences.keys).union(current.keys)
+        let ids = Set(sequences.keys).union(lastStates.keys).union(current.keys)
         guard ids.count <= 64 else { throw OrcaUIReadError.capacity }
         var next = sequences
         var states = lastStates
@@ -218,7 +229,7 @@ struct OrcaUITracker {
             guard sequence < Int.max - 1 else { throw OrcaUIReadError.capacity }
             events.append(try NormalizedEvent(provider: "orca", sessionID: "outside-ui", runID: id,
                 state: state.taskState, evidenceKind: .lifecycle, confidence: .inferred,
-                sequence: sequence, receivedMonotonic: now))
+                sequence: sequence, epoch: epoch, receivedMonotonic: now))
             next[id] = sequence + 1
             states[id] = state
         }

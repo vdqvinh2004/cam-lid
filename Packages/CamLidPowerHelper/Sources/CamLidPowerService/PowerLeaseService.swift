@@ -6,28 +6,33 @@ import LidRecoveryJournal
 public struct HelperSafety: Sendable {
     public let onAC: Bool
     public let batteryPercent: Double?
-    public let thermalNominal: Bool
+    public let thermal: ThermalLevel
     public let consoleUID: UInt32?
     public let lidClosed: Bool?
     public let externalDisplays: Int?
 
-    public init(onAC: Bool, batteryPercent: Double?, thermalNominal: Bool, consoleUID: UInt32?,
+    public init(onAC: Bool, batteryPercent: Double?, thermal: ThermalLevel, consoleUID: UInt32?,
                 lidClosed: Bool?, externalDisplays: Int?) {
         self.onAC = onAC
         self.batteryPercent = batteryPercent
-        self.thermalNominal = thermalNominal
+        self.thermal = thermal
         self.consoleUID = consoleUID
         self.lidClosed = lidClosed
         self.externalDisplays = externalDisplays
     }
 
-    /// Without `batteryFloor` the charger is required (and at least 20% battery); with it, battery power is
-    /// allowed while the battery stays at or above the floor.
-    func permits(_ uid: UInt32, batteryFloor: Int? = nil) -> Bool {
-        let minimum = onAC ? 20.0 : batteryFloor.map(Double.init)
-        guard let minimum else { return false }
-        return thermalNominal && consoleUID == uid && lidClosed != nil && externalDisplays == 0 &&
-            batteryPercent.map { $0.isFinite && $0 >= minimum && $0 <= 100 } == true
+    /// The first reason this reading does not permit a hold, or nil. Thermal is judged by the service, because the
+    /// serious grace depends on time. Without `batteryFloor` the charger is required (and at least 20% battery).
+    func blocker(_ uid: UInt32, batteryFloor: Int? = nil, requiresOpen: Bool = false) -> String? {
+        guard let battery = batteryPercent, battery.isFinite, battery <= 100 else { return "batteryUnknown" }
+        let minimum: Double
+        if onAC { minimum = 20 } else if let batteryFloor { minimum = Double(batteryFloor) } else { return "notCharging" }
+        guard battery >= minimum else { return "batteryFloor" }
+        guard let lidClosed else { return "lidUnknown" }
+        if requiresOpen, lidClosed { return "lidClosedAtStart" }
+        guard consoleUID == uid else { return "consoleUserChanged" }
+        guard let externalDisplays else { return "externalDisplayUnknown" }
+        return externalDisplays == 0 ? nil : "externalDisplayConnected"
     }
 }
 
@@ -80,6 +85,10 @@ public final class PowerLeaseService {
     private var activationLease: Lease?
     private var restoreAttempted = false
     private var terminalEventReason: String?
+    /// The shared thermal rule, restarted with each hold: a serious run is measured from this hold's first reading.
+    private var thermalGuard = ThermalGuard()
+    /// Why the last lease ended, given to a renewal that arrives after it; cleared by the next acquire.
+    private var lastStop: String?
     /// Diagnostic sink for state transitions only (never request payloads); a no-op unless the host sets it.
     public var log: (String) -> Void = { _ in }
     /// Asks the system to sleep. Restoring the setting with the lid already closed does not sleep the Mac by itself
@@ -119,12 +128,23 @@ public final class PowerLeaseService {
         return value
     }
 
-    private func safe(uid: UInt32, batteryFloor: Int?, requiresOpen: Bool = false) throws -> Bool {
+    /// The reason the helper must not hold or keep the Mac awake now, or nil. A reading slower than the budget may be
+    /// stale, so it counts as unsafe.
+    private func unsafeReason(uid: UInt32, batteryFloor: Int?, requiresOpen: Bool = false) throws -> String? {
         let before = try now()
         let reading = try safety()
         let after = try now()
-        return after - before <= Self.maximumSafetyReadSeconds && reading.permits(uid, batteryFloor: batteryFloor) &&
-            (!requiresOpen || reading.lidClosed == false)
+        guard after - before <= Self.maximumSafetyReadSeconds else { return "safetyReadSlow" }
+        if let thermal = thermalGuard.stopReason(for: reading.thermal, now: after) { return thermal }
+        return reading.blocker(uid, batteryFloor: batteryFloor, requiresOpen: requiresOpen)
+    }
+
+    /// Why a renewal must end the lease now, or nil. The terminal event wins, then the deadline, then safety.
+    private func renewalStop(_ current: Lease, uid: UInt32, time: Double) throws -> String? {
+        if let terminal = terminalEventReason { return terminal }
+        if time >= current.cap { return "sessionExpired" }
+        if time >= current.deadline { return "heartbeatExpired" }
+        return try unsafeReason(uid: uid, batteryFloor: current.batteryFloor)
     }
 
     public func start() {
@@ -257,7 +277,8 @@ public final class PowerLeaseService {
                 }
                 let start = try now()
                 let floor = request.batteryFloorPercent
-                guard try safe(uid: uid, batteryFloor: floor, requiresOpen: true) else { return reply(false, "safetyRefused") }
+                thermalGuard = ThermalGuard()
+                if let blocker = try unsafeReason(uid: uid, batteryFloor: floor, requiresOpen: true) { return reply(false, blocker) }
                 guard try mechanism.admissionAllowed() else { return reply(false, "preexistingOverride") }
                 guard try now() < start + mechanism.leaseSeconds else { return reply(false, "admissionExpired") }
                 let token = UUID()
@@ -268,7 +289,7 @@ public final class PowerLeaseService {
                 try save(intent: .enableLidOverride, disposition: .pending, lease: pending)
                 // A slow fsync/safety check must not authorize an already expired mutation.
                 guard terminalEventReason == nil, try now() < pending.deadline,
-                      try safe(uid: uid, batteryFloor: floor, requiresOpen: true), try now() < pending.deadline else {
+                      try unsafeReason(uid: uid, batteryFloor: floor, requiresOpen: true) == nil, try now() < pending.deadline else {
                     state = "recoveryRequired"
                     reason = "admissionExpiredBeforeWrite"
                     return reply(false, reason)
@@ -300,20 +321,20 @@ public final class PowerLeaseService {
                 }
                 state = "active"
                 reason = "leaseAcquired"
+                lastStop = nil
                 poll()
                 return reply(state == "active", reason, token: state == "active" ? token : nil)
             case .renew:
-                // The app was asleep too; its first renewal after wake learns why its Strict lease ended.
-                if lease == nil, reason == "systemSleptWhileHeld" { return reply(false, reason) }
+                // A renewal after the lease ended learns why it ended, not a generic invalid lease.
+                if lease == nil, let stop = lastStop { return reply(false, stop) }
                 guard var current = lease, state == "active", current.owner == owner,
                       current.uid == uid, current.token == request.token,
                       let sequence = request.sequence, sequence > current.sequence,
                       request.sessionSeconds == nil else { return reply(false, "invalidLease") }
                 let time = try now()
-                guard terminalEventReason == nil, time < current.deadline, time < current.cap,
-                      try safe(uid: uid, batteryFloor: current.batteryFloor) else {
-                    try restore(reason: terminalEventReason ?? "renewalRefused")
-                    return reply(false, terminalEventReason ?? "renewalRefused")
+                if let stop = try renewalStop(current, uid: uid, time: time) {
+                    try restore(reason: stop)
+                    return reply(false, stop)
                 }
                 let oldDeadline = current.deadline
                 current.deadline = min(time + mechanism.leaseSeconds, current.cap)
@@ -398,8 +419,8 @@ public final class PowerLeaseService {
             if time >= current.cap { stopReason = "sessionExpired" }
             else if time >= current.deadline { stopReason = "heartbeatExpired" }
             else {
-                let healthy = try safe(uid: current.uid, batteryFloor: current.batteryFloor)
-                if healthy {
+                let blocker = try unsafeReason(uid: current.uid, batteryFloor: current.batteryFloor)
+                if blocker == nil {
                     let overrideStillSet = try mechanism.readApplied()
                     // This is a read-only coexistence check. A failed read is unknown, never
                     // clear, and never authorizes a global write.
@@ -414,7 +435,7 @@ public final class PowerLeaseService {
                     let after = try now()
                     if after >= current.cap { stopReason = "sessionExpired" }
                     else if after >= current.deadline { stopReason = "heartbeatExpired" }
-                    else { stopReason = "safetyStop" }
+                    else { stopReason = blocker }
                 }
             }
         } catch { stopReason = "monitorFailed" }
@@ -506,6 +527,7 @@ public final class PowerLeaseService {
                     : mechanism.acknowledgedClearIsRestore ? "restored" : "cleanupAcknowledged"
             }
             reason = stopReason
+            lastStop = stopReason
             sleepIfLidClosed(after: stopReason)
         } catch {
             if case JournalFailure.revisionConflict = error, adoptRestoreWrittenElsewhere() { return }

@@ -38,6 +38,9 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
     private var latestReadings: SensorReadings?
     private var lastSampleStartedAt: Double?
     private var workerInFlight = false
+    // Worker-only, like `sampler`: the last die read and when it started.
+    private var lastTemperatureStart: Double?
+    private var lastTemperature = TemperatureObservation.unsupported
 
     public convenience init() {
         self.init(
@@ -158,6 +161,15 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
 
     static let stallBudgetSeconds = 0.2
 
+    /// The die temperature is read this often; a reading is stale after `TemperatureObservation.staleAfterSeconds`.
+    static let temperatureSampleSeconds: Double = 5
+
+    /// True when no die read has started yet, or the last one is old enough to repeat (or the clock stepped back).
+    static func temperatureIsDue(now: Double, lastStarted: Double?) -> Bool {
+        guard let lastStarted else { return true }
+        return now < lastStarted || now - lastStarted >= temperatureSampleSeconds
+    }
+
     static func withinStallBudget(_ elapsed: Double) -> Bool {
         elapsed.isFinite && elapsed >= 0 && elapsed <= stallBudgetSeconds
     }
@@ -170,11 +182,17 @@ public final class LiveSensorProvider: SensorProvider, @unchecked Sendable {
         // This function is called only by the serial worker. `sampler` therefore
         // has a single writer and the main thread never waits for Mach/IOKit.
         let cpu = sampler.sample(Self.cpuTicks())
-        // The die temperature read is slow under load, so it runs last and has its own stall
-        // budget in `settle`. It never marks the lid. Any failure reports `.unsupported`.
+        // The die read is a HID enumeration of about 64 ms, and its observation stays fresh for 10 s, so it runs every
+        // 5 s. Passes in between keep the last observation with its own sample time. It runs last, with its own stall
+        // budget in `settle`, and never marks the lid. Any failure reports `.unsupported`.
         let temperatureStartedAt = clock()
-        let temperature = TemperatureReader.read()
-        let temperatureElapsed = clock() - temperatureStartedAt
+        var temperatureElapsed = 0.0
+        if Self.temperatureIsDue(now: temperatureStartedAt, lastStarted: lastTemperatureStart) {
+            lastTemperatureStart = temperatureStartedAt
+            lastTemperature = TemperatureReader.read()
+            temperatureElapsed = clock() - temperatureStartedAt
+        }
+        let temperature = lastTemperature
         let readings = SensorReadings(
             batteryPercent: battery,
             powerSource: power,

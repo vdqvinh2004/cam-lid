@@ -126,6 +126,19 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var lastOrcaMetadataSuccess = -Double.infinity
     private var orcaMetadataIssue = "orcaMetadataNotObserved"
     private var orcaMetadataEpoch = UUID()
+    /// Orca is queried twice per poll, each query a CLI spawn of about 0.11 s of CPU. A poll runs every 15 s while Orca is
+    /// open and never while it is closed. The state is stale only after three polls without a good reply, the same window
+    /// the snapshot resolver uses.
+    static let orcaMetadataPollSeconds = OrcaHostResolver.pollSeconds
+    static let orcaMetadataStaleSeconds = OrcaHostResolver.staleSeconds
+    static let orcaBundleIdentifier = "com.stablyai.orca"
+    /// Whether a poll is due: Orca open, and the last poll at least one poll interval ago.
+    static func orcaPollDue(orcaRunning: Bool, sinceLastPoll: Double) -> Bool {
+        orcaRunning && sinceLastPoll >= orcaMetadataPollSeconds
+    }
+    private var orcaAppRunning: Bool {
+        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == Self.orcaBundleIdentifier }
+    }
     private var lastOrcaReportedProviders: Set<String> = []
     private var processPolling = false
     private var lastProcessPoll = -Double.infinity
@@ -139,6 +152,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private var activityMemory: [String: AgentActivityMemory] = [:]
     private let sampleActivityNow: @Sendable (_ reportedOrcaProviders: Set<String>?) -> (processes: [AgentActivityProcess], at: Double)
     private var installationSnapshot: AgentInstallationSnapshot?
+    /// Installed CLIs and apps change rarely, so they are checked at most every five minutes, not on every process scan.
+    private var installationCheckedAt = -Double.infinity
     private var lifetimeTracker = LifetimeRuleTracker()
     private var lifetimeProcessSnapshot: LifetimeProcessSnapshot?
     private var exactTaskEpoch: String?
@@ -831,23 +846,34 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     /// The reason line for a stop: one phrase per code. A helper stop uses the closed-lid wording without its final period.
     static func safetyReasonText(_ reasons: [String]) -> String {
-        let labels = ["thermalCritical": tr("Critical thermal pressure"), "thermalSerious": tr("Sustained serious thermal pressure"),
-            "thermalUnknown": tr("Thermal reading unavailable"), "lidUnknown": tr("Lid reading unavailable"),
-            "powerUnknown": tr("Power source unavailable"), "notCharging": tr("AC power required"),
-            "batteryFloor": tr("Battery below safety floor"), "batteryUnknown": tr("Battery reading unavailable"), "cpuStop": tr("Sustained CPU load exceeded limit")]
-        return reasons.map { reason -> String in
+        reasons.map { reason -> String in
             if reason.hasPrefix("helper") {
                 return helperStopText(reason).trimmingCharacters(in: CharacterSet(charactersIn: "."))
             }
-            return labels[reason] ?? tr("Safety condition requires attention")
+            return safetyLabel(reason) ?? tr("Safety condition requires attention")
         }.joined(separator: "; ")
+    }
+
+    /// The phrase for one stop code. The app's safety policy and the helper's guards use the same codes, so a thermal or
+    /// battery stop reads the same whichever side made it.
+    static func safetyLabel(_ code: String) -> String? {
+        ["thermalCritical": tr("Critical thermal pressure"), "thermalSerious": tr("Sustained serious thermal pressure"),
+         "thermalUnknown": tr("Thermal reading unavailable"), "lidUnknown": tr("Lid reading unavailable"),
+         "powerUnknown": tr("Power source unavailable"), "notCharging": tr("AC power required"),
+         "batteryFloor": tr("Battery below safety floor"), "batteryUnknown": tr("Battery reading unavailable"),
+         "cpuStop": tr("Sustained CPU load exceeded limit"),
+         "lidClosedAtStart": tr("Closed lid starts only with the lid open"),
+         "consoleUserChanged": tr("The signed-in user changed"),
+         "externalDisplayConnected": tr("An external display is connected"),
+         "externalDisplayUnknown": tr("External display state is unavailable"),
+         "safetyReadSlow": tr("A safety reading was too slow to trust")][code]
     }
 
     static func helperReasonText(_ reason: String) -> String {
         switch reason {
         case "systemSleptWhileHeld": tr("The Mac slept during a Strict session (macOS can end Strict, for example when a display changes). Start a new session to continue.")
         case "mechanismUnavailable": tr("The installed helper doesn’t offer Strict yet. Reinstall it in Settings › Closed Lid.")
-        case "safetyRefused": tr("Closed lid can only start with the lid open, normal temperature and no external display, on the charger (or on battery above the stop level when battery sessions are allowed).")
+        case "safetyRefused": tr("Closed lid can only start with the lid open, a temperature below critical, no external display, on the charger (or on battery above the stop level when battery sessions are allowed).")
         case "preexistingOverride", "foreignGlobalSleepDisabled": tr("Another app already disables sleep, so CamLid left it alone.")
         case "overrideChanged": tr("Another app changed the sleep setting (for example LidRun), so closed lid stopped.")
         case "recoveryRequired", "restorationFailed", "startupInspectionFailed":
@@ -859,7 +885,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
              "monitorFailed", "helperStopping", "helperRestart", "operationFailed", "operationFailedCleanup":
             tr("Closed lid lost its hold, and the sleep setting was restored. Start again to continue.")
         // Unknown codes stay in the log and `camlid status`, never in the interface.
-        default: tr("Closed lid stopped.")
+        default: safetyLabel(reason) ?? tr("Closed lid stopped.")
         }
     }
 
@@ -879,9 +905,15 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         pollProcesses()
         pollOrcaMetadata()
         let now = uptime()
-        if config.orcaMetadataAllowed, lastOrcaMetadataSuccess.isFinite, now - lastOrcaMetadataSuccess > 15 {
+        if config.orcaMetadataAllowed, lastOrcaMetadataSuccess.isFinite, now - lastOrcaMetadataSuccess > Self.orcaMetadataStaleSeconds {
             invalidateOrcaMetadata(issue: "orcaMetadataStale")
         }
+        // Orca closed: its state goes at once. The stale window is for a reply that is late, not for a quit app.
+        if config.orcaMetadataAllowed, lastOrcaMetadataSuccess.isFinite, !orcaAppRunning {
+            invalidateOrcaMetadata(issue: "orcaMetadataUnavailable")
+        }
+        // Computed once per tick: the completion check and the working count below both read it.
+        let badges = badgeStates()
         let health = currentHealth()
         latestHealth = health
         recordSensorAvailability(health)
@@ -917,7 +949,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             let decision = PolicyEngine.evaluate(
                 session: active, tasks: sleepRelevantTasks(now: now), health: health, config: policyConfig,
                 armed: true, safety: signal, recoveryConflict: false,
-                completionUncertain: agentCompletionUncertain()
+                completionUncertain: agentCompletionUncertain(badges)
                     || (!config.adapterEnrollment.isEmpty && now - lastProcessSuccess > 15),
                 lifetimeHoldReason: commandHoldReason(now: now) ?? lifetime?.holdReason ?? music
                     ?? (hasLifetimeRules ? "lifetimeRuleUnknown" : nil),
@@ -945,7 +977,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
         latestReason = statusReason(signal: signal)
         let activeMode = session?.requestedMode
-        let agentWorking = badgeStates().contains { $0.detectionEnabled && $0.workingCount > 0 }
+        let agentWorking = badges.contains { $0.detectionEnabled && $0.workingCount > 0 }
         let activityHolding = Self.isHoldingForActivity(mode: activeMode, agentWorking: agentWorking, musicHolding: musicHolding,
                                                         audioHolding: !anyAudioNames.isEmpty)
         let timerRemaining: Double? = if activeMode == .timed || activeMode == .manual {
@@ -1006,16 +1038,16 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                 cliDetected: installationSnapshot?.cliDetected.contains(provider),
                 appDetected: installationSnapshot?.appDetected.contains(provider) ?? false,
                 observationKnown: uptime() - lastProcessSuccess <= 15
-                    || (provider == "orca" && config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= 15))
+                    || (provider == "orca" && config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= Self.orcaMetadataStaleSeconds))
         }
     }
 
-    private func agentCompletionUncertain() -> Bool {
+    private func agentCompletionUncertain(_ badges: [AgentBadgeState]) -> Bool {
         // Owner decision (trial 8, option A): Orca's idle report counts as completion while its metadata is fresh;
         // without metadata consent or with stale metadata, completion stays uncertain.
         (config.adapterEnrollment.contains("orca")
-            && !(config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= 15))
-            || Self.badgesLeaveCompletionUnproven(badgeStates()) { activityClassified($0) }
+            && !(config.orcaMetadataAllowed && uptime() - lastOrcaMetadataSuccess <= Self.orcaMetadataStaleSeconds))
+            || Self.badgesLeaveCompletionUnproven(badges) { activityClassified($0) }
     }
 
     /// An enabled agent with nothing running has nothing to finish (trial 8: idle Codex and OpenCode read "Unknown" and
@@ -1518,9 +1550,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let lifetimeNames = NativeProcessList.kernelNames(of: config.lifetimeRules ?? [])
         let sampleActivity = sampleActivityNow
         let reportedOrcaProviders = orcaReportedProviders()
+        let checkInstallation = started - installationCheckedAt >= 300
         Task { [weak self] in
             let (candidates, complete, installation, lifetime, activity, orcaRunning) = await Task.detached(priority: .utility) {
-                let installation = AgentCLIInstallation.snapshot()
+                let installation = checkInstallation ? AgentCLIInstallation.snapshot() : nil
                 let processList = NativeProcessList()
                 let snapshot = processList.agentSnapshot()
                 let candidates = ProcessDiscovery(provider: InMemoryProcessList(records: snapshot.records),
@@ -1532,7 +1565,10 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             }.value
             guard let self else { return }
             self.processPolling = false
-            self.installationSnapshot = installation
+            if let installation {
+                self.installationSnapshot = installation
+                self.installationCheckedAt = started
+            }
             self.lifetimeProcessSnapshot = lifetime
             let orcaRunPIDs = Set(orcaRunning.map { $0.identity.pid })
             self.orcaRunAgentCount = orcaRunning.count
@@ -1544,13 +1580,13 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
 
     /// Providers Orca named an agent of in its last successful query, while that query is fresh and Orca observation is on.
     private func orcaReportedProviders() -> Set<String>? {
-        guard config.orcaMetadataAllowed, uptime() - lastOrcaMetadataSuccess <= 15 else { return nil }
+        guard config.orcaMetadataAllowed, uptime() - lastOrcaMetadataSuccess <= Self.orcaMetadataStaleSeconds else { return nil }
         return lastOrcaReportedProviders
     }
 
     private func pollOrcaMetadata() {
-        guard config.orcaMetadataAllowed, Bundle.main.bundleURL.pathExtension == "app",
-              !orcaMetadataPolling, uptime() - lastOrcaMetadataPoll >= 5 else { return }
+        guard config.orcaMetadataAllowed, Bundle.main.bundleURL.pathExtension == "app", !orcaMetadataPolling,
+              Self.orcaPollDue(orcaRunning: orcaAppRunning, sinceLastPoll: uptime() - lastOrcaMetadataPoll) else { return }
         lastOrcaMetadataPoll = uptime(); orcaMetadataPolling = true
         let epoch = orcaMetadataEpoch
         Task { [weak self] in
@@ -1563,7 +1599,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             switch result {
             case .success(let snapshot): self.receiveOrcaMetadataSnapshot(snapshot)
             case .failure(let error):
-                // One failed poll keeps the last good state; `refresh` drops it once nothing good arrived for 15 s.
+                // One failed poll keeps the last good state; `refresh` drops it once nothing good arrived for the stale window.
                 self.orcaMetadataIssue = error is OrcaPollError ? "orcaMetadataUnavailable" : "orcaMetadataInvalid"
             }
         }
@@ -1576,14 +1612,27 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         guard duration.isFinite, duration >= 0, duration <= 4.5, age.isFinite, age >= 0, age <= 1 else {
             orcaMetadataIssue = "orcaMetadataStale"; return   // a late reply is skipped, not trusted and not a reset
         }
+        let events: [NormalizedEvent]
         do {
-            let events = try orcaMetadataTracker.consume(OrcaUISnapshot(statuses: snapshot.statuses,
+            events = try orcaMetadataTracker.consume(OrcaUISnapshot(statuses: snapshot.statuses,
                 complete: true, observedAt: snapshot.receivedAt), now: now)
-            for event in events { try receiveObservation(event) }
-            lastOrcaMetadataSuccess = snapshot.receivedAt
-            lastOrcaReportedProviders = snapshot.reportedProviders
-            orcaMetadataIssue = "none"
-        } catch { invalidateOrcaMetadata(issue: "orcaMetadataRejected") }
+        } catch {
+            // A snapshot the tracker refused changed nothing, so its numbering stays as it is.
+            invalidateOrcaMetadata(issue: "orcaMetadataRejected")
+            return
+        }
+        for event in events {
+            do { _ = try receiveObservation(event) }
+            catch {
+                // The store refused an event the tracker had already numbered, which leaves a gap the store never closes.
+                orcaMetadataTracker.restart()
+                invalidateOrcaMetadata(issue: "orcaMetadataRejected")
+                return
+            }
+        }
+        lastOrcaMetadataSuccess = snapshot.receivedAt
+        lastOrcaReportedProviders = snapshot.reportedProviders
+        orcaMetadataIssue = "none"
     }
 
     private func invalidateOrcaMetadata(issue: String) {
@@ -1591,7 +1640,9 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         lastOrcaMetadataSuccess = -Double.infinity
         let now = uptime()
         if let events = try? orcaMetadataTracker.consume(OrcaUISnapshot(statuses: [], complete: false, observedAt: now), now: now) {
-            for event in events { _ = try? receiveObservation(event) }
+            for event in events {
+                do { try receiveObservation(event) } catch { orcaMetadataTracker.restart(); break }
+            }
         }
     }
 
@@ -1601,7 +1652,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
             orcaUIIssue = snapshot.complete ? nil : "orcaUIIncomplete"
             for event in events {
                 do { try receiveObservation(event) }
-                catch { orcaUIIssue = "orcaUIObservationRejected" }
+                catch { orcaUIIssue = "orcaUIObservationRejected"; orcaUITracker.restart(); break }
             }
         } catch {
             orcaUIIssue = (error as? OrcaUIReadError)?.code ?? "orcaUIObservationRejected"
@@ -1929,7 +1980,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
                     || (lifetimeContributes && lifetime?.hasActiveRule == true),
                 workUnknown: tasks.contains { $0.state == .unknown } || (lifetimeContributes
                     && (lifetime?.hasUnknownHold == true || lifetime?.suppressesAutoCompletion == true || lifetime == nil))
-                    || now - lastProcessSuccess > 5 || agentCompletionUncertain(),
+                    || now - lastProcessSuccess > 5 || agentCompletionUncertain(badgeStates()),
                 restore: .verified, backendVerified: false)
             if options.flags["dry-run"] == nil, !decision.eligible {
                 record(category: .stateTransition, newState: sessionStateForRecord(),

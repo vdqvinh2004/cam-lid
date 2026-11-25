@@ -32,6 +32,14 @@ import CamLidCore
         #expect(MusicSource.allCases.allSatisfy { $0.name == $0.chipTitle })
     }
 
+    /// A helper's thermal, battery and display stops read exactly as the app's own stops do.
+    @Test func helperStopCodesReadLikeTheAppsOwnCodes() {
+        #expect(AppCoordinator.safetyReasonText(["helper:thermalSerious"]) == "Sustained serious thermal pressure")
+        #expect(AppCoordinator.safetyReasonText(["helper:thermalSerious"]) == AppCoordinator.safetyReasonText(["thermalSerious"]))
+        #expect(AppCoordinator.safetyReasonText(["helper:externalDisplayConnected"]) == "An external display is connected")
+        #expect(AppCoordinator.safetyReasonText(["helper:safetyReadSlow"]) == "A safety reading was too slow to trust")
+    }
+
     @Test func helperStopTextMatchesTheClosedLidNoticeForEveryStopCode() {
         #expect(AppCoordinator.helperStopText("helperReleaseFailed")
             == "The sleep setting could not be restored yet. CamLid is retrying.")

@@ -66,9 +66,17 @@ enum MusicOutput {
     /// Live: reads CoreAudio's process list.
     static func processes() -> [Process] {
         guard #available(macOS 14.2, *) else { return [] }
-        return processObjects().map { object in
-            Process(bundleID: bundleID(of: object), isOutputting: flag(kAudioProcessPropertyIsRunningOutput, of: object),
-                    pid: processID(of: object))
+        return readProcesses(objects: processObjects(), isOutputting: { flag(kAudioProcessPropertyIsRunningOutput, of: $0) },
+                             bundleID: { bundleID(of: $0) }, pid: { processID(of: $0) })
+    }
+
+    /// Pure: one entry per process object. A process that is not outputting keeps no identity, so a read costs one CoreAudio
+    /// call for it and three for an outputting process, rather than three for every process on the Mac.
+    static func readProcesses<Object>(objects: [Object], isOutputting: (Object) -> Bool, bundleID: (Object) -> String?,
+                                      pid: (Object) -> Int32) -> [Process] {
+        objects.map { object in
+            guard isOutputting(object) else { return Process(bundleID: nil, isOutputting: false) }
+            return Process(bundleID: bundleID(object), isOutputting: true, pid: pid(object))
         }
     }
 
@@ -217,7 +225,8 @@ enum PlaybackAssertion {
 /// is seen plays while its output runs and keeps a 10-second bridge, since its track changes are not measured.
 /// Reads come every 2 s while a hold is in force, and every 5 s otherwise.
 struct MusicPlaybackHold {
-    static let idleSampleSeconds = 5.0
+    /// Each sample asks CoreAudio about every process, so an idle Mac samples every 10 s.
+    static let idleSampleSeconds = 10.0
     static let holdingSampleSeconds = 2.0
     static let assertedQuietSeconds = 3.0
     static let spotifyQuietSeconds = 5.0

@@ -59,7 +59,9 @@ struct AgentBadgeTests {
         #expect(AgentBadgeState(provider: "orca", enabled: false, tasks: rows).observedState == "Active")
     }
     @Test func staleIdleAndWaitingRemainDistinct() throws {
-        #expect(AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("a", .idle)], evidenceAgeSeconds: 16).observedState == "Unknown")
+        // Orca's evidence stays fresh for its stale window (three polls): 16 s is Inactive, 46 s is stale.
+        #expect(AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("a", .idle)], evidenceAgeSeconds: 16).observedState == "Inactive")
+        #expect(AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("a", .idle)], evidenceAgeSeconds: 46).observedState == "Unknown")
         #expect(AgentBadgeState(provider: "orca", enabled: true, tasks: [try row("a", .waiting)], evidenceAgeSeconds: 16).observedState == "Waiting")
         let hashed = try AgentTask(id: "evt-123", sessionID: "s", runID: "r", state: .working, evidenceKind: .lifecycle, confidence: .exact)
         #expect(AgentBadgeState(provider: "codex", enabled: true, tasks: [hashed]).observedState == "Active")

@@ -96,18 +96,19 @@ struct MusicPlaybackTests {
         #expect(hold.observe(now: 6) { MusicReading(outputting: [.appleMusic]) }.isEmpty)            // more than 3 s: ended
     }
 
-    @Test func theReadsAreEveryFiveSecondsWhenIdleAndEveryTwoWhileHolding() {
+    @Test func theReadsAreEveryTenSecondsWhenIdleAndEveryTwoWhileHolding() {
         var hold = MusicPlaybackHold()
         var reads: [Double] = []
-        for second in stride(from: 0.0, through: 10.0, by: 1.0) {
+        for second in stride(from: 0.0, through: 20.0, by: 1.0) {
             _ = hold.observe(now: second) { reads.append(second); return MusicReading() }
         }
-        #expect(reads == [0, 5, 10])
+        #expect(reads == [0, 10, 20])
         reads = []
-        for second in stride(from: 15.0, through: 21.0, by: 1.0) {
+        for second in stride(from: 21.0, through: 36.0, by: 1.0) {
             _ = hold.observe(now: second) { reads.append(second); return MusicReading(outputting: [.browser], assertionHeld: [.browser]) }
         }
-        #expect(reads == [15, 17, 19, 21])
+        // The idle read waits for the next 10 s mark; once a browser holds, the reads come every 2 s.
+        #expect(reads == [30, 32, 34, 36])
     }
 
     @Test func aBrowserHoldingThePlaybackAssertionCountsAsPlaying() {
@@ -176,6 +177,6 @@ struct MusicPlaybackTests {
         #expect(reading == MusicReading(outputting: [.safari], assertionHeld: [.safari]))
         var hold = MusicPlaybackHold()
         #expect(hold.observe(now: 0) { MusicReading(outputting: [.safari]) }.isEmpty)
-        #expect(hold.observe(now: 6) { reading } == [.safari])
+        #expect(hold.observe(now: 10) { reading } == [.safari])
     }
 }

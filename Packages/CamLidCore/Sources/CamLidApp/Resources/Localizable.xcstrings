@@ -2292,16 +2292,6 @@
         }
       }
     },
-    "Closed lid can only start with the lid open, normal temperature and no external display, on the charger (or on battery above the stop level when battery sessions are allowed).": {
-      "localizations": {
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chế độ đóng nắp chỉ bắt đầu khi nắp mở, nhiệt độ bình thường, không có màn hình ngoài, và đang cắm sạc (hoặc đang dùng pin trên mức dừng nếu được phép phiên bằng pin)."
-          }
-        }
-      }
-    },
     "Closed lid can’t reach the helper. Retrying.": {
       "localizations": {
         "vi": {
@@ -2408,6 +2398,66 @@
           "stringUnit": {
             "state": "translated",
             "value": "Đóng nắp đã sẵn sàng · Mac chưa kiểm tra"
+          }
+        }
+      }
+    },
+    "Closed lid starts only with the lid open": {
+      "localizations": {
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chế độ đóng nắp chỉ bắt đầu khi nắp đang mở"
+          }
+        }
+      }
+    },
+    "The signed-in user changed": {
+      "localizations": {
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Người dùng đang đăng nhập đã thay đổi"
+          }
+        }
+      }
+    },
+    "An external display is connected": {
+      "localizations": {
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang kết nối màn hình ngoài"
+          }
+        }
+      }
+    },
+    "External display state is unavailable": {
+      "localizations": {
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không đọc được trạng thái màn hình ngoài"
+          }
+        }
+      }
+    },
+    "A safety reading was too slow to trust": {
+      "localizations": {
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Số đo an toàn đọc quá chậm nên không đáng tin"
+          }
+        }
+      }
+    },
+    "Closed lid can only start with the lid open, a temperature below critical, no external display, on the charger (or on battery above the stop level when battery sessions are allowed).": {
+      "localizations": {
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chế độ đóng nắp chỉ bắt đầu khi nắp đang mở, nhiệt độ chưa ở mức nguy hiểm, không có màn hình ngoài, và đang cắm sạc (hoặc đang dùng pin trên mức dừng nếu được phép phiên bằng pin)."
           }
         }
       }

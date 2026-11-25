@@ -101,7 +101,7 @@ public enum NativeHelperEnvironment {
         }
         return HelperSafety(onAC: battery[kIOPSPowerSourceStateKey] as? String == kIOPSACPowerValue,
             batteryPercent: current.doubleValue / maximum.doubleValue * 100,
-            thermalNominal: ProcessInfo.processInfo.thermalState == .nominal,
+            thermal: ThermalLevel(ProcessInfo.processInfo.thermalState),
             consoleUID: consoleUID, lidClosed: closed,
             externalDisplays: online.filter { CGDisplayIsBuiltin($0) == 0 }.count)
     }
@@ -118,6 +118,19 @@ public enum NativeHelperEnvironment {
         case 0xe000_0280: return "sleepObserved"
         case 0xe000_0300, 0xe000_0320: return "wakeObserved"
         default: return nil
+        }
+    }
+}
+
+extension ThermalLevel {
+    /// The process thermal state as the guard reads it. A state this build does not know is unknown, never nominal.
+    init(_ state: ProcessInfo.ThermalState) {
+        switch state {
+        case .nominal: self = .nominal
+        case .fair: self = .fair
+        case .serious: self = .serious
+        case .critical: self = .critical
+        @unknown default: self = .unknown
         }
     }
 }

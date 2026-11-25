@@ -47,8 +47,9 @@ struct PassiveSupervisionTests {
         try app.receiveObservation(observation("a", state: .idle, sequence: 1))
         let now = ContinuousTime.now
         #expect(app.sleepRelevantTasks(now: now).filter { $0.state == .working }.count == 1)
-        // No further observation: stale work degrades, never completes.
-        let stale = app.sleepRelevantTasks(now: now + 16)
+        // No further observation: Orca's working row holds through its poll window, then degrades, never completes.
+        #expect(app.sleepRelevantTasks(now: now + 16).contains { $0.state == .working })
+        let stale = app.sleepRelevantTasks(now: now + OrcaHostResolver.staleSeconds + 1)
         #expect(stale.contains { $0.state == .unknown })
         #expect(!stale.contains { $0.state == .completed })
     }

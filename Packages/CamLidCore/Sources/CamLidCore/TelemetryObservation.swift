@@ -70,6 +70,8 @@ public struct TemperatureObservation: Codable, Sendable, Equatable {
     public let availability: String
     public let reasonCode: String?
     public static let unsupported = TemperatureObservation()
+    /// A die reading older than this projects as stale. The sensor reads it every 5 s, which keeps it inside this window.
+    public static let staleAfterSeconds: Double = 10
 
     public init(valueCelsius: Double? = nil, sensorID: String? = nil,
                 displayName: String? = nil, source: String? = nil,
@@ -117,7 +119,7 @@ public struct TemperatureObservation: Codable, Sendable, Equatable {
         guard let time = sampledAtMonotonic, now.isFinite, now >= time else {
             return Self(availability: "error", reasonCode: "invalidTemperatureTimestamp")
         }
-        guard now - time <= 10 else {
+        guard now - time <= Self.staleAfterSeconds else {
             return Self(sensorID: sensorID, displayName: displayName, source: source, sampledAtMonotonic: time, availability: "stale", reasonCode: "staleTemperature")
         }
         return self

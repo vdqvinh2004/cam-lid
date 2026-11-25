@@ -88,6 +88,16 @@ Strict was implemented per [spec 016](../../specs/016-strict-lid-only/spec.md) a
 (trials S1–S4, owner attended; details and timestamps in the spec's tasks). The decisions above stand; nothing in the
 results called for changing them.
 
+## Amendment (2026-11-25): thermal guard shared with the app
+The helper accepted only `nominal`, while the app's safety policy has always accepted `fair`, so the helper could stop a
+session the app still considered safe. Both now use one rule, `ThermalGuard` in CamLidPowerWire: `nominal` and `fair`
+continue, `serious` stops after 30 s of continuous serious, and `critical` and `unknown` stop at once. Every guard
+returns its own code (`thermalSerious`, `batteryFloor`, `externalDisplayConnected`, ...), given to the app on the next
+renewal, so the history and `camlid status` name the cause instead of `invalidLease`. `PowerHelperVersion` is 2, so the
+helper must be reinstalled. The support row (Mac17,3 / 26A434) rests on trials made under the nominal-only rule; the
+closed-lid check with this build is required before release. The attended lab preflight (`LidNativeAdapter`) still
+requires `nominal`: it qualifies a lab row and is not the production guard.
+
 | Trial | Result |
 |---|---|
 | S1 Auto with Claude Code, lid closed, on battery (48%) | Held with the lid closed, `SleepDisabled` 0 throughout, released after "Sleep when done", the kernel slept the Mac 5 s later (`Clamshell Sleep`). |

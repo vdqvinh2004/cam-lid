@@ -50,7 +50,7 @@ final class Fixture {
     let owner = UUID()
     var time = 100.0
     var safetyDelay = 0.0
-    var safety =  HelperSafety(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501,
+    var safety =  HelperSafety(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 501,
                               lidClosed: false, externalDisplays: 0)
     /// Set to offer Strict (ADR 0003) with fake kernel calls.
     var clamshell: FakeClamshellCalls?
@@ -75,10 +75,10 @@ final class Fixture {
     /// while the battery stays at or above it; the helper stops on its own below it.
     @Test func batteryPowerNeedsAFloorAndStopsBelowIt() throws {
         func onBattery(_ percent: Double) -> HelperSafety {
-            HelperSafety(onAC: false, batteryPercent: percent, thermalNominal: true, consoleUID: 501, lidClosed: false, externalDisplays: 0)
+            HelperSafety(onAC: false, batteryPercent: percent, thermal: .nominal, consoleUID: 501, lidClosed: false, externalDisplays: 0)
         }
         let noFloor = Fixture(); noFloor.safety = onBattery(80)
-        #expect(noFloor.acquire().reason == "safetyRefused" && noFloor.backend.writes.isEmpty)
+        #expect(noFloor.acquire().reason == "notCharging" && noFloor.backend.writes.isEmpty)
 
         let f = Fixture(); f.safety = onBattery(80)
         f.service.start()
@@ -89,12 +89,12 @@ final class Fixture {
         #expect(f.service.handle(PowerRequest(operation: .renew, token: held.token, sequence: 2), owner: f.owner, uid: 501).accepted)
         f.safety = onBattery(19)
         f.service.poll()
-        #expect(f.service.reason == "safetyStop" && f.backend.disabled == false)
+        #expect(f.service.reason == "batteryFloor" && f.backend.disabled == false)
 
         let low = Fixture(); low.safety = onBattery(30)
         low.service.start()
         #expect(low.service.handle(PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 300, batteryFloorPercent: 40),
-                                   owner: low.owner, uid: 501).reason == "safetyRefused")
+                                   owner: low.owner, uid: 501).reason == "batteryFloor")
         for floor in [5, 60] {
             let bad = Fixture(); bad.service.start()
             #expect(bad.service.handle(PowerRequest(operation: .acquire, sequence: 1, sessionSeconds: 300, batteryFloorPercent: floor),
@@ -156,7 +156,7 @@ final class Fixture {
         var requested = 0
         f.service.sleepSystem = { requested += 1 }
         let started = f.acquire()
-        f.safety = HelperSafety(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501,
+        f.safety = HelperSafety(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 501,
                                 lidClosed: closed, externalDisplays: displays)
         switch cause {
         case "release": _ = f.service.handle(PowerRequest(operation: .release, token: started.token), owner: f.owner, uid: 501)
@@ -233,21 +233,21 @@ final class Fixture {
             #expect(!f.acquire(seconds: seconds).accepted)
             #expect(f.backend.writes.isEmpty)
         }
-        let readings: [HelperSafety] = [
-            .init(onAC: false, batteryPercent: 80, thermalNominal: true, consoleUID: 501, lidClosed: false, externalDisplays: 0),
-            .init(onAC: true, batteryPercent: nil, thermalNominal: true, consoleUID: 501, lidClosed: false, externalDisplays: 0),
-            .init(onAC: true, batteryPercent: .nan, thermalNominal: true, consoleUID: 501, lidClosed: false, externalDisplays: 0),
-            .init(onAC: true, batteryPercent: 19, thermalNominal: true, consoleUID: 501, lidClosed: false, externalDisplays: 0),
-            .init(onAC: true, batteryPercent: 80, thermalNominal: false, consoleUID: 501, lidClosed: false, externalDisplays: 0),
-            .init(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 502, lidClosed: false, externalDisplays: 0),
-            .init(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501, lidClosed: nil, externalDisplays: 0),
-            .init(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501, lidClosed: true, externalDisplays: 0),
-            .init(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501, lidClosed: false, externalDisplays: 1),
+        let readings: [(HelperSafety, String)] = [
+            (.init(onAC: false, batteryPercent: 80, thermal: .nominal, consoleUID: 501, lidClosed: false, externalDisplays: 0), "notCharging"),
+            (.init(onAC: true, batteryPercent: nil, thermal: .nominal, consoleUID: 501, lidClosed: false, externalDisplays: 0), "batteryUnknown"),
+            (.init(onAC: true, batteryPercent: .nan, thermal: .nominal, consoleUID: 501, lidClosed: false, externalDisplays: 0), "batteryUnknown"),
+            (.init(onAC: true, batteryPercent: 19, thermal: .nominal, consoleUID: 501, lidClosed: false, externalDisplays: 0), "batteryFloor"),
+            (.init(onAC: true, batteryPercent: 80, thermal: .critical, consoleUID: 501, lidClosed: false, externalDisplays: 0), "thermalCritical"),
+            (.init(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 502, lidClosed: false, externalDisplays: 0), "consoleUserChanged"),
+            (.init(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 501, lidClosed: nil, externalDisplays: 0), "lidUnknown"),
+            (.init(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 501, lidClosed: true, externalDisplays: 0), "lidClosedAtStart"),
+            (.init(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 501, lidClosed: false, externalDisplays: 1), "externalDisplayConnected"),
         ]
-        for reading in readings {
+        for (reading, expected) in readings {
             let f = Fixture()
             f.safety = reading
-            #expect(f.acquire().reason == "safetyRefused")
+            #expect(f.acquire().reason == expected)
             #expect(f.backend.writes.isEmpty)
         }
     }
@@ -255,13 +255,13 @@ final class Fixture {
     @Test func closedLidCanContinueButACLossStops() {
         let f = Fixture()
         #expect(f.acquire().accepted)
-        f.safety = .init(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501, lidClosed: true, externalDisplays: 0)
+        f.safety = .init(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 501, lidClosed: true, externalDisplays: 0)
         f.service.poll()
         #expect(f.service.state == "active")
-        f.safety = .init(onAC: false, batteryPercent: 80, thermalNominal: true, consoleUID: 501, lidClosed: true, externalDisplays: 0)
+        f.safety = .init(onAC: false, batteryPercent: 80, thermal: .nominal, consoleUID: 501, lidClosed: true, externalDisplays: 0)
         f.service.poll()
         #expect(f.backend.writes == [true, false])
-        #expect(f.service.reason == "safetyStop")
+        #expect(f.service.reason == "notCharging")
     }
 
     @Test func journalMustPrecedeEnableAndLateCommitCannotEnable() {
@@ -311,7 +311,7 @@ final class Fixture {
     func aRestartedHelperSleepsAClosedMacOnlyInTheSameBoot(_ boot: String, _ sleeps: Int) {
         let f = Fixture()
         #expect(f.acquire().accepted)
-        f.safety = HelperSafety(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501,
+        f.safety = HelperSafety(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 501,
                                 lidClosed: true, externalDisplays: 0)
         var requested = 0
         let replacement = f.makeService(bootID: boot)
@@ -432,7 +432,7 @@ final class Fixture {
     @Test func slowSafetyReadCannotAdmitOrExtendAHealthyLease() {
         let f = Fixture()
         f.safetyDelay = 1.1
-        #expect(f.acquire().reason == "safetyRefused")
+        #expect(f.acquire().reason == "safetyReadSlow")
         #expect(f.backend.writes.isEmpty)
         let active = Fixture()
         #expect(active.acquire().accepted)

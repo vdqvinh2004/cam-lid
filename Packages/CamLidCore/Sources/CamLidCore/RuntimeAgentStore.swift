@@ -132,12 +132,14 @@ public struct RuntimeAgentStore: Sendable {
                     parentRunID: task.parentRunID, state: task.state, evidenceKind: task.evidenceKind,
                     confidence: task.confidence, waitUntilMonotonic: deadline)) ?? task
             }
-            // A missing heartbeat cannot keep a working run active forever.
+            // A missing heartbeat cannot keep a working run active forever. Orca is read once per poll, so its
+            // window matches its snapshot age; a 15 s window would flip its row between two polls.
             let key = taskKeys[task.id] ?? ""
-            guard task.state == .working, let receipt = receipts[key], now - receipt > 15 else { return task }
+            let freshSeconds = provider(for: task.id) == OrcaHostResolver.providerID ? OrcaHostResolver.staleSeconds : 15
+            guard task.state == .working, let receipt = receipts[key], now - receipt > freshSeconds else { return task }
             return (try? AgentTask(id: task.id, sessionID: task.sessionID, runID: task.runID,
                 parentRunID: task.parentRunID, state: .unknown, evidenceKind: task.evidenceKind,
-                confidence: .unknown, unknownUntilMonotonic: receipt + 15 + 120)) ?? task
+                confidence: .unknown, unknownUntilMonotonic: receipt + freshSeconds + 120)) ?? task
         }.sorted { $0.id < $1.id }
     }
 

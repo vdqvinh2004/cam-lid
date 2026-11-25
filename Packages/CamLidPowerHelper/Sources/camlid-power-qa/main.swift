@@ -193,7 +193,7 @@ do {
         let sample: [String: Any] = [
             "source": "unprivileged native reader, not root helper",
             "onAC": value.onAC, "batteryPercent": value.batteryPercent.map { $0 as Any } ?? NSNull(),
-            "thermalNominal": value.thermalNominal, "consoleUID": value.consoleUID.map { $0 as Any } ?? NSNull(),
+            "thermal": value.thermal.rawValue, "consoleUID": value.consoleUID.map { $0 as Any } ?? NSNull(),
             "lidClosed": value.lidClosed.map { $0 as Any } ?? NSNull(),
             "externalDisplays": value.externalDisplays.map { $0 as Any } ?? NSNull(),
             "readDurationSeconds": elapsed, "withinOneSecond": elapsed.isFinite && elapsed >= 0 && elapsed <= 1,

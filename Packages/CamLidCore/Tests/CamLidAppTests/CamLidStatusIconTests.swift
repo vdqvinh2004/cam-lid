@@ -26,11 +26,18 @@ struct CamLidStatusIconTests {
         #expect(DashboardMetric.batterySymbol(percent: 5, onCharger: false) == "battery.0percent")
         #expect(DashboardMetric.batterySymbol(percent: 40, onCharger: true) == "powerplug")
     }
-    @Test @MainActor func workingSpinnerFramesRotate() throws {
-        let frames = CamLidStatusIcon.autoSpinnerFrames
-        #expect(frames.count == 12)
-        #expect(Set(try frames.map { try #require($0.tiffRepresentation) }).count == frames.count)
-        #expect(frames.allSatisfy { $0.isTemplate })
+    /// The arc turns and the laptop stays: the base has no arc, and the arc is a template the size of the badge.
+    @Test @MainActor func spinnerSplitsTheTurningArcFromTheStillLaptop() throws {
+        let still = try #require(CamLidStatusIcon.autoSpinnerStill)
+        let base = try #require(CamLidStatusIcon.autoSpinnerBase)
+        let arc = try #require(CamLidStatusIcon.autoSpinnerArc)
+        #expect(still.isTemplate && base.isTemplate && arc.isTemplate)
+        #expect(still.size == NSSize(width: 18, height: 16) && base.size == still.size)
+        #expect(arc.size == NSSize(width: 9, height: 9))
+        let stillPixels = try #require(still.tiffRepresentation)
+        let basePixels = try #require(base.tiffRepresentation)
+        #expect(stillPixels != basePixels)
+        #expect(CamLidStatusIcon.autoSpinnerTurnSeconds == 1.2)
     }
     /// The spinner runs for an Auto session that activity keeps awake: a working agent, or music (owner report 2026-11-11).
     @Test @MainActor func spinnerRunsForAgentWorkAndMusicOnlyInAutoMode() {

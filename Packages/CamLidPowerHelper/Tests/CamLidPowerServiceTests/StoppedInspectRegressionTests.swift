@@ -26,7 +26,7 @@ private final class StoppedInspectMechanism: LeasePowerMechanism {
     func makeService() -> PowerLeaseService {
         PowerLeaseService(mechanism: mechanism, store: store, bootID: "synthetic-boot",
                           clock: { 100 }, safety: {
-            HelperSafety(onAC: true, batteryPercent: 80, thermalNominal: true, consoleUID: 501,
+            HelperSafety(onAC: true, batteryPercent: 80, thermal: .nominal, consoleUID: 501,
                          lidClosed: false, externalDisplays: 0)
         })
     }

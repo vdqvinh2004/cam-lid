@@ -95,6 +95,47 @@ struct OrcaUIObservationTests {
         #expect(store.tasks(now: 3).allSatisfy { $0.state != .completed })
     }
 
+    /// A lost event leaves a gap. The store buffers the events after it, rejects them once its buffer is full, and never
+    /// closes the gap, so the rejections repeat for as long as the tracker keeps its sequences: the loop seen in the app.
+    @Test func aLostEventLeavesAGapTheStoreNeverCloses() throws {
+        var tracker = OrcaUITracker(); var store = RuntimeAgentStore()
+        func snapshot(_ tick: Int) -> OrcaUISnapshot {
+            OrcaUISnapshot(statuses: [OrcaUIStatus(id: "meta-a", state: .working)], complete: true, observedAt: Double(tick))
+        }
+        var rejectedLate = 0
+        for tick in 0..<200 {
+            let events = try tracker.consume(snapshot(tick), now: Double(tick))
+            if tick == 1 { continue }                              // the store rejected this event
+            for event in events where (try? store.ingest(JSONEncoder().encode(event), now: Double(tick))) == nil {
+                if tick >= 100 { rejectedLate += 1 }
+            }
+        }
+        #expect(store.lastRejection == "reorderBufferFull")
+        #expect(rejectedLate == 100)
+    }
+
+    /// The app restarts the tracker on a rejection. Its new epoch is taken as a fresh run, so the gap is closed for good.
+    @Test func aNewEpochReadmitsARunAfterItsGap() throws {
+        var tracker = OrcaUITracker(); var store = RuntimeAgentStore()
+        func snapshot(_ tick: Int) -> OrcaUISnapshot {
+            OrcaUISnapshot(statuses: [OrcaUIStatus(id: "meta-a", state: .working)], complete: true, observedAt: Double(tick))
+        }
+        for event in try tracker.consume(snapshot(0), now: 0) { _ = try store.ingest(JSONEncoder().encode(event), now: 0) }
+        _ = try tracker.consume(snapshot(1), now: 1)              // lost
+        for tick in 2..<100 {
+            for event in try tracker.consume(snapshot(tick), now: Double(tick)) {
+                _ = try? store.ingest(JSONEncoder().encode(event), now: Double(tick))
+            }
+        }
+        #expect(store.lastRejection == "reorderBufferFull")
+        tracker.restart()
+        let fresh = try tracker.consume(snapshot(100), now: 100)
+        #expect(fresh.allSatisfy { $0.epoch == 1 && $0.sequence == 0 })
+        let outcomes = try fresh.map { try store.ingest(JSONEncoder().encode($0), now: 100) }
+        #expect(outcomes == ["applied"])
+        #expect(store.tasks(now: 100).first { $0.runID == "meta-a" }?.state == .working)
+    }
+
     @Test func invalidSnapshotsAreTransactionalAndCapacityCannotDropKnownTabs() throws {
         var tracker = OrcaUITracker()
         let first = OrcaUISnapshot(statuses: [OrcaUIStatus(id: "a", state: .working)], complete: true, observedAt: 1)

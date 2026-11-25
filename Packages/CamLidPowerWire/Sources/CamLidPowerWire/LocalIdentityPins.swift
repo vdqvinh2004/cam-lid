@@ -5,7 +5,7 @@ import Security
 /// Bumped whenever the helper's behavior changes. The pins record the version installed; an app that ships a higher
 /// one asks for a reinstall, an app that ships the same one never does.
 public enum PowerHelperVersion {
-    public static let current = 1
+    public static let current = 2
 }
 
 /// Explicit local trust, installed by root out-of-band, not a UID-only fallback.

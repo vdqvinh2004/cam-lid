@@ -1,12 +1,14 @@
+import CamLidPowerWire
+
 /// Bounded safety stop policy. Unknown is not healthy: any missing safety input
 /// stops protection with a specific reason. Feeds PolicyEngine as SafetySignal.
-/// T011: serious thermal 30s, critical immediate, 5s sampling, 15s stale stop,
+/// Thermal follows ThermalGuard, the rule the helper also uses; 5s sampling, 15s stale stop,
 /// battery/AC cutoff, latched re-arm (latch lives in the engine).
 public struct SafetyPolicy: Sendable {
-    public static let seriousThermalSeconds = 30.0
+    public static let seriousThermalSeconds = ThermalGuard.seriousGraceSeconds
     public static let sampleIntervalSeconds = 5.0
 
-    private var seriousSince: Double?
+    private var thermal = ThermalGuard()
     private var lastEvaluatedAt: Double?
     private var lastConfiguration: Configuration?
     private var cached: SafetySignal = .clear
@@ -28,19 +30,8 @@ public struct SafetyPolicy: Sendable {
         lastConfiguration = config
         var reasons: [String] = []
 
-        switch health.thermalPressure {
-        case .critical:
-            reasons.append("thermalCritical")
-        case .serious:
-            if seriousSince == nil { seriousSince = now }
-            if let start = seriousSince, now - start >= Self.seriousThermalSeconds {
-                reasons.append("thermalSerious")
-            }
-        case .nominal, .fair:
-            seriousSince = nil
-        case .unknown:
-            seriousSince = nil
-            reasons.append("thermalUnknown")
+        if let stop = thermal.stopReason(for: ThermalLevel(health.thermalPressure), now: now) {
+            reasons.append(stop)
         }
 
         if health.lidState == .unknown { reasons.append("lidUnknown") }
@@ -58,5 +49,18 @@ public struct SafetyPolicy: Sendable {
 
         cached = SafetySignal(reasons: reasons)
         return cached
+    }
+}
+
+extension ThermalLevel {
+    /// The app's thermal reading as the shared guard reads it.
+    init(_ pressure: ThermalPressure) {
+        switch pressure {
+        case .nominal: self = .nominal
+        case .fair: self = .fair
+        case .serious: self = .serious
+        case .critical: self = .critical
+        case .unknown: self = .unknown
+        }
     }
 }

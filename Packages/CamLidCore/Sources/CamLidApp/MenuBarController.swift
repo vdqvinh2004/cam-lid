@@ -139,8 +139,9 @@ public final class MenuBarController: NSObject {
     private var renderedStatus: MenuBarStatus?
     private var renderedMode: RequestedMode?
     private var renderedTimerText: String?
-    private var autoAnimationTimer: Timer?
-    private var autoAnimationIndex = 0
+    /// The arc that turns while activity keeps an Auto session awake: a subview of the status button, so the laptop stays still.
+    private var autoSpinner: PassThroughImageView?
+    private static let autoSpinKey = "camlid.autoSpin"
 
     public override init() {
         super.init()
@@ -166,6 +167,8 @@ public final class MenuBarController: NSObject {
 
     public func remove() {
         stopAutoAnimation()
+        autoSpinner?.removeFromSuperview()
+        autoSpinner = nil
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
@@ -255,35 +258,65 @@ public final class MenuBarController: NSObject {
     }
 
     private func startAutoAnimation() {
-        guard autoAnimationTimer == nil else { return }
-        guard let button = statusItem?.button else { return }
-        let frames = CamLidStatusIcon.autoSpinnerFrames
-        autoAnimationIndex = 0
-        button.image = frames.first
+        guard let button = statusItem?.button, let still = CamLidStatusIcon.autoSpinnerStill,
+              let base = CamLidStatusIcon.autoSpinnerBase, let arc = CamLidStatusIcon.autoSpinnerArc else { return }
         // Reduce Motion: a still mark; the accessible label already says an agent is working.
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.advanceAutoAnimation() }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        autoAnimationTimer = timer
-    }
-
-    private func advanceAutoAnimation() {
-        guard let button = statusItem?.button else {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             stopAutoAnimation()
+            button.image = still
             return
         }
-        let frames = CamLidStatusIcon.autoSpinnerFrames
-        guard !frames.isEmpty else { return }
-        autoAnimationIndex = (autoAnimationIndex + 1) % frames.count
-        button.image = frames[autoAnimationIndex]
+        // The laptop stays where it is; only the arc, a layer of its own, turns about its centre.
+        button.image = base
+        let spinner = autoSpinner ?? makeAutoSpinner(in: button)
+        spinner.image = arc
+        spinner.frame = Self.arcFrame(in: button)
+        spinner.layer?.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        spinner.layer?.position = CGPoint(x: spinner.frame.midX, y: spinner.frame.midY)
+        spinner.isHidden = false
+        guard spinner.layer?.animation(forKey: Self.autoSpinKey) == nil else { return }
+        spinner.layer?.add(Self.spinAnimation(), forKey: Self.autoSpinKey)
     }
 
     private func stopAutoAnimation() {
-        autoAnimationTimer?.invalidate()
-        autoAnimationTimer = nil
-        autoAnimationIndex = 0
+        autoSpinner?.layer?.removeAnimation(forKey: Self.autoSpinKey)
+        autoSpinner?.isHidden = true
+    }
+
+    private func makeAutoSpinner(in button: NSStatusBarButton) -> PassThroughImageView {
+        button.wantsLayer = true
+        let spinner = PassThroughImageView()
+        spinner.imageScaling = .scaleNone
+        spinner.wantsLayer = true
+        spinner.isHidden = true
+        spinner.setAccessibilityElement(false)
+        button.addSubview(spinner)
+        autoSpinner = spinner
+        return spinner
+    }
+
+    /// The square of the arc in the button's coordinates: the badge in the mark's lower right corner, where the arc is drawn.
+    private static func arcFrame(in button: NSStatusBarButton) -> NSRect {
+        let arc = CamLidStatusIcon.autoSpinnerArc?.size ?? .zero
+        let markSize = CamLidStatusIcon.autoSpinnerStill?.size ?? .zero
+        let mark = (button.cell as? NSButtonCell)?.imageRect(forBounds: button.bounds)
+            ?? NSRect(x: button.bounds.midX - markSize.width / 2, y: button.bounds.midY - markSize.height / 2,
+                      width: markSize.width, height: markSize.height)
+        // The status button is flipped: its bottom is the larger y, which is where the badge is drawn.
+        let bottom = button.isFlipped ? mark.maxY - arc.height : mark.minY
+        return NSRect(x: mark.maxX - arc.width, y: bottom, width: arc.width, height: arc.height)
+    }
+
+    /// One clockwise turn per `autoSpinnerTurnSeconds`, repeated for as long as the session runs. Core Animation draws each
+    /// step, so the app does no work per frame.
+    static func spinAnimation() -> CABasicAnimation {
+        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
+        spin.fromValue = 0.0
+        spin.toValue = -2 * Double.pi
+        spin.duration = CamLidStatusIcon.autoSpinnerTurnSeconds
+        spin.repeatCount = .infinity
+        spin.timingFunction = CAMediaTimingFunction(name: .linear)
+        return spin
     }
 
     /// Call from the dashboard panel dismissal path (including Esc) so
@@ -426,4 +459,9 @@ public final class MenuBarController: NSObject {
     @objc private func didSelectSettings() { actions?.menuBarOpenSettings() }
     @objc private func didSelectActivityLog() { actions?.menuBarOpenActivityLog() }
     @objc private func didSelectQuit() { actions?.menuBarQuit() }
+}
+
+/// The spinning arc. It takes no clicks, so the status button still receives them.
+private final class PassThroughImageView: NSImageView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

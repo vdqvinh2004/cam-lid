@@ -74,7 +74,7 @@ private final class LidLeaseFixture {
     func makeService() -> PowerLeaseService {
         PowerLeaseService(mechanism: mechanism, store: store, bootID: "boot-lid",
             clock: { self.time }, safety: {
-                HelperSafety(onAC: true, batteryPercent: 80, thermalNominal: true,
+                HelperSafety(onAC: true, batteryPercent: 80, thermal: .nominal,
                              consoleUID: 501, lidClosed: false, externalDisplays: 0)
             })
     }
