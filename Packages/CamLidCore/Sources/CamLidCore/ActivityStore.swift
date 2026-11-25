@@ -165,6 +165,8 @@ public struct DeletionReceipt: Sendable, Codable, Equatable {
 public protocol HistoryStorage: Sendable {
     func append(_ record: StoredTransition)
     func load() -> [StoredTransition]
+    /// Bytes held now, read without decoding records: checked on every write against the byte cap.
+    func retainedBytes() -> Int
     /// Removes every record matching the predicate. Returns the removed count.
     @discardableResult
     func removeAll(where shouldRemove: @Sendable (StoredTransition) -> Bool) -> Int
@@ -219,7 +221,7 @@ public final class InMemoryHistoryStorage: HistoryStorage, @unchecked Sendable {
     }
 
     /// O(1) running total of estimated encoded bytes currently held.
-    public func storedByteCount() -> Int {
+    public func retainedBytes() -> Int {
         lock.lock(); defer { lock.unlock() }
         return totalBytes
     }
@@ -231,6 +233,24 @@ public final class InMemoryHistoryStorage: HistoryStorage, @unchecked Sendable {
     }
 }
 
+/// When retention last ran. Copies of one `ActivityStore` share it, so the recorder's store keeps a single clock.
+private final class PruneClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastPrune: Date?
+
+    func isDue(at reference: Date, every interval: Double) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let lastPrune else { return true }
+        // A clock set backwards re-anchors on the next write instead of stalling pruning.
+        return reference < lastPrune || reference.timeIntervalSince(lastPrune) >= interval
+    }
+
+    func markPruned(at reference: Date) {
+        lock.lock(); defer { lock.unlock() }
+        lastPrune = reference
+    }
+}
+
 /// Append-only transition history with bounded retention, redacted export,
 /// and explicit delete receipts.
 public struct ActivityStore: Sendable {
@@ -238,6 +258,9 @@ public struct ActivityStore: Sendable {
     public static let defaultRetentionSeconds: Double = 14 * 24 * 3_600
     /// 20 MiB including rotated files, per domain-model.md.
     public static let defaultMaxBytes: Int = 20 * 1_024 * 1_024
+    /// Retention reads the whole history, so it runs at most this often while records are written.
+    /// shortcut: records past the window stay on disk until the next pass (reads hide them), upgrade if on-disk age must be exact.
+    public static let pruneIntervalSeconds: Double = 60 * 60
 
     /// Owned CLI history integration point: CLI surfaces this machine code
     /// until `camlid logs`/`history` commands are wired to this store.
@@ -247,6 +270,7 @@ public struct ActivityStore: Sendable {
     private let now: @Sendable () -> Date
     private let retentionSeconds: Double
     private let maxBytes: Int
+    private let pruneClock = PruneClock()
 
     public init(
         storage: any HistoryStorage = InMemoryHistoryStorage(),
@@ -265,19 +289,25 @@ public struct ActivityStore: Sendable {
         record([transition])
     }
 
-    /// Appends an ordered batch, enforcing retention once after its writes.
+    /// Appends an ordered batch; retention runs when a pass is due or the byte cap is hit.
     public func record(_ transitions: [StoredTransition]) {
         for transition in transitions { storage.append(transition) }
-        enforceRetention(now: now())
+        let reference = now()
+        let due = pruneClock.isDue(at: reference, every: Self.pruneIntervalSeconds)
+        guard due || storage.retainedBytes() > maxBytes else { return }
+        enforceRetention(now: reference)
     }
 
-    /// Oldest-first snapshot, optionally filtered by session and/or reason code.
+    /// Oldest-first snapshot, optionally filtered by session and/or reason code. Records past the
+    /// retention window are hidden even before a pass removes them.
     public func transitions(
         sessionID: String? = nil,
         reasonCode: String? = nil,
         category: ActivityCategory? = nil
     ) -> [StoredTransition] {
-        storage.load()
+        let cutoff = now().addingTimeInterval(-retentionSeconds)
+        return storage.load()
+            .filter { record in record.timestamp >= cutoff }
             .filter { record in sessionID.map { wanted in wanted == record.sessionID } ?? true }
             .filter { record in reasonCode.map { wanted in record.reasonCodes.contains(wanted) } ?? true }
             .filter { record in category.map { wanted in wanted == record.category } ?? true }
@@ -290,25 +320,22 @@ public struct ActivityStore: Sendable {
     /// Enforces the 14-day / 20 MiB bounds, oldest first.
     public func enforceRetention(now reference: Date? = nil) {
         let reference = reference ?? now()
+        pruneClock.markPruned(at: reference)
         let cutoff = reference.addingTimeInterval(-retentionSeconds)
+        // The day cap streams through the storage, so the history is never held in memory as records.
+        _ = storage.removeAll { $0.timestamp < cutoff }
+        // Byte cap, oldest first. File storage keeps its bytes under the cap by rotation, so this rarely loads.
+        guard storage.retainedBytes() > maxBytes else { return }
         let ordered = storage.load().sorted {
             if $0.timestamp != $1.timestamp { return $0.timestamp < $1.timestamp }
             return $0.id.uuidString < $1.id.uuidString
         }
-        guard !ordered.isEmpty else { return }
+        var total = ordered.reduce(0) { $0 + $1.estimatedSize() }
         var doomed = Set<UUID>()
-        var remaining = ordered.map { ($0, $0.estimatedSize()) }
-        // Day cap first.
-        for (record, _) in remaining where record.timestamp < cutoff {
-            doomed.insert(record.id)
-        }
-        remaining.removeAll { doomed.contains($0.0.id) }
-        // Byte cap: whichever bound is hit first wins, oldest pruned first.
-        var total = remaining.reduce(0) { $0 + $1.1 }
-        for (record, size) in remaining {
+        for record in ordered {
             guard total > maxBytes else { break }
             doomed.insert(record.id)
-            total -= size
+            total -= record.estimatedSize()
         }
         guard !doomed.isEmpty else { return }
         let doomedIDs = doomed

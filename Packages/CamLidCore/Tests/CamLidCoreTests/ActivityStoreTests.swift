@@ -33,6 +33,56 @@ private func makeStore(maxBytes: Int = ActivityStore.defaultMaxBytes) -> Activit
     ActivityStore(storage: InMemoryHistoryStorage(), now: { fixtureNow }, maxBytes: maxBytes)
 }
 
+/// A clock the test moves forward, so the store's pass schedule can be exercised.
+private final class TestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: Date
+
+    init(_ start: Date) { current = start }
+
+    var now: Date {
+        lock.lock(); defer { lock.unlock() }
+        return current
+    }
+
+    func advance(by seconds: Double) {
+        lock.lock(); defer { lock.unlock() }
+        current = current.addingTimeInterval(seconds)
+    }
+}
+
+/// Counts retention passes (`removeAll`) and whole-history loads: a pass streams and never loads.
+private final class CountingHistoryStorage: HistoryStorage, @unchecked Sendable {
+    private let inner = InMemoryHistoryStorage()
+    private let lock = NSLock()
+    private var loadCount = 0
+    private var passCount = 0
+
+    var loads: Int {
+        lock.lock(); defer { lock.unlock() }
+        return loadCount
+    }
+
+    var passes: Int {
+        lock.lock(); defer { lock.unlock() }
+        return passCount
+    }
+
+    func append(_ record: StoredTransition) { inner.append(record) }
+
+    func load() -> [StoredTransition] {
+        lock.lock(); loadCount += 1; lock.unlock()
+        return inner.load()
+    }
+
+    func retainedBytes() -> Int { inner.retainedBytes() }
+
+    func removeAll(where shouldRemove: @Sendable (StoredTransition) -> Bool) -> Int {
+        lock.lock(); passCount += 1; lock.unlock()
+        return inner.removeAll(where: shouldRemove)
+    }
+}
+
 @Suite("Activity history privacy, rotation, redaction (T009)")
 struct ActivityStoreTests {
     @Test("stored records carry no transcript-capable fields by construction")
@@ -164,6 +214,31 @@ struct ActivityStoreTests {
         let all = store.deleteAll()
         #expect(all.scope == .all)
         #expect(all.removedCount == 1)
+        #expect(store.transitions().isEmpty)
+    }
+
+    @Test("retention runs at most once per interval and never loads the whole history")
+    func passesAreRateLimited() throws {
+        let clock = TestClock(fixtureNow)
+        let storage = CountingHistoryStorage()
+        let store = ActivityStore(storage: storage, now: { clock.now })
+        store.record(try makeTransition())
+        #expect(storage.passes == 1)
+        for revision in 2...51 { store.record(try makeTransition(revision: revision)) }
+        #expect(storage.passes == 1)
+        clock.advance(by: ActivityStore.pruneIntervalSeconds)
+        store.record(try makeTransition(revision: 52))
+        #expect(storage.passes == 2)
+        #expect(storage.loads == 0)
+    }
+
+    @Test("reads hide records past the window even before the next pass removes them")
+    func readsHideStaleRecords() throws {
+        let clock = TestClock(fixtureNow)
+        let store = ActivityStore(storage: InMemoryHistoryStorage(), now: { clock.now })
+        store.record(try makeTransition(sessionID: "s-1"))
+        #expect(store.transitions().map(\.sessionID) == ["s-1"])
+        clock.advance(by: ActivityStore.defaultRetentionSeconds + 1)
         #expect(store.transitions().isEmpty)
     }
 

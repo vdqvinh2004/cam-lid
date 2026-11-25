@@ -98,8 +98,10 @@ struct AsyncHistoryRecorderTests {
         storage.releaseFirstAppend.signal()
         #expect(await recorder.flush(timeout: 2))
         #expect(storage.appendedCount == 65)
-        #expect(storage.loadCallCount == 3)
-        #expect(storage.deleteCallCount == 0)
+        // One retention pass for the whole burst: the store prunes on its interval, not once per batch. The pass streams,
+        // so it never loads the history, and the expired queued delete never ran.
+        #expect(storage.loadCallCount == 0)
+        #expect(storage.deleteCallCount == 1)
     }
 
     @Test("expired queued deletion never starts storage mutation")
@@ -117,7 +119,8 @@ struct AsyncHistoryRecorderTests {
         storage.releaseFirstAppend.signal()
         try await Task.sleep(for: .milliseconds(50))
         #expect(await recorder.flush(timeout: 1))
-        #expect(storage.deleteCallCount == 0)
+        // Only the first write's retention pass ran; the expired delete never did.
+        #expect(storage.deleteCallCount == 1)
     }
 
     @Test("diagnostic is sampled on worker and cached for lock-only reads")
@@ -199,6 +202,8 @@ private final class BlockingHistoryStorage: HistoryStorage, @unchecked Sendable 
         return []
     }
 
+    func retainedBytes() -> Int { 0 }
+
     func removeAll(where shouldRemove: @Sendable (StoredTransition) -> Bool) -> Int {
         lock.lock(); deleteCount += 1; lock.unlock()
         return 0
@@ -221,6 +226,8 @@ private final class BlockingLoadHistoryStorage: HistoryStorage, @unchecked Senda
     }
 
     func append(_ record: StoredTransition) {}
+
+    func retainedBytes() -> Int { 0 }
 
     func load() -> [StoredTransition] {
         lock.lock()

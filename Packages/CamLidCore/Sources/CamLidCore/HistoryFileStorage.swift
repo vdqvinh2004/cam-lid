@@ -68,6 +68,12 @@ public final class FileHistoryStorage: HistoryStorage, @unchecked Sendable {
         return loadLocked()
     }
 
+    /// Bytes on disk for both files, from metadata only: record bodies are not read.
+    public func retainedBytes() -> Int {
+        lock.lock(); defer { lock.unlock() }
+        return [rotatedURL, activeURL].reduce(0) { total, url in total + ((try? inspectFile(url))?.size ?? 0) }
+    }
+
     @discardableResult
     public func removeAll(where shouldRemove: @Sendable (StoredTransition) -> Bool) -> Int {
         lock.lock(); defer { lock.unlock() }
