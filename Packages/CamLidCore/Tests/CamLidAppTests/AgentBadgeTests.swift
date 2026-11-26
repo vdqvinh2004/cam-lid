@@ -86,6 +86,13 @@ struct AgentBadgeTests {
         #expect(app.settingsUnavailableReason == nil && app.installationText == "App detected")
     }
 
+    /// Antigravity counts only its `agy` CLI process; the IDE app stays presence-only like Cursor, so its CPU never reads as work.
+    @Test func antigravityIsObservedThroughItsCLIOnly() {
+        #expect(AgentProviderCatalog.info(for: "antigravity")?.processNames == ["agy"])
+        #expect(AppCoordinator.activityProviders.contains("antigravity"))
+        #expect(!AppCoordinator.activityProviders.contains("cursor"))
+    }
+
     @Test func providerMarksMapToBundledAssets() {
         for info in AgentProviderCatalog.providers {
             let state = AgentBadgeState(provider: info.id, enabled: true, tasks: [])

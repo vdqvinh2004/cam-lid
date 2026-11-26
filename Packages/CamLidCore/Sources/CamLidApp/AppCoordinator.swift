@@ -178,6 +178,8 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         Bundle.main.url(forResource: "SKILL", withExtension: "md").flatMap { try? Data(contentsOf: $0) }
     })
     var refusalNotice: String?
+    /// The battery start notice this coordinator showed; a charge that lifts the refusal clears it in `refresh()`.
+    private var batteryNotice: String?
     private(set) var authorityUnavailable = false
     private(set) var terminationFlowActive = false
 
@@ -451,6 +453,7 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
     private func showStartBlock(_ block: StartBlock) {
         guard let notice = block.notice else { return }
         refusalNotice = notice
+        if case .battery = block { batteryNotice = notice }
         if let reason = block.recordedReason {
             record(category: .configuration, newState: sessionStateForRecord(), reasons: [reason])
         }
@@ -916,6 +919,11 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         let badges = badgeStates()
         let health = currentHealth()
         latestHealth = health
+        // A charge that lifts the refusal clears the battery notice; a newer notice that replaced it is left alone.
+        if let shown = batteryNotice, refusalNotice == shown, config.batteryEntryRefusal(health: health) == nil {
+            refusalNotice = nil
+            batteryNotice = nil
+        }
         recordSensorAvailability(health)
         if agents.lastRejection != lastReportedEvidenceRejection {
             lastReportedEvidenceRejection = agents.lastRejection
@@ -1659,12 +1667,14 @@ public final class AppCoordinator: NSObject, NSApplicationDelegate, MenuBarActio
         }
     }
 
-    /// Agents observed for activity: the terminal agents (spec 015). IDE-hosted agents (Antigravity, Cursor) are
-    /// recognised by their app process, whose own CPU would read as work, so they stay presence-only.
+    /// Agents observed for activity: the terminal agents (spec 015). IDE-hosted agents (Cursor) are recognised by their
+    /// app process, whose own CPU would read as work, so they stay presence-only. Antigravity is observed through its
+    /// `agy` CLI process, which is the only process it counts.
     /// Idle levels measured 2026-11-01, all under the 0.03-core threshold: Claude Code 0.004–0.020, Codex 0–0.003,
     /// OpenCode 0.006–0.018, Freebuff 0.004–0.024, Pi 0.002–0.020.
+    /// shortcut: Antigravity's agy idle level is not measured and uses the shared 0.03-core threshold; measure it on a live session.
     nonisolated static let activityProviders: Set<String> = ["claude", "codex", "opencode", "freebuff", "pi",
-                                                             "copilot-cli", "aider", "gemini-cli", "amp", "goose"]
+                                                             "copilot-cli", "aider", "gemini-cli", "amp", "goose", "antigravity"]
 
     nonisolated static func sampleActivity(_ list: NativeProcessList, reportedOrcaProviders: Set<String>?) -> (processes: [AgentActivityProcess], at: Double) {
         let observed = activityProviders

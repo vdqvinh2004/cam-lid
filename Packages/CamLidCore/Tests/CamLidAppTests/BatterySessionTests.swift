@@ -40,6 +40,23 @@ struct BatterySessionTests {
         }
     }
 
+    /// The battery notice follows the refusal: it holds while the battery is low, and a charge clears it on the next refresh.
+    @Test func batteryNoticeClearsWhenChargeLiftsTheRefusal() async throws {
+        let fixture = QARefinementSupport(); defer { fixture.cleanup() }
+        var reading = try health(.battery, battery: 25)
+        let app = fixture.makeCoordinator(healthReader: { reading })
+        try await apply(["mode": "timed", "batteryModeAllowed": true, "chargingOnly": false], to: app)
+        await app.startPreviewSession()
+        #expect(app.refusalNotice != nil)
+        app.refresh()
+        #expect(app.refusalNotice != nil)
+        reading = try health(.ac, battery: 25)
+        app.refresh()
+        #expect(app.refusalNotice == nil)
+        #expect(try status(app)["session"] == nil)
+        #expect(await app.flushHistory())
+    }
+
     @Test func infiniteStartsBoundedAndRevocationStopsAtNextEvaluation() async throws {
         let fixture = QARefinementSupport(); defer { fixture.cleanup() }
         let reading = try health(.battery, battery: 40)

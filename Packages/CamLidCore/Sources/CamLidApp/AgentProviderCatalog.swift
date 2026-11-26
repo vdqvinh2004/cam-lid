@@ -61,7 +61,7 @@ enum AgentProviderCatalog {
             assetName: "agent-vscode-copilot", symbolName: "chevron.left.forwardslash.chevron.right", monogram: nil),
         AgentProviderInfo(
             id: "antigravity", title: "Antigravity",
-            cliNames: ["agy"], processNames: ["antigravity"],
+            cliNames: ["agy"], processNames: ["agy"],
             applicationBundleIDs: ["com.google.antigravity", "com.google.antigravity-ide"],
             assetName: "agent-antigravity", symbolName: "sparkles", monogram: nil),
         AgentProviderInfo(
