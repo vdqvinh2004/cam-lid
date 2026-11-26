@@ -9,7 +9,7 @@ The shared roadmap (kept outside this repository) defines cross-feature gates an
 > agents, one persistent helper, GitHub releases). Their task lists now mark tasks `[x]` when evidence exists, `[~]`
 > when [ADR 0002](../docs/adr/0002-observer-only-agent-activity.md), [0003](../docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md)
 > or [0004](../docs/adr/0004-distribution-through-github-releases.md) replaced them (the reason is on the line), and
-> leave `[ ]` only for work that is still valid. Current work is spec 016 (remaining trials). v0.2.0 was released as a pre-release on 2026-11-18 (specs 021 to 025; the release gate is spec 024). Spec 020 plans later work; specs 019 and 026 to 031 are v0.3 work, released as 0.3.0 beta on 2026-11-23 (tag `v0.3.0`). The branch `v0.3` was deleted after the release; its commits are in `main`.
+> leave `[ ]` only for work that is still valid. Remaining trials are tracked in spec 016. v0.2.0 was released as a pre-release on 2026-11-18 (specs 021 to 025; the release gate is spec 024). Spec 020 plans later work; specs 019 and 026 to 031 are v0.3 work, released as 0.3.0 beta on 2026-11-23 (tag `v0.3.0`). The branch `v0.3` was deleted after the release; its commits are in `main`. v0.4.0 (2026-11-25) and v0.4.1 (2026-11-26) were small releases without a spec of their own; their changes are in the release notes and in the amendment to [ADR 0003](../docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md) (one thermal rule for the app and the helper).
 
 - [M0: Project Planning](001-project-planning/spec.md) — Complete: documentation only.
 - [M1: Power and Detection Feasibility](002-power-feasibility/spec.md) — **Closed for this design:** the backend question was answered by the persistent helper (014) and Strict (016), qualified on one Mac by attended trials.
@@ -57,8 +57,8 @@ are sources of truth, shared references rather than additional milestone feature
 preserves all 60 future tasks once. M0's four completed tasks are document work only.
 
 ## Feature Selection
-This checkout has no `.specify/feature.json`. Use explicit feature context; current offline
-current work is scoped to `SPECIFY_FEATURE_DIRECTORY=specs/014-persistent-helper`.
+`.specify/feature.json` is local and ignored by git. Use explicit feature context rather than a saved selection, for
+example `SPECIFY_FEATURE_DIRECTORY=specs/016-strict-lid-only`.
 Selection alone passes no release gate or native-action permission.
 Run Spec Kit against a single folder from repository root, for example:
 ```

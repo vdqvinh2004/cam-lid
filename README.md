@@ -32,17 +32,23 @@ notes say so. An app you sign ad hoc yourself needs **Reinstall helper…** afte
 - **Agents are observed from outside only** ([ADR 0002](docs/adr/0002-observer-only-agent-activity.md)). CamLid
   installs no hooks, plugins or wrappers and never edits an agent's configuration.
   - Orca: read-only `orca` CLI status of its panes.
-  - Claude Code, Codex, OpenCode run in a terminal: working or idle is estimated from the CPU activity of the agent
-    and its child processes, shown as "(estimated)"
-    ([spec 015](specs/015-agent-activity-observer/spec.md)). CPU in an agent's first 25 seconds after launch is not
-    counted as work.
+  - Terminal agents (Claude Code, Codex, OpenCode, Freebuff, Pi, Copilot CLI, Gemini CLI, Aider, Amp, Goose and
+    Antigravity's `agy` CLI): working or idle is estimated from the CPU activity of the agent and its child
+    processes, shown as "(estimated)" ([spec 015](specs/015-agent-activity-observer/spec.md)). The threshold was
+    measured for Claude Code, Codex and OpenCode; the others use the same threshold, unmeasured. CPU in an agent's
+    first 25 seconds after launch is not counted as work. Only agents you select in Settings › Agents can keep the
+    Mac awake. IDE apps such as Cursor and the Antigravity app are detected but never read for activity. An agent
+    started inside Orca's terminal is counted as Orca's, not under its own name, so run it outside Orca to see it
+    under its own name.
   - Watched programs: optional rules that keep the Mac awake while a given program runs.
 - **Music and audio.** Music sources you turn on in Settings › Agents keep Auto awake while they play. **Any audio** (off by
   default) does the same for any other app that plays sound: the hold starts after three seconds of output and ends a minute
   after the sound stops. Activity names the app.
 - **Language.** English or Tiếng Việt in Settings › General › Language, following macOS by default. The About window is in the menu.
 - **Safety stops** on low battery, high thermal pressure, unplugged charger (unless "Allow on battery" is on),
-  sustained CPU load (optional) and session time limits. Missing readings never count as healthy.
+  sustained CPU load (optional) and session time limits. Missing readings never count as healthy. Thermal rule (the
+  app and the helper use the same one): Fair is fine, Serious stops after 30 seconds without a break, Critical or an
+  unknown reading stops at once. A stop names its cause in the menu, in Activity and in `camlid status`.
 - **When a session ends with the lid closed, the Mac sleeps** (unless an external display is connected).
 - **Lid open.** A session keeps the Mac awake while the lid is open, through a verified power assertion, without the
   helper. The closed-lid option still needs the helper.
@@ -133,7 +139,8 @@ camlid logs export --redacted --output events.json
 camlid simulate --scenario scenario.json --use-current-config   # offline run with your saved settings
 ```
 
-Full contract: [CLI](specs/003-native-foundation/contracts/cli.md).
+`camlid commands` is the authoritative list. Contracts: [CLI v1](specs/003-native-foundation/contracts/cli.md) and
+[CLI v0.3](specs/031-cli-parity/contracts/cli-v0.3.md).
 
 AI agents can learn the command from a skill file. Settings › General › *Let AI agents
 use CamLid* writes that one file, `~/.agents/skills/camlid/SKILL.md`, in your home folder, where agents on this Mac can read
@@ -160,7 +167,9 @@ sound, never its content, and need no new permission.
 - Decisions: [ADR 0001](docs/adr/0001-persistent-helper-and-strict-experimental-mode.md),
   [ADR 0002](docs/adr/0002-observer-only-agent-activity.md),
   [ADR 0003](docs/adr/0003-strict-mode-lid-only-on-the-persistent-helper.md),
-  [ADR 0004](docs/adr/0004-distribution-through-github-releases.md).
+  [ADR 0004](docs/adr/0004-distribution-through-github-releases.md),
+  [ADR 0005](docs/adr/0005-stable-signing-certificate-for-the-helper-pin.md),
+  [ADR 0006](docs/adr/0006-command-wrapper-amends-observer-only.md).
 - [Security policy](SECURITY.md) and [contributing](CONTRIBUTING.md); `scripts/release.sh` builds a release.
 - [Constitution](.specify/memory/constitution.md).
 

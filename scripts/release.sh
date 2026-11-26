@@ -139,7 +139,7 @@ ${BANNER}Keeps a Mac awake with the lid closed while AI coding agents work, and 
 - **Dashboard.** Says "Keeping awake (lid open)" when the Mac is held awake with the lid open and closed-lid protection
   is not verified.
 - **Sleep diagnostics.** CamLid's own power assertion is labelled "CamLid is active" and is not counted as another app.
-- **Agents.** Claude Code, Codex and OpenCode in a terminal are estimated from CPU activity. Orca is read from its CLI.
+- **Agents.** Terminal agents (Claude Code, Codex, OpenCode, Freebuff, Pi, Copilot CLI, Gemini CLI, Aider, Amp, Goose, Antigravity's \`agy\`) are estimated from CPU activity. Orca is read from its CLI.
 - **Update check (new in 0.2, off by default).** Settings › General can ask GitHub once a day whether a newer release exists. It never downloads or installs anything.
 - **Agent skill (new in 0.2).** Settings › General › *Let AI agents use CamLid* writes one skill file, \`~/.agents/skills/camlid/SKILL.md\`, in your home folder. Turning it off removes that file unless you changed it.
 - **Display option (new in 0.2).** Settings › General › New sessions: "Let the display sleep during sessions" is on by default. Turn it off to keep the display on while a session holds the Mac awake. It applies to the next session.
